@@ -1,0 +1,16 @@
+{
+  "name": "Ausfüllen & Signieren",
+  "short_name": "Fill & Sign",
+  "description": "PDFs und Fotos von Formularen ausfüllen und unterschreiben – direkt auf dem iPad.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f2f2f5",
+  "theme_color": "#b3122e",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
