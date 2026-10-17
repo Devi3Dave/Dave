@@ -3,9 +3,8 @@ import { fileURLToPath } from "node:url";
 import Anthropic from "@anthropic-ai/sdk";
 import express from "express";
 import { z } from "zod";
-import { toolDefinitions } from "../shared/tools.js";
-import { loadMarketData } from "./marketData.js";
-import { SYSTEM_PROMPT } from "./prompt.js";
+import { DEFAULT_MODEL, runClaudeTurn, type TurnEvent } from "../shared/claudeTurn.js";
+import { loadMarketData } from "../shared/marketData.js";
 
 try {
   process.loadEnvFile(".env");
@@ -14,10 +13,7 @@ try {
 }
 
 const PORT = Number(process.env.PORT ?? 8787);
-const MODEL = process.env.CLAUDE_MODEL ?? "claude-opus-5-5";
-// Models that accept server-side refusal fallbacks (`fallbacks: "default"`).
-const FALLBACK_MODELS = new Set(["claude-opus-5-5", "claude-opus-5", "claude-fable-5-1", "claude-sonnet-5-5"]);
-const TOOLS = toolDefinitions();
+const MODEL = process.env.CLAUDE_MODEL ?? DEFAULT_MODEL;
 
 const client = new Anthropic();
 const app = express();
@@ -57,81 +53,21 @@ app.post("/api/chat", async (req, res) => {
     "Cache-Control": "no-cache, no-transform",
     Connection: "keep-alive",
   });
-  const send = (event: Record<string, unknown>) => res.write(`data: ${JSON.stringify(event)}\n\n`);
+  const abort = new AbortController();
+  res.on("close", () => abort.abort());
+  const send = (event: TurnEvent) => res.write(`data: ${JSON.stringify(event)}\n\n`);
 
-  let current: { abort: () => void } | null = null;
-  let sawToolUse = false;
-  let closed = false;
-  res.on("close", () => {
-    closed = true;
-    current?.abort();
-  });
-
-  for (let attempt = 0; attempt < 3 && !closed; attempt++) {
-    try {
-      const stream = client.beta.messages.stream({
-        model: MODEL,
-        max_tokens: 64000,
-        system: [{ type: "text", text: SYSTEM_PROMPT }],
-        tools: TOOLS,
-        messages: messages as Anthropic.Beta.BetaMessageParam[],
-        thinking: { type: "adaptive", display: "summarized" },
-        output_config: { effort },
-        cache_control: { type: "ephemeral" },
-        ...(FALLBACK_MODELS.has(MODEL) ? { betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" as const } : {}),
-      });
-      current = stream;
-      sawToolUse = false;
-
-      for await (const event of stream) {
-        if (event.type === "content_block_start") {
-          const block = event.content_block;
-          if (block.type === "tool_use") {
-            sawToolUse = true;
-            send({ type: "tool_start", id: block.id, name: block.name });
-          }
-          else if (block.type === "thinking") send({ type: "thinking_start" });
-        } else if (event.type === "content_block_delta") {
-          if (event.delta.type === "text_delta") send({ type: "text", text: event.delta.text });
-          else if (event.delta.type === "thinking_delta") send({ type: "thinking", text: event.delta.thinking });
-        }
-      }
-      const message = await stream.finalMessage();
-      send({
-        type: "final",
-        message: {
-          content: message.content,
-          stop_reason: message.stop_reason,
-          stop_details: message.stop_details,
-          model: message.model,
-          usage: message.usage,
-        },
-      });
-      break;
-    } catch (err) {
-      if (closed) break;
-      if (err instanceof Anthropic.APIError) {
-        const hint =
-          err instanceof Anthropic.AuthenticationError
-            ? "Kein gültiger API-Schlüssel. Setze ANTHROPIC_API_KEY in tradingview-clone/.env."
-            : err instanceof Anthropic.RateLimitError
-              ? "Rate-Limit erreicht, bitte kurz warten."
-              : err.message;
-        send({ type: "error", status: err.status, message: hint });
-        break;
-      }
-      // With eager input streaming a tool input can arrive as unparseable JSON
-      // and the SDK rejects the stream. Only that case (a non-API error after a
-      // tool_use block started) is re-issued; the client drops the partial turn.
-      const message = (err as Error).message;
-      console.warn(`[claude] attempt ${attempt + 1} failed: ${message}`);
-      if (!sawToolUse || attempt === 2) {
-        send({ type: "error", message });
-        break;
-      }
-      send({ type: "reset" });
-    }
-  }
+  await runClaudeTurn(
+    client,
+    {
+      model: MODEL,
+      messages: messages as Anthropic.Beta.BetaMessageParam[],
+      effort,
+      authHint: "Kein gültiger API-Schlüssel. Setze ANTHROPIC_API_KEY in tradingview-clone/.env.",
+    },
+    send,
+    abort.signal,
+  );
   res.end();
 });
 

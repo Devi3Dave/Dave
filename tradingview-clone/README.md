@@ -18,6 +18,24 @@ npm run dev                 # Web: http://localhost:5173, API: http://localhost:
 
 Produktion: `npm run build && npm start` (Express liefert dann auch das Frontend auf Port 8787 aus).
 
+## Auf dem iPad (Web-App)
+
+ChartAI läuft auch ohne Server als installierbare Web-App:
+**https://devi3dave.github.io/Dave/chartai/**
+
+1. Den Link in **Safari** auf dem iPad öffnen.
+2. Teilen-Symbol → **„Zum Home-Bildschirm“** → Hinzufügen.
+3. ChartAI vom Home-Bildschirm starten, im Claude-Panel auf **⚙** tippen und den API-Schlüssel
+   eintragen (erstellen unter platform.claude.com → API Keys).
+
+Der Schlüssel wird nur auf dem iPad gespeichert und direkt an `api.anthropic.com` gesendet.
+Unterschiede zur Server-Version: Krypto-Kurse kommen live von Binance; Aktien/Indizes über Yahoo
+sind ohne Server nicht abrufbar (Yahoo blockiert Browser-Zugriffe) und zeigen Demo-Daten.
+Zeichnen per Touch: Werkzeug wählen und Punkte antippen.
+
+Die Web-App wird bei jedem Push auf `master` per GitHub Actions gebaut (`npm run build:standalone`)
+und zusammen mit der Fill & Sign-App auf GitHub Pages veröffentlicht.
+
 ## Funktionen
 
 **Chart**
@@ -63,9 +81,10 @@ gesammelt entfernen.
 shared/   math.ts        Indikator-Mathematik (rein, getestet)
           indicators.ts  Registry: Parameter, Ausgaben, Farben, Panels
           tools.ts       Zod-Schemas der Claude-Tools (Quelle für API-Schema und Validierung)
-server/   index.ts       Express: /api/chat (SSE-Proxy zur Claude API), /api/klines
+          claudeTurn.ts  Ein gestreamter Claude-Turn (Server und Standalone-Build)
           marketData.ts  Binance / Yahoo / Demo-Daten
           prompt.ts      Systemprompt inkl. Indikatorkatalog
+server/   index.ts       Express: /api/chat (SSE-Proxy zur Claude API), /api/klines
 src/      chart/         ChartEngine (lightweight-charts v5), Zeichen- und Band-Primitives
           claude/        Kontextaufbau, Tool-Ausführung im Browser, Agent-Loop (useClaudeChat)
           components/    TopBar, Werkzeugleiste, Chart, Indikator-Dialoge, Claude-Panel
@@ -85,6 +104,8 @@ setzen.
 |---|---|
 | `npm run dev` | Vite + API-Server mit Hot Reload |
 | `npm run build` | Typecheck und Produktions-Build |
+| `npm run build:standalone` | Build ohne Server (iPad/GitHub Pages) |
+| `npm run icons` | App-Icons in `public/` neu erzeugen |
 | `npm start` | Produktionsserver (nach `build`) |
 | `npm test` | Vitest (Indikatoren, Tool-Schemas) |
 | `npm run typecheck` | TypeScript-Prüfung |

@@ -3,6 +3,7 @@ import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { ChartEngine } from "../chart/ChartEngine";
 import { useClaudeChat, type AssistantPart, type Effort } from "../claude/useClaudeChat";
+import { MODELS, STANDALONE, claudeSettings, useClaudeSettings } from "../config";
 import { clearDrawings } from "../store";
 
 const TOOL_LABELS: Record<string, string> = {
@@ -65,18 +66,23 @@ export function ClaudePanel({ getEngine }: { getEngine: () => ChartEngine | null
   const [input, setInput] = useState("");
   const [effort, setEffort] = useState<Effort>("high");
   const [screenshot, setScreenshot] = useState(true);
-  const [model, setModel] = useState<string | null>(null);
-  const [apiKey, setApiKey] = useState(true);
+  const [serverModel, setServerModel] = useState<string | null>(null);
+  const [serverKey, setServerKey] = useState(true);
+  const [showSettings, setShowSettings] = useState(false);
+  const settings = useClaudeSettings();
+  const model = STANDALONE ? settings.model : serverModel;
+  const apiKey = STANDALONE ? Boolean(settings.apiKey) : serverKey;
   const listRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (STANDALONE) return;
     fetch("/api/health")
       .then((r) => r.json())
       .then((h) => {
-        setModel(h.model);
-        setApiKey(h.apiKey);
+        setServerModel(h.model);
+        setServerKey(h.apiKey);
       })
-      .catch(() => setModel(null));
+      .catch(() => setServerModel(null));
   }, []);
 
   useEffect(() => {
@@ -103,15 +109,28 @@ export function ClaudePanel({ getEngine }: { getEngine: () => ChartEngine | null
           <button title="Neues Gespräch" onClick={reset}>
             Neu
           </button>
+          {STANDALONE && (
+            <button title="Einstellungen" onClick={() => setShowSettings(true)}>
+              ⚙
+            </button>
+          )}
         </div>
       </div>
 
       <div className="claude-messages" ref={listRef}>
-        {!apiKey && (
-          <div className="notice error">
-            Kein <code>ANTHROPIC_API_KEY</code> gesetzt. Lege <code>tradingview-clone/.env</code> an (siehe <code>.env.example</code>) und starte den Server neu – oder melde dich mit <code>ant auth login</code> an.
-          </div>
-        )}
+        {!apiKey &&
+          (STANDALONE ? (
+            <div className="notice error">
+              Noch kein API-Schlüssel hinterlegt.{" "}
+              <button className="link" onClick={() => setShowSettings(true)}>
+                Jetzt eintragen
+              </button>
+            </div>
+          ) : (
+            <div className="notice error">
+              Kein <code>ANTHROPIC_API_KEY</code> gesetzt. Lege <code>tradingview-clone/.env</code> an (siehe <code>.env.example</code>) und starte den Server neu – oder melde dich mit <code>ant auth login</code> an.
+            </div>
+          ))}
         {items.length === 0 && (
           <div className="claude-empty">
             <p>Frag Claude nach einer Analyse oder lass Indikatoren und Linien einzeichnen. Claude sieht Kursdaten, Indikatoren, Zeichnungen und einen Screenshot des Charts.</p>
@@ -178,6 +197,69 @@ export function ClaudePanel({ getEngine }: { getEngine: () => ChartEngine | null
           )}
         </div>
       </div>
+      {showSettings && <SettingsDialog onClose={() => setShowSettings(false)} />}
     </aside>
+  );
+}
+
+function SettingsDialog({ onClose }: { onClose: () => void }) {
+  const current = useClaudeSettings();
+  const [apiKey, setApiKey] = useState(current.apiKey);
+  const [model, setModel] = useState(current.model);
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal small" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-head">
+          <h2>Claude-Einstellungen</h2>
+          <button onClick={onClose}>✕</button>
+        </div>
+        <label className="field">
+          API-Schlüssel
+          <input
+            type="password"
+            autoComplete="off"
+            autoCapitalize="off"
+            spellCheck={false}
+            placeholder="sk-ant-…"
+            value={apiKey}
+            onChange={(e) => setApiKey(e.target.value.trim())}
+          />
+        </label>
+        <label className="field">
+          Modell
+          <select value={model} onChange={(e) => setModel(e.target.value)}>
+            {MODELS.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <p className="hint">
+          Der Schlüssel wird nur auf diesem Gerät gespeichert und direkt an api.anthropic.com gesendet. Einen Schlüssel erstellst du unter platform.claude.com → API Keys.
+        </p>
+        <div className="modal-actions">
+          {current.apiKey && (
+            <button
+              onClick={() => {
+                claudeSettings.set({ apiKey: "" });
+                onClose();
+              }}
+            >
+              Schlüssel löschen
+            </button>
+          )}
+          <button
+            className="send"
+            onClick={() => {
+              claudeSettings.set({ apiKey, model });
+              onClose();
+            }}
+          >
+            Speichern
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }

@@ -1,0 +1,72 @@
+name: Deploy GitHub Pages
+
+# Publishes ChartAI (standalone iPad build) under /chartai/ and keeps the
+# Fill & Sign app, which lives on its own branch, at the site root.
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Build ChartAI
+        working-directory: tradingview-clone
+        run: |
+          npm ci
+          npm run build:standalone
+
+      - name: Check out Fill & Sign
+        uses: actions/checkout@v4
+        continue-on-error: true
+        with:
+          ref: claude/adobe-fill-sign-ipad-o0mne6
+          path: fill-sign-src
+
+      - name: Build Fill & Sign
+        if: hashFiles('fill-sign-src/fill-sign-ipad/package-lock.json') != ''
+        working-directory: fill-sign-src/fill-sign-ipad
+        run: |
+          npm ci
+          npm run build
+
+      - name: Assemble site
+        run: |
+          mkdir -p _site
+          if [ -d fill-sign-src/fill-sign-ipad/dist ]; then
+            cp -r fill-sign-src/fill-sign-ipad/dist/. _site/
+          else
+            echo '<!doctype html><meta http-equiv="refresh" content="0; url=chartai/">' > _site/index.html
+          fi
+          cp -r tradingview-clone/dist _site/chartai
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

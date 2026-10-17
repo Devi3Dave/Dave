@@ -1,4 +1,4 @@
-import type { Bar } from "../shared/math.js";
+import type { Bar } from "./math.js";
 
 export interface MarketData {
   symbol: string;
@@ -26,7 +26,8 @@ export function isCryptoSymbol(symbol: string): boolean {
 
 async function fetchJson(url: string): Promise<unknown> {
   const res = await fetch(url, {
-    headers: { "User-Agent": "Mozilla/5.0 (tradingview-claude)" },
+    // Browsers set their own User-Agent; only the Node server needs one for Yahoo.
+    headers: typeof window === "undefined" ? { "User-Agent": "Mozilla/5.0 (tradingview-claude)" } : undefined,
     signal: AbortSignal.timeout(10_000),
   });
   if (!res.ok) throw new Error(`${url} -> HTTP ${res.status}`);
