@@ -1,0 +1,183 @@
+import { useEffect, useRef, useState } from "react";
+import Markdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import type { ChartEngine } from "../chart/ChartEngine";
+import { useClaudeChat, type AssistantPart, type Effort } from "../claude/useClaudeChat";
+import { clearDrawings } from "../store";
+
+const TOOL_LABELS: Record<string, string> = {
+  get_chart_data: "Kursdaten lesen",
+  get_indicator_values: "Indikator berechnen",
+  add_indicator: "Indikator hinzufügen",
+  remove_indicator: "Indikator entfernen",
+  set_chart: "Chart wechseln",
+  draw_trendline: "Trendlinie zeichnen",
+  draw_horizontal_line: "Linie zeichnen",
+  draw_vertical_line: "Vertikale zeichnen",
+  draw_zone: "Zone zeichnen",
+  draw_fibonacci: "Fibonacci zeichnen",
+  add_text: "Text setzen",
+  add_markers: "Marker setzen",
+  remove_drawing: "Zeichnung entfernen",
+  clear_drawings: "Zeichnungen löschen",
+  take_screenshot: "Screenshot prüfen",
+};
+
+const QUICK_PROMPTS = [
+  "Analysiere den aktuellen Chart: Trend, Schlüsselniveaus und Indikatorlage.",
+  "Zeichne die wichtigsten Unterstützungs- und Widerstandszonen ein.",
+  "Finde und zeichne die relevanten Trendlinien.",
+  "Zeichne ein Fibonacci-Retracement über den letzten großen Swing.",
+  "Füge RSI und MACD hinzu und markiere Divergenzen im Chart.",
+  "Erstelle ein Long- und ein Short-Szenario mit Einstieg, Stop und Zielen im Chart.",
+];
+
+function Part({ part }: { part: AssistantPart }) {
+  switch (part.type) {
+    case "text":
+      return (
+        <div className="md">
+          <Markdown remarkPlugins={[remarkGfm]}>{part.text}</Markdown>
+        </div>
+      );
+    case "thinking":
+      return part.text.trim() ? (
+        <details className="thinking">
+          <summary>Denkprozess</summary>
+          <p>{part.text}</p>
+        </details>
+      ) : null;
+    case "tool":
+      return (
+        <div className={`tool-chip ${part.status}`}>
+          <span className="tool-icon">{part.status === "running" ? "⟳" : part.status === "done" ? "✓" : "!"}</span>
+          {TOOL_LABELS[part.name] ?? part.name}
+          {part.summary && <span className="tool-summary"> · {part.summary}</span>}
+        </div>
+      );
+    case "notice":
+      return <div className={`notice ${part.level}`}>{part.text}</div>;
+  }
+}
+
+export function ClaudePanel({ getEngine }: { getEngine: () => ChartEngine | null }) {
+  const { items, busy, send, stop, reset } = useClaudeChat(getEngine);
+  const [input, setInput] = useState("");
+  const [effort, setEffort] = useState<Effort>("high");
+  const [screenshot, setScreenshot] = useState(true);
+  const [model, setModel] = useState<string | null>(null);
+  const [apiKey, setApiKey] = useState(true);
+  const listRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    fetch("/api/health")
+      .then((r) => r.json())
+      .then((h) => {
+        setModel(h.model);
+        setApiKey(h.apiKey);
+      })
+      .catch(() => setModel(null));
+  }, []);
+
+  useEffect(() => {
+    listRef.current?.scrollTo({ top: listRef.current.scrollHeight });
+  }, [items]);
+
+  const submit = (text = input) => {
+    if (!text.trim() || busy) return;
+    void send(text, { effort, screenshot });
+    setInput("");
+  };
+
+  return (
+    <aside className="claude-panel">
+      <div className="claude-head">
+        <div>
+          <strong>✦ Claude</strong>
+          {model && <span className="model">{model}</span>}
+        </div>
+        <div className="claude-head-actions">
+          <button title="Claudes Zeichnungen entfernen" onClick={() => clearDrawings("claude")}>
+            Zeichnungen ✕
+          </button>
+          <button title="Neues Gespräch" onClick={reset}>
+            Neu
+          </button>
+        </div>
+      </div>
+
+      <div className="claude-messages" ref={listRef}>
+        {!apiKey && (
+          <div className="notice error">
+            Kein <code>ANTHROPIC_API_KEY</code> gesetzt. Lege <code>tradingview-clone/.env</code> an (siehe <code>.env.example</code>) und starte den Server neu – oder melde dich mit <code>ant auth login</code> an.
+          </div>
+        )}
+        {items.length === 0 && (
+          <div className="claude-empty">
+            <p>Frag Claude nach einer Analyse oder lass Indikatoren und Linien einzeichnen. Claude sieht Kursdaten, Indikatoren, Zeichnungen und einen Screenshot des Charts.</p>
+            <div className="quick">
+              {QUICK_PROMPTS.map((q) => (
+                <button key={q} onClick={() => submit(q)} disabled={busy}>
+                  {q}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        {items.map((item, i) =>
+          item.role === "user" ? (
+            <div key={i} className="msg user">
+              {item.text}
+            </div>
+          ) : (
+            <div key={i} className="msg assistant">
+              {item.parts.map((p, k) => (
+                <Part key={k} part={p} />
+              ))}
+              {item.streaming && <span className="cursor-blink">▍</span>}
+            </div>
+          ),
+        )}
+      </div>
+
+      <div className="claude-input">
+        <textarea
+          value={input}
+          placeholder="z. B. „Zeichne mir die Bollinger Bänder und erkläre den Squeeze“"
+          rows={3}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              submit();
+            }
+          }}
+        />
+        <div className="claude-input-row">
+          <label title="Denktiefe / Aufwand">
+            Aufwand
+            <select value={effort} onChange={(e) => setEffort(e.target.value as Effort)}>
+              <option value="low">niedrig</option>
+              <option value="medium">mittel</option>
+              <option value="high">hoch</option>
+              <option value="xhigh">sehr hoch</option>
+              <option value="max">maximal</option>
+            </select>
+          </label>
+          <label title="Screenshot des Charts mitsenden">
+            <input type="checkbox" checked={screenshot} onChange={(e) => setScreenshot(e.target.checked)} /> Screenshot
+          </label>
+          {busy ? (
+            <button className="send stop" onClick={stop}>
+              Stopp
+            </button>
+          ) : (
+            <button className="send" onClick={() => submit()} disabled={!input.trim()}>
+              Senden
+            </button>
+          )}
+        </div>
+      </div>
+    </aside>
+  );
+}
