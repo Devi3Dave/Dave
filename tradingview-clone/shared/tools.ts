@@ -1,0 +1,141 @@
+// Claude tool definitions. The Zod schemas are the single source of truth:
+// the server turns them into JSON Schema for the API, the browser uses them to
+// validate tool inputs before touching the chart.
+import { z } from "zod";
+import { INDICATOR_IDS } from "./indicators.js";
+
+export const INTERVALS = ["1m", "5m", "15m", "30m", "1h", "4h", "1d", "1w"] as const;
+export const CHART_TYPES = ["candles", "bars", "heikin_ashi", "line", "area"] as const;
+
+const time = z
+  .union([z.number(), z.string()])
+  .describe("Zeitpunkt einer Kerze: Unix-Sekunden (UTC) oder ISO-8601-String. Wird auf die nächste Kerze gerundet.");
+const point = z.object({ time, price: z.number() });
+const color = z.string().describe("CSS-Farbe, z. B. '#26a69a' oder 'rgba(239,83,80,0.3)'.");
+const lineStyle = z.enum(["solid", "dashed", "dotted"]);
+const indicator = z.enum(INDICATOR_IDS).describe("Indikator-ID aus der Liste im Systemprompt.");
+const params = z
+  .record(z.string(), z.number())
+  .describe("Parameter des Indikators, z. B. {\"length\": 50}. Fehlende Werte nutzen die Standardwerte.");
+
+export const toolSchemas = {
+  get_chart_data: {
+    description:
+      "Liefert OHLCV-Kerzen des aktuellen Charts (neueste zuletzt). Nutze das für Preisniveaus, Hochs/Tiefs und exakte Zeitstempel bevor du zeichnest.",
+    schema: z.object({
+      last_n: z.number().int().min(1).max(1000).optional().describe("Anzahl der letzten Kerzen (Standard 150)."),
+    }),
+  },
+  get_indicator_values: {
+    description:
+      "Berechnet einen Indikator auf den aktuellen Kerzen und liefert die letzten Werte, ohne ihn einzuzeichnen. Ideal für die Analyse.",
+    schema: z.object({ indicator, params: params.optional(), last_n: z.number().int().min(1).max(500).optional() }),
+  },
+  add_indicator: {
+    description:
+      "Fügt dem Chart einen Indikator hinzu (Overlay oder eigenes Panel, je nach Typ). Gibt die Instanz-ID und die letzten Werte zurück.",
+    schema: z.object({
+      indicator,
+      params: params.optional(),
+      colors: z.array(color).optional().describe("Optionale Farben je Ausgabelinie in der Reihenfolge der Ausgaben."),
+    }),
+  },
+  remove_indicator: {
+    description: "Entfernt einen Indikator per Instanz-ID oder alle mit id='all'.",
+    schema: z.object({ id: z.string() }),
+  },
+  set_chart: {
+    description: "Wechselt Symbol, Zeiteinheit oder Charttyp. Danach sind neue Kerzen geladen.",
+    schema: z.object({
+      symbol: z.string().optional().describe("z. B. BTCUSDT, ETHUSDT (Binance) oder AAPL, ^GDAXI, EURUSD=X (Yahoo)."),
+      interval: z.enum(INTERVALS).optional(),
+      chart_type: z.enum(CHART_TYPES).optional(),
+    }),
+  },
+  draw_trendline: {
+    description: "Zeichnet eine Trendlinie / einen Strahl zwischen zwei Punkten.",
+    schema: z.object({
+      start: point,
+      end: point,
+      extend: z.enum(["none", "right", "left", "both"]).optional().describe("Linie über die Punkte hinaus verlängern."),
+      color: color.optional(),
+      line_style: lineStyle.optional(),
+      width: z.number().min(1).max(6).optional(),
+      label: z.string().optional(),
+    }),
+  },
+  draw_horizontal_line: {
+    description: "Zeichnet eine horizontale Linie (Unterstützung, Widerstand, Ziel, Stop) mit Preisbeschriftung.",
+    schema: z.object({ price: z.number(), color: color.optional(), line_style: lineStyle.optional(), label: z.string().optional() }),
+  },
+  draw_vertical_line: {
+    description: "Zeichnet eine vertikale Linie an einer Kerze (z. B. Ereignis, Ausbruch).",
+    schema: z.object({ time, color: color.optional(), label: z.string().optional() }),
+  },
+  draw_zone: {
+    description: "Zeichnet eine Preiszone als Rechteck (z. B. Unterstützungszone, Order-Block, Fair-Value-Gap). Ohne Zeiten über den ganzen Chart.",
+    schema: z.object({
+      top: z.number(),
+      bottom: z.number(),
+      start_time: time.optional(),
+      end_time: time.optional(),
+      extend_right: z.boolean().optional(),
+      color: color.optional(),
+      label: z.string().optional(),
+    }),
+  },
+  draw_fibonacci: {
+    description: "Zeichnet ein Fibonacci-Retracement von start (z. B. Swing-Tief) nach end (z. B. Swing-Hoch).",
+    schema: z.object({
+      start: point,
+      end: point,
+      levels: z.array(z.number()).optional().describe("Standard: 0, 0.236, 0.382, 0.5, 0.618, 0.786, 1, 1.618"),
+      color: color.optional(),
+    }),
+  },
+  add_text: {
+    description: "Setzt eine Textnotiz an eine Position im Chart.",
+    schema: z.object({ time, price: z.number(), text: z.string(), color: color.optional() }),
+  },
+  add_markers: {
+    description: "Setzt Marker (Pfeile/Punkte mit Text) an Kerzen, z. B. Kauf-/Verkaufssignale, Divergenzen, Muster.",
+    schema: z.object({
+      markers: z.array(
+        z.object({
+          time,
+          position: z.enum(["above", "below"]),
+          shape: z.enum(["arrowUp", "arrowDown", "circle", "square"]).optional(),
+          color: color.optional(),
+          text: z.string().optional(),
+        }),
+      ),
+    }),
+  },
+  remove_drawing: {
+    description: "Entfernt eine Zeichnung oder einen Marker per ID.",
+    schema: z.object({ id: z.string() }),
+  },
+  clear_drawings: {
+    description: "Löscht Zeichnungen und Marker. scope='claude' nur deine eigenen, 'all' alle.",
+    schema: z.object({ scope: z.enum(["claude", "all"]) }),
+  },
+  take_screenshot: {
+    description: "Macht ein Bild des aktuellen Charts inkl. Indikatoren und Zeichnungen, um das Ergebnis visuell zu prüfen.",
+    schema: z.object({}),
+  },
+} as const;
+
+export type ToolName = keyof typeof toolSchemas;
+export type ToolInput<N extends ToolName> = z.infer<(typeof toolSchemas)[N]["schema"]>;
+
+export function toolDefinitions() {
+  return (Object.keys(toolSchemas) as ToolName[]).map((name) => {
+    const { $schema: _ignored, ...input_schema } = z.toJSONSchema(toolSchemas[name].schema) as Record<string, unknown>;
+    return {
+      name,
+      description: toolSchemas[name].description,
+      input_schema: input_schema as { type: "object"; [k: string]: unknown },
+      eager_input_streaming: true,
+    };
+  });
+}
