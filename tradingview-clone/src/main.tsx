@@ -8,3 +8,8 @@ createRoot(document.getElementById("root")!).render(
     <App />
   </StrictMode>,
 );
+
+// The service worker only matters for the installed (standalone) web app.
+if (import.meta.env.PROD && import.meta.env.VITE_STANDALONE === "true" && "serviceWorker" in navigator) {
+  window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js").catch(() => undefined));
+}

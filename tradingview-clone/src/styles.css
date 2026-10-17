@@ -631,3 +631,121 @@ textarea {
     border-top: 1px solid var(--border);
   }
 }
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.modal-actions .send {
+  margin-left: 0;
+}
+
+button.link {
+  color: var(--claude);
+  text-decoration: underline;
+  padding: 0;
+}
+
+/* ---------- iPad / installed web app ---------- */
+
+html,
+body {
+  overscroll-behavior: none;
+}
+
+.app {
+  /* The black-translucent status bar of the home-screen app overlaps the page. */
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+button,
+select,
+.legend-actions {
+  touch-action: manipulation;
+}
+
+.topbar,
+.toolbar,
+.legend,
+.claude-head {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+@media (pointer: coarse) {
+  .app {
+    grid-template-columns: 52px 1fr;
+    grid-template-rows: 50px 1fr;
+  }
+
+  .app.with-claude {
+    grid-template-columns: 52px 1fr minmax(320px, 380px);
+  }
+
+  .toolbar button {
+    width: 44px;
+    height: 44px;
+    font-size: 18px;
+  }
+
+  .topbar button,
+  .topbar select {
+    min-height: 36px;
+    padding: 6px 10px;
+  }
+
+  /* 16px keeps iOS Safari from zooming into focused inputs. */
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+
+  /* No hover on touch screens: keep the indicator buttons visible. */
+  .legend-actions {
+    opacity: 1;
+  }
+
+  .legend-actions button {
+    padding: 4px 8px;
+    font-size: 14px;
+  }
+
+  .claude-head-actions button,
+  .quick button {
+    min-height: 40px;
+  }
+}
+
+@media (pointer: coarse) and (max-width: 900px) {
+  .brand {
+    display: none;
+  }
+
+  .symbol-form input {
+    width: 124px;
+  }
+
+  .topbar {
+    gap: 6px;
+  }
+
+  .group button {
+    padding: 6px 7px;
+  }
+
+  .app.with-claude {
+    grid-template-columns: 52px 1fr;
+    grid-template-rows: 50px 1fr 45vh;
+  }
+}

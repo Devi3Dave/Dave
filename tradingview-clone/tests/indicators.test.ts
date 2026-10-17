@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { INDICATORS, resolveParams } from "../shared/indicators";
 import * as m from "../shared/math";
-import { demoBars } from "../server/marketData";
+import { demoBars } from "../shared/marketData";
 import { toolDefinitions } from "../shared/tools";
 
 const bars = demoBars("TEST", "1h", 400);

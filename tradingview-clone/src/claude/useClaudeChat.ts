@@ -1,14 +1,15 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { useCallback, useRef, useState } from "react";
 import type { ChartEngine } from "../chart/ChartEngine";
+import type { Effort, FinalMessage } from "../../shared/claudeTurn";
 import { store } from "../store";
 import { buildChartState } from "./context";
 import { executeTool } from "./executor";
+import { runTurn } from "./transport";
 
 type MessageParam = Anthropic.Beta.BetaMessageParam;
-type ContentBlock = Anthropic.Beta.BetaContentBlock;
 
-export type Effort = "low" | "medium" | "high" | "xhigh" | "max";
+export type { Effort };
 
 export type AssistantPart =
   | { type: "text"; text: string }
@@ -20,62 +21,38 @@ export type ChatItem =
   | { role: "user"; text: string; image?: string }
   | { role: "assistant"; parts: AssistantPart[]; streaming: boolean };
 
-interface FinalMessage {
-  content: ContentBlock[];
-  stop_reason: string | null;
-  stop_details?: { category?: string | null; explanation?: string | null } | null;
-}
-
 const MAX_TURNS = 25;
 
-/** Streams one model turn from the server; returns the final message or throws. */
+/** Streams one model turn; returns the final message or throws. */
 async function streamTurn(
   messages: MessageParam[],
   effort: Effort,
   signal: AbortSignal,
   on: { text: (t: string) => void; thinking: (t: string) => void; toolStart: (id: string, name: string) => void; reset: () => void },
 ): Promise<FinalMessage> {
-  const res = await fetch("/api/chat", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ messages, effort }),
-    signal,
-  });
-  if (!res.ok || !res.body) throw new Error(`Server-Fehler ${res.status}: ${await res.text()}`);
-
-  const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
-  let buffer = "";
-  for (;;) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    buffer += value;
-    let idx: number;
-    while ((idx = buffer.indexOf("\n\n")) >= 0) {
-      const chunk = buffer.slice(0, idx);
-      buffer = buffer.slice(idx + 2);
-      if (!chunk.startsWith("data: ")) continue;
-      const event = JSON.parse(chunk.slice(6));
-      switch (event.type) {
-        case "text":
-          on.text(event.text);
-          break;
-        case "thinking":
-          on.thinking(event.text);
-          break;
-        case "tool_start":
-          on.toolStart(event.id, event.name);
-          break;
-        case "reset":
-          on.reset();
-          break;
-        case "final":
-          return event.message as FinalMessage;
-        case "error":
-          throw new Error(event.message);
-      }
+  let final: FinalMessage | null = null;
+  let error: string | null = null;
+  await runTurn(messages, effort, signal, (event) => {
+    switch (event.type) {
+      case "text":
+        return on.text(event.text);
+      case "thinking":
+        return on.thinking(event.text);
+      case "tool_start":
+        return on.toolStart(event.id, event.name);
+      case "reset":
+        return on.reset();
+      case "final":
+        final = event.message;
+        return;
+      case "error":
+        error = event.message;
+        return;
     }
-  }
-  throw new Error("Verbindung zum Server unterbrochen.");
+  });
+  if (error) throw new Error(error);
+  if (!final) throw new Error("Verbindung unterbrochen.");
+  return final;
 }
 
 export function useClaudeChat(getEngine: () => ChartEngine | null) {

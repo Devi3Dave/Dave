@@ -1,6 +1,8 @@
 import { useSyncExternalStore } from "react";
+import { loadMarketData, type MarketData } from "../shared/marketData";
 import type { Bar } from "../shared/math";
 import type { CHART_TYPES, INTERVALS } from "../shared/tools";
+import { STANDALONE } from "./config";
 
 export type Interval = (typeof INTERVALS)[number];
 export type ChartType = (typeof CHART_TYPES)[number];
@@ -185,9 +187,7 @@ export async function loadChart(symbol: string, interval: Interval): Promise<voi
     ...(symbolChanged ? { drawings: [], markers: [] } : {}),
   });
   try {
-    const res = await fetch(`/api/klines?symbol=${encodeURIComponent(symbol)}&interval=${interval}`);
-    const json = await res.json();
-    if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
+    const json = await fetchMarketData(symbol, interval);
     if (seq !== loadSeq) return;
     store.set({ bars: json.bars, source: json.source, symbol: json.symbol, loading: false });
     if (json.source === "binance") connectLive(json.symbol, interval, seq);
@@ -195,6 +195,15 @@ export async function loadChart(symbol: string, interval: Interval): Promise<voi
     if (seq !== loadSeq) return;
     store.set({ loading: false, error: (err as Error).message });
   }
+}
+
+async function fetchMarketData(symbol: string, interval: Interval): Promise<MarketData> {
+  // Without the Node server the browser fetches directly (Binance allows it; Yahoo does not, so stocks fall back to demo data).
+  if (STANDALONE) return loadMarketData(symbol, interval);
+  const res = await fetch(`/api/klines?symbol=${encodeURIComponent(symbol)}&interval=${interval}`);
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
+  return json as MarketData;
 }
 
 function connectLive(symbol: string, interval: Interval, seq: number) {

@@ -1,4 +1,4 @@
-import { INDICATORS } from "../shared/indicators.js";
+import { INDICATORS } from "./indicators.js";
 
 const catalog = INDICATORS.map((d) => {
   const params = d.params.map((p) => `${p.key}=${p.default}`).join(", ");
