@@ -15,6 +15,7 @@ import {
   type ISeriesApi,
   type ISeriesMarkersPluginApi,
   type MouseEventParams,
+  type SeriesMarker,
   type SeriesType,
   type Time,
   type UTCTimestamp,
@@ -22,6 +23,7 @@ import {
 import { getIndicator, resolveParams, type IndicatorDef, type OutputDef } from "../../shared/indicators";
 import { heikinAshi, type Bar, type Series } from "../../shared/math";
 import { INTERVAL_SECONDS } from "../../shared/marketData";
+import type { CandlePattern, Formation } from "../../shared/patterns";
 import { resolveTimeZone, type ChartSettings } from "../chartSettings";
 import type { ChartMarker, ChartState, ChartType, IndicatorInstance } from "../store";
 import type { LiveLiquidation } from "../market/liquidationFeed";
@@ -30,6 +32,7 @@ import { BandFillPrimitive, type BandPoint } from "./BandFillPrimitive";
 import { DrawingsPrimitive } from "./DrawingsPrimitive";
 import { HeatmapPrimitive } from "./HeatmapPrimitive";
 import { LiquidationBubblesPrimitive } from "./LiquidationBubblesPrimitive";
+import { PatternsPrimitive } from "./PatternsPrimitive";
 import { VolumeProfilePrimitive } from "./VolumeProfilePrimitive";
 
 export const THEME = {
@@ -79,6 +82,9 @@ export class ChartEngine {
   private markers: ChartMarker[] = [];
   private readonly axisLabels = new AxisLabelsPrimitive();
   private readonly liquidationBubbles = new LiquidationBubblesPrimitive();
+  private readonly patterns = new PatternsPrimitive((t) => this.drawings.timeToX(t));
+  private patternMarkers: SeriesMarker<Time>[] = [];
+  private patternKey = "";
   private liquidations: LiveLiquidation[] = [];
   private side: "left" | "right" = "right";
   private settingsKey = "";
@@ -87,6 +93,9 @@ export class ChartEngine {
   onCrosshair: (logical: number | null, point: PointerEvent | null) => void = () => {};
   onClick: (e: PointerEvent) => void = () => {};
   onLayout: () => void = () => {};
+  /** Freehand drawing (brush): pointer down → moves → up, while chart panning is off. */
+  onDrag: (phase: "start" | "move" | "end", e: PointerEvent) => void = () => {};
+  private dragMode = false;
 
   constructor(container: HTMLElement) {
     this.chart = createChart(container, {
@@ -111,22 +120,53 @@ export class ChartEngine {
     // Own click detection: the library folds two quick clicks into a double
     // click, which would swallow the second point of a two-point drawing.
     let down: { x: number; y: number } | null = null;
-    container.addEventListener("pointerdown", (ev) => {
-      down = { x: ev.clientX, y: ev.clientY };
-    });
-    container.addEventListener("pointerup", (ev) => {
-      if (!down || Math.hypot(ev.clientX - down.x, ev.clientY - down.y) > 4) return;
-      down = null;
+    let dragging = false;
+    const toEvent = (ev: globalThis.PointerEvent): PointerEvent | null => {
       const rect = container.getBoundingClientRect();
       // Pane x starts after a left-side price scale.
       const x = ev.clientX - rect.left - (this.side === "left" ? this.priceScaleWidth() : 0);
       const y = ev.clientY - rect.top;
-      if (x < 0 || x > this.chart.timeScale().width()) return; // price scale
+      if (x < 0 || x > this.chart.timeScale().width()) return null; // price scale
       const logical = this.chart.timeScale().coordinateToLogical(x);
-      const paneIndex = this.paneLayout().findIndex((p) => y >= p.top && y < p.top + p.height);
-      if (logical === null || paneIndex < 0) return;
-      this.onClick({ x, y: y - this.paneLayout()[paneIndex].top, logical, paneIndex });
+      const layout = this.paneLayout();
+      const paneIndex = layout.findIndex((p) => y >= p.top && y < p.top + p.height);
+      if (logical === null || paneIndex < 0) return null;
+      return { x, y: y - layout[paneIndex].top, logical, paneIndex };
+    };
+    container.addEventListener("pointerdown", (ev) => {
+      down = { x: ev.clientX, y: ev.clientY };
+      if (!this.dragMode) return;
+      const e = toEvent(ev);
+      if (!e || e.paneIndex !== 0) return;
+      dragging = true;
+      container.setPointerCapture(ev.pointerId);
+      this.onDrag("start", e);
     });
+    container.addEventListener("pointermove", (ev) => {
+      if (!dragging) return;
+      const e = toEvent(ev);
+      if (e && e.paneIndex === 0) this.onDrag("move", e);
+    });
+    container.addEventListener("pointerup", (ev) => {
+      if (dragging) {
+        dragging = false;
+        down = null;
+        const e = toEvent(ev);
+        if (e) this.onDrag("end", e);
+        return;
+      }
+      if (!down || Math.hypot(ev.clientX - down.x, ev.clientY - down.y) > 4) return;
+      down = null;
+      const e = toEvent(ev);
+      if (e) this.onClick(e);
+    });
+  }
+
+  /** While on, dragging draws instead of panning/zooming the chart. */
+  setDragMode(on: boolean) {
+    if (on === this.dragMode || this.destroyed) return;
+    this.dragMode = on;
+    this.chart.applyOptions({ handleScroll: !on, handleScale: !on });
   }
 
   private destroyed = false;
@@ -137,6 +177,7 @@ export class ChartEngine {
     this.main?.detachPrimitive(this.drawings);
     this.main?.detachPrimitive(this.axisLabels);
     this.main?.detachPrimitive(this.liquidationBubbles);
+    this.main?.detachPrimitive(this.patterns);
     this.chart.remove();
   }
 
@@ -209,6 +250,7 @@ export class ChartEngine {
       this.main.detachPrimitive(this.drawings);
       this.main.detachPrimitive(this.axisLabels);
       this.main.detachPrimitive(this.liquidationBubbles);
+      this.main.detachPrimitive(this.patterns);
       this.markersApi?.detach();
       this.chart.removeSeries(this.main);
     }
@@ -244,6 +286,7 @@ export class ChartEngine {
     this.main.attachPrimitive(this.drawings);
     this.main.attachPrimitive(this.axisLabels);
     this.main.attachPrimitive(this.liquidationBubbles);
+    this.main.attachPrimitive(this.patterns);
     this.markersApi = createSeriesMarkers(this.main, []);
   }
 
@@ -486,6 +529,34 @@ export class ChartEngine {
         b.heatmap.primitive.setHeatmap(b.computed.instance.hidden ? null : (def.heatmap?.(bars, params) ?? null), contrast);
       }
     }
+    this.fillPatterns();
+  }
+
+  /** Candle patterns become series markers, formations are drawn by their primitive. */
+  private fillPatterns() {
+    const candles: CandlePattern[] = [];
+    const formations: Formation[] = [];
+    for (const b of this.built) {
+      const { def, params, instance } = b.computed;
+      if (!def.patterns || instance.hidden) continue;
+      const r = def.patterns(this.bars, params);
+      candles.push(...r.candles);
+      formations.push(...r.formations);
+    }
+    this.patterns.setFormations(formations);
+    const markers: SeriesMarker<Time>[] = candles.map((c) => ({
+      time: ts(c.time),
+      position: c.direction === "bullish" ? "belowBar" : "aboveBar",
+      shape: c.direction === "bullish" ? "arrowUp" : c.direction === "bearish" ? "arrowDown" : "circle",
+      color: c.direction === "bullish" ? THEME.up : c.direction === "bearish" ? THEME.down : "#787b86",
+      text: c.name,
+      size: 0.6,
+    }));
+    const key = JSON.stringify(markers);
+    if (key === this.patternKey) return;
+    this.patternKey = key;
+    this.patternMarkers = markers;
+    this.applyMarkers();
   }
 
   get computed(): ComputedIndicator[] {
@@ -508,19 +579,17 @@ export class ChartEngine {
 
   private applyMarkers() {
     const times = new Set(this.bars.map((b) => b.time));
-    this.markersApi?.setMarkers(
-      this.markers
-        .filter((m) => times.has(m.time))
-        .sort((a, b) => a.time - b.time)
-        .map((m) => ({
-          id: m.id,
-          time: ts(m.time),
-          position: m.position === "above" ? "aboveBar" : "belowBar",
-          shape: m.shape,
-          color: m.color,
-          text: m.text,
-        })),
-    );
+    const own: SeriesMarker<Time>[] = this.markers
+      .filter((m) => times.has(m.time))
+      .map((m) => ({
+        id: m.id,
+        time: ts(m.time),
+        position: m.position === "above" ? "aboveBar" : "belowBar",
+        shape: m.shape,
+        color: m.color,
+        text: m.text,
+      }));
+    this.markersApi?.setMarkers([...own, ...this.patternMarkers].sort((a, b) => (a.time as number) - (b.time as number)));
   }
 
   // ---------------- helpers for tools ----------------

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { indicatorLabel } from "../../shared/indicators";
 import { ChartEngine, type ComputedIndicator, type PointerEvent } from "../chart/ChartEngine";
 import { liquidationFeed } from "../market/liquidationFeed";
-import { DEFAULT_FIB_LEVELS, formatPrice } from "../chart/DrawingsPrimitive";
+import { DEFAULT_FIBEXT_LEVELS, DEFAULT_FIB_LEVELS, formatPrice } from "../chart/DrawingsPrimitive";
 import { placeOnSide } from "../../shared/position";
 import { addDrawing, newId, removeDrawing, removeIndicator, updateIndicator, updateSettings, useChart, type ChartStore, type Drawing, type Point } from "../store";
 import { lastPositionDefaults } from "./PositionDialog";
@@ -15,7 +15,16 @@ interface Props {
   onEditPosition: (id: string) => void;
 }
 
-const TWO_POINT_TOOLS = new Set(["trendline", "ray", "zone", "fib"]);
+/** Clicks needed per multi-point tool. */
+const POINT_COUNT: Record<string, number> = { trendline: 2, ray: 2, zone: 2, fib: 2, measure: 2, fibext: 3, channel: 3 };
+
+/** Step hints for tools that need more than the obvious two taps. */
+const STEP_HINTS: Record<string, string[]> = {
+  fibext: ["Start der Bewegung antippen (z. B. Swing-Tief)", "Ende der Bewegung antippen (Swing-Hoch)", "Ende des Rücksetzers antippen"],
+  channel: ["Start der Kanallinie antippen", "Ende der Kanallinie antippen", "Breite des Kanals antippen"],
+  measure: ["Startpunkt antippen", "Endpunkt antippen"],
+  brush: ["Mit gedrücktem Finger / gedrückter Maus zeichnen"],
+};
 const POSITION_TOOLS = new Set(["long", "short"]);
 
 const POSITION_HINTS = ["Einstieg antippen", "Stop-Loss antippen", "Take-Profit antippen (auch Ende der Zeitspanne)"];
@@ -49,9 +58,21 @@ function positionDraft(chart: ChartStore, side: "long" | "short", entry: Point, 
   };
 }
 
-function makeDrawing(tool: string, a: Point, b: Point): Drawing | null {
+function makeDrawing(tool: string, pts: Point[]): Drawing | null {
   const base = { id: newId("user"), author: "user" as const };
+  const a = pts[0];
+  const b = pts[1] ?? a;
   switch (tool) {
+    case "fibext":
+      return { ...base, kind: "fibext", a, b, c: pts[2] ?? b, levels: DEFAULT_FIBEXT_LEVELS, color: "auto" };
+    case "channel": {
+      // Offset of the third tap from the base line, measured at its time.
+      const c = pts[2];
+      const onLine = c && b.time !== a.time ? a.price + ((b.price - a.price) * (c.time - a.time)) / (b.time - a.time) : a.price;
+      return { ...base, kind: "channel", a, b, offset: c ? c.price - onLine : 0, color: "#2962ff" };
+    }
+    case "measure":
+      return { ...base, kind: "measure", a, b, color: "#2962ff" };
     case "trendline":
     case "ray":
       return { ...base, kind: "trendline", a, b, extend: tool === "ray" ? "right" : "none", color: "#2962ff", style: "solid", width: 2 };
@@ -75,7 +96,8 @@ function makeDrawing(tool: string, a: Point, b: Point): Drawing | null {
 export function ChartArea({ chart, onEngine, magnet, onEditIndicator, onEditPosition }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const engineRef = useRef<ChartEngine | null>(null);
-  const pendingRef = useRef<Point | null>(null);
+  const pendingRef = useRef<Point[]>([]);
+  const strokeRef = useRef<{ points: Point[]; x: number; y: number } | null>(null);
   const firstClickRef = useRef<{ x: number; y: number } | null>(null);
   const positionRef = useRef<{ entry: Point; stop: number | null } | null>(null);
   const [hint, setHint] = useState<string | null>(null);
@@ -120,9 +142,9 @@ export function ChartArea({ chart, onEngine, magnet, onEditIndicator, onEditPosi
         const p = pointAt(e);
         if (p) engine.drawings.setPreview(positionDraft(chart, currentTool, pos.entry, pos.stop, p));
       }
-      if (pending && e && e.paneIndex === 0) {
+      if (pending.length && e && e.paneIndex === 0) {
         const p = pointAt(e);
-        if (p) engine.drawings.setPreview(makeDrawing(currentTool, pending, p));
+        if (p) engine.drawings.setPreview(makeDrawing(currentTool, [...pending, p]));
       }
     };
 
@@ -146,7 +168,7 @@ export function ChartArea({ chart, onEngine, magnet, onEditIndicator, onEditPosi
       if (!p) return;
       const done = (d: Drawing) => {
         addDrawing(d);
-        pendingRef.current = null;
+        pendingRef.current = [];
         positionRef.current = null;
         setHint(null);
         engine.drawings.setPreview(null);
@@ -180,16 +202,42 @@ export function ChartArea({ chart, onEngine, magnet, onEditIndicator, onEditPosi
         editPositionRef.current(d.id);
         return;
       }
-      if (TWO_POINT_TOOLS.has(currentTool)) {
-        if (!pendingRef.current) {
-          pendingRef.current = p;
-          firstClickRef.current = { x: e.x, y: e.y };
+      const needed = POINT_COUNT[currentTool];
+      if (needed) {
+        const last = firstClickRef.current;
+        if (pendingRef.current.length && last && Math.hypot(last.x - e.x, last.y - e.y) < 4) return;
+        pendingRef.current = [...pendingRef.current, p];
+        firstClickRef.current = { x: e.x, y: e.y };
+        if (pendingRef.current.length < needed) {
+          setHint(STEP_HINTS[currentTool]?.[pendingRef.current.length] ?? null);
           return;
         }
-        const first = firstClickRef.current;
-        if (first && Math.hypot(first.x - e.x, first.y - e.y) < 4) return;
-        const d = makeDrawing(currentTool, pendingRef.current, p);
+        const d = makeDrawing(currentTool, pendingRef.current);
         if (d) done(d);
+      }
+    };
+
+    // Brush: freehand strokes while the tool is active (chart panning is off meanwhile).
+    engine.onDrag = (phase, e) => {
+      const time = engine.logicalToTime(e.logical);
+      const price = engine.priceAt(e.y);
+      const stroke = strokeRef.current;
+      if (phase === "start") {
+        strokeRef.current = time !== null && price !== null ? { points: [{ time, price }], x: e.x, y: e.y } : null;
+        return;
+      }
+      if (!stroke) return;
+      if (time !== null && price !== null && Math.hypot(e.x - stroke.x, e.y - stroke.y) >= 3) {
+        stroke.points.push({ time, price });
+        stroke.x = e.x;
+        stroke.y = e.y;
+      }
+      const d: Drawing = { id: newId("user-path"), author: "user", kind: "path", points: stroke.points.slice(), width: 2, color: "#f7c948" };
+      if (phase === "move") engine.drawings.setPreview(d);
+      else {
+        strokeRef.current = null;
+        engine.drawings.setPreview(null);
+        if (d.kind === "path" && d.points.length > 1) addDrawing(d);
       }
     };
 
@@ -198,10 +246,15 @@ export function ChartArea({ chart, onEngine, magnet, onEditIndicator, onEditPosi
     const unsubscribe = chart.subscribe(() => {
       engine.update(chart.get());
       const t = chart.get().tool;
-      if (!TWO_POINT_TOOLS.has(t)) pendingRef.current = null;
+      engine.setDragMode(t === "brush");
+      if (!POINT_COUNT[t]) pendingRef.current = [];
       if (!POSITION_TOOLS.has(t)) positionRef.current = null;
-      if (!TWO_POINT_TOOLS.has(t) && !POSITION_TOOLS.has(t)) engine.drawings.setPreview(null);
-      setHint(POSITION_TOOLS.has(t) ? POSITION_HINTS[positionRef.current ? (positionRef.current.stop === null ? 1 : 2) : 0] : null);
+      if (!POINT_COUNT[t] && !POSITION_TOOLS.has(t) && !strokeRef.current) engine.drawings.setPreview(null);
+      setHint(
+        POSITION_TOOLS.has(t)
+          ? POSITION_HINTS[positionRef.current ? (positionRef.current.stop === null ? 1 : 2) : 0]
+          : (STEP_HINTS[t]?.[pendingRef.current.length] ?? null),
+      );
     });
     // The feed follows the active chart's symbol; other charts must not show its liquidations.
     const pushLiquidations = () => {
@@ -213,7 +266,7 @@ export function ChartArea({ chart, onEngine, magnet, onEditIndicator, onEditPosi
     ro.observe(containerRef.current!);
     const onKey = (ev: KeyboardEvent) => {
       if (ev.key === "Escape") {
-        pendingRef.current = null;
+        pendingRef.current = [];
         positionRef.current = null;
         engine.drawings.setPreview(null);
         chart.set({ tool: "cursor" });

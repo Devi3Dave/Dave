@@ -15,6 +15,8 @@ import { positionStats } from "../../shared/position";
 import type { Drawing, LineStyleName, Point } from "../store";
 
 export const DEFAULT_FIB_LEVELS = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1, 1.618];
+export const DEFAULT_FIBEXT_LEVELS = [0, 0.618, 1, 1.272, 1.618, 2, 2.618];
+const FIBEXT_COLORS = ["#787b86", "#00bcd4", "#2962ff", "#4caf50", "#ff9800", "#f23645", "#9c27b0"];
 const FIB_COLORS = ["#787b86", "#f23645", "#ff9800", "#4caf50", "#089981", "#00bcd4", "#787b86", "#2962ff"];
 
 interface Segment {
@@ -109,7 +111,7 @@ export class DrawingsPrimitive implements ISeriesPrimitive<Time> {
     return this.series?.priceToCoordinate(price) ?? null;
   }
 
-  private xy(p: Point) {
+  private xy(p: Point): { x: number; y: number } | null {
     const x = this.timeToX(p.time);
     const y = this.priceToY(p.price);
     return x === null || y === null ? null : { x, y };
@@ -174,6 +176,42 @@ export class DrawingsPrimitive implements ISeriesPrimitive<Time> {
       case "text": {
         const p = this.xy(d.at);
         if (p) g.anchors.push(p);
+        break;
+      }
+      case "fibext": {
+        const a = this.xy(d.a);
+        const b = this.xy(d.b);
+        const c = this.xy(d.c);
+        if (!a || !b || !c) break;
+        for (const level of d.levels) {
+          const y = this.priceToY(d.c.price + (d.b.price - d.a.price) * level);
+          if (y !== null) g.segments.push({ x1: c.x, y1: y, x2: width, y2: y });
+        }
+        g.segments.push({ x1: a.x, y1: a.y, x2: b.x, y2: b.y }, { x1: b.x, y1: b.y, x2: c.x, y2: c.y });
+        g.anchors.push(a, b, c);
+        break;
+      }
+      case "channel": {
+        const a = this.xy(d.a);
+        const b = this.xy(d.b);
+        const a2 = this.xy({ time: d.a.time, price: d.a.price + d.offset });
+        const b2 = this.xy({ time: d.b.time, price: d.b.price + d.offset });
+        if (!a || !b || !a2 || !b2) break;
+        g.segments.push({ x1: a.x, y1: a.y, x2: b.x, y2: b.y }, { x1: a2.x, y1: a2.y, x2: b2.x, y2: b2.y });
+        g.anchors.push(a, b, a2);
+        break;
+      }
+      case "measure": {
+        const a = this.xy(d.a);
+        const b = this.xy(d.b);
+        if (!a || !b) break;
+        g.rects.push({ x: Math.min(a.x, b.x), y: Math.min(a.y, b.y), w: Math.abs(b.x - a.x), h: Math.abs(b.y - a.y) });
+        g.anchors.push(a, b);
+        break;
+      }
+      case "path": {
+        const pts = d.points.map((p) => this.xy(p)).filter((p): p is { x: number; y: number } => !!p);
+        for (let i = 1; i < pts.length; i++) g.segments.push({ x1: pts[i - 1].x, y1: pts[i - 1].y, x2: pts[i].x, y2: pts[i].y });
         break;
       }
       case "position": {
@@ -293,6 +331,82 @@ export class DrawingsPrimitive implements ISeriesPrimitive<Time> {
         }
         break;
       }
+      case "fibext": {
+        const levels = g.segments.slice(0, -2);
+        d.levels.forEach((level, i) => {
+          const sg = levels[i];
+          if (!sg) return;
+          const c = d.color !== "auto" ? d.color : FIBEXT_COLORS[DEFAULT_FIBEXT_LEVELS.indexOf(level)] ?? "#787b86";
+          ctx.strokeStyle = c;
+          ctx.lineWidth = 1;
+          line(ctx, sg);
+          ctx.fillStyle = c;
+          ctx.fillText(`${level} (${formatPrice(d.c.price + (d.b.price - d.a.price) * level)})`, sg.x1 + 4, sg.y1 - 7);
+        });
+        ctx.strokeStyle = "#787b86";
+        ctx.setLineDash([4, 4]);
+        for (const sg of g.segments.slice(-2)) line(ctx, sg);
+        ctx.setLineDash([]);
+        break;
+      }
+      case "channel": {
+        const [s1, s2] = g.segments;
+        if (!s1 || !s2) break;
+        ctx.fillStyle = withAlpha(d.color, 0.1);
+        ctx.beginPath();
+        ctx.moveTo(s1.x1, s1.y1);
+        ctx.lineTo(s1.x2, s1.y2);
+        ctx.lineTo(s2.x2, s2.y2);
+        ctx.lineTo(s2.x1, s2.y1);
+        ctx.closePath();
+        ctx.fill();
+        ctx.lineWidth = 1.5;
+        line(ctx, s1);
+        line(ctx, s2);
+        ctx.setLineDash([4, 4]);
+        ctx.lineWidth = 1;
+        line(ctx, { x1: (s1.x1 + s2.x1) / 2, y1: (s1.y1 + s2.y1) / 2, x2: (s1.x2 + s2.x2) / 2, y2: (s1.y2 + s2.y2) / 2 });
+        ctx.setLineDash([]);
+        if (d.label) label(ctx, d.label, s1.x2 + 6, s1.y2, d.color);
+        break;
+      }
+      case "measure": {
+        const r = g.rects[0];
+        if (!r) break;
+        const up = d.b.price >= d.a.price;
+        const c = up ? "#2962ff" : "#f23645";
+        ctx.fillStyle = withAlpha(c, 0.15);
+        ctx.fillRect(r.x, r.y, r.w, r.h);
+        ctx.strokeStyle = c;
+        ctx.lineWidth = 1;
+        const [a, b] = g.anchors;
+        // Arrows along both axes, like TradingView's ruler.
+        line(ctx, { x1: a.x, y1: (a.y + b.y) / 2, x2: b.x, y2: (a.y + b.y) / 2 });
+        line(ctx, { x1: (a.x + b.x) / 2, y1: a.y, x2: (a.x + b.x) / 2, y2: b.y });
+        const diff = d.b.price - d.a.price;
+        const la = this.timeToLogical(d.a.time) ?? 0;
+        const lb = this.timeToLogical(d.b.time) ?? 0;
+        const text = `${diff >= 0 ? "+" : ""}${formatPrice(diff)} (${diff >= 0 ? "+" : ""}${((diff / d.a.price) * 100).toLocaleString("de-DE", { maximumFractionDigits: 2 })} %) · ${Math.round(Math.abs(lb - la))} Kerzen · ${formatDuration(Math.abs(d.b.time - d.a.time))}`;
+        const w = ctx.measureText(text).width;
+        const ly = up ? r.y - 12 : r.y + r.h + 12;
+        ctx.fillStyle = c;
+        ctx.fillRect(r.x + r.w / 2 - w / 2 - 6, ly - 9, w + 12, 18);
+        ctx.fillStyle = "#ffffff";
+        ctx.fillText(text, r.x + r.w / 2 - w / 2, ly);
+        break;
+      }
+      case "path": {
+        ctx.lineWidth = d.width;
+        ctx.lineJoin = "round";
+        ctx.lineCap = "round";
+        ctx.beginPath();
+        g.segments.forEach((sg, i) => {
+          if (i === 0) ctx.moveTo(sg.x1, sg.y1);
+          ctx.lineTo(sg.x2, sg.y2);
+        });
+        ctx.stroke();
+        break;
+      }
       case "position":
         this.drawPosition(ctx, d, g, preview);
         break;
@@ -382,6 +496,16 @@ function fmtPct(v: number) {
 
 function fmtMoney(v: number) {
   return v.toLocaleString("de-DE", { maximumFractionDigits: 2, minimumFractionDigits: 2 });
+}
+
+/** 90 s → "1 min 30 s", 93600 → "1 T 2 h". */
+export function formatDuration(seconds: number): string {
+  const d = Math.floor(seconds / 86400);
+  const h = Math.floor((seconds % 86400) / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  if (d) return h ? `${d} T ${h} h` : `${d} T`;
+  if (h) return m ? `${h} h ${m} min` : `${h} h`;
+  return m ? `${m} min` : `${seconds} s`;
 }
 
 function line(ctx: CanvasRenderingContext2D, s: Segment) {

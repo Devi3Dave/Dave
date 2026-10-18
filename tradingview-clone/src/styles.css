@@ -173,6 +173,25 @@ textarea {
   gap: 2px;
   padding: 6px 0;
   border-right: 1px solid var(--border);
+  /* Many tools: scroll on short screens (iPad landscape). */
+  overflow-y: auto;
+  scrollbar-width: none;
+  min-height: 0;
+}
+
+.toolbar button {
+  flex-shrink: 0;
+}
+
+.toolbar .auto-fib sup {
+  font-size: 9px;
+  margin-left: 1px;
+}
+
+/* The brush draws with the finger, the page must not scroll or zoom meanwhile. */
+.chart-area.tool-brush .chart-container,
+.chart-area.tool-brush .chart-container * {
+  touch-action: none;
 }
 
 .toolbar button {
@@ -1342,7 +1361,7 @@ select,
 .menu-panel {
   position: fixed;
   z-index: 40;
-  width: 260px;
+  width: 300px;
   max-height: 70vh;
   overflow-y: auto;
   padding: 6px;
@@ -1462,4 +1481,38 @@ select,
 .dialog-actions .danger {
   color: var(--down);
   border: 1px solid var(--down);
+}
+
+/* ---------- templates ---------- */
+
+.template-item {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+}
+
+.template-name {
+  font-weight: 600;
+}
+
+.template-desc {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.template-delete {
+  color: var(--muted);
+  padding: 6px 8px;
+}
+
+.menu-actions {
+  border-top: 1px solid var(--border);
+  margin-top: 4px;
+  padding-top: 4px;
+}
+
+.save-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }

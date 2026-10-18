@@ -6,6 +6,7 @@ import { toggleFavorite, useFavorites } from "../favorites";
 import { LAYOUTS, addIndicator, loadChart, setLayout, store, useChartState, useWorkspace, workspace, type ChartType } from "../store";
 import { APP_VERSION, BUILD_SHA, BUILD_TIME, formatBuildTime, reloadToLatest, useUpdateCheck } from "../version";
 import { Menu } from "./Menu";
+import { TemplatesMenu } from "./TemplatesMenu";
 
 const POPULAR = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT", "AAPL", "MSFT", "NVDA", "TSLA", "^GSPC", "^GDAXI", "EURUSD=X", "GC=F"];
 
@@ -218,6 +219,7 @@ export function TopBar({ onOpenIndicators, onOpenSettings, heatmapOpen, onToggle
         ƒx Indikatoren
       </button>
       <FavoritesMenu />
+      <TemplatesMenu />
       <LayoutMenu />
       <button className="pill" onClick={onOpenSettings} aria-label="Chart-Einstellungen" data-tip={"Chart-Einstellungen\nAchsen, Kurslabel, Countdown, Zeitzone, Gitter"}>
         ⚙

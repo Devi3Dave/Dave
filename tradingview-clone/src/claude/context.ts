@@ -28,6 +28,14 @@ export function describeDrawing(d: Drawing, bars: Bar[] = []): string {
       return `${tag} Fibonacci ${p(d.a)} -> ${p(d.b)}`;
     case "text":
       return `${tag} Text "${d.text}" bei ${p(d.at)}`;
+    case "fibext":
+      return `${tag} Fibonacci-Extension ${p(d.a)} -> ${p(d.b)} -> ${p(d.c)}`;
+    case "channel":
+      return `${tag} Paralleler Kanal ${p(d.a)} -> ${p(d.b)}, zweite Linie um ${num(d.offset)} versetzt`;
+    case "measure":
+      return `${tag} Messung ${p(d.a)} -> ${p(d.b)} (${(((d.b.price - d.a.price) / d.a.price) * 100).toFixed(2)} %)`;
+    case "path":
+      return `${tag} Freihandzeichnung (${d.points.length} Punkte, ${num(Math.min(...d.points.map((q) => q.price)))}–${num(Math.max(...d.points.map((q) => q.price)))})`;
     case "position": {
       const st = positionStats(d, bars);
       return `${tag} ${d.side === "long" ? "Long" : "Short"}-Position Einstieg ${num(d.entry)}, Stop ${num(d.stop)}, Ziel ${num(d.target)} (${iso(d.from)} bis ${iso(d.to)}), CRV ${st.rr.toFixed(2)}, Konto ${num(d.account)}, Risiko ${num(d.risk)} %, Hebel ${num(d.leverage)}×, Menge ${num(st.qty)}, Status ${st.status}, PnL ${num(st.pnl)}`;

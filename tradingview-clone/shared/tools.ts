@@ -109,6 +109,33 @@ export const toolSchemas = {
       label: z.string().optional(),
     }),
   },
+  draw_fib_extension: {
+    description: "Zeichnet eine trendbasierte Fibonacci-Extension: Bewegung start→end, projiziert ab dem Rücksetzer-Punkt retrace (Kursziele 0.618, 1, 1.272, 1.618, 2, 2.618).",
+    schema: z.object({
+      start: point,
+      end: point,
+      retrace: point,
+      levels: z.array(z.number()).optional(),
+      color: color.optional(),
+    }),
+  },
+  draw_auto_fibonacci: {
+    description: "Zeichnet automatisch ein Fibonacci-Retracement über den größten Swing (höchstes Hoch / tiefstes Tief) der letzten last_n Kerzen.",
+    schema: z.object({ last_n: z.number().int().min(5).max(1000).optional().describe("Standard: 150") }),
+  },
+  draw_parallel_channel: {
+    description: "Zeichnet einen parallelen Kanal: Basislinie start→end und eine parallele Linie durch den Preis width_point (z. B. gegenüberliegendes Swing-Hoch/-Tief).",
+    schema: z.object({ start: point, end: point, width_point: point, color: color.optional(), label: z.string().optional() }),
+  },
+  get_patterns: {
+    description:
+      "Erkennt Kerzenmuster (Engulfing, Hammer, Shooting Star, Morning/Evening Star, Harami, …) und Chartformationen (Doppeltop/-boden, Schulter-Kopf-Schulter, Dreiecke) in den geladenen Kerzen. Zum Einzeichnen die Indikatoren candlepatterns bzw. chartpatterns hinzufügen.",
+    schema: z.object({
+      last_n: z.number().int().min(10).max(1000).optional().describe("Kerzen für Kerzenmuster, Standard 100"),
+      pivot: z.number().int().min(2).max(30).optional().describe("Swing-Länge für Formationen, Standard 5"),
+      tolerance_pct: z.number().min(0.2).max(10).optional().describe("Standard 1.5"),
+    }),
+  },
   add_text: {
     description: "Setzt eine Textnotiz an eine Position im Chart.",
     schema: z.object({ time, price: z.number(), text: z.string(), color: color.optional() }),
