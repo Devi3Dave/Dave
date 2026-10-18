@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react";
-import { loadMarketData, type MarketData } from "../shared/marketData";
+import { loadMarketData, loadOpenInterest, type MarketData, type OpenInterestPoint } from "../shared/marketData";
 import type { Bar } from "../shared/math";
 import type { CHART_TYPES, INTERVALS } from "../shared/tools";
 import { DEFAULT_SETTINGS, type ChartSettings } from "./chartSettings";
@@ -204,10 +204,10 @@ export async function loadChart(symbol: string, interval: Interval): Promise<voi
   }
 }
 
-async function fetchMarketData(symbol: string, interval: Interval): Promise<MarketData> {
+export async function fetchMarketData(symbol: string, interval: string, limit = 1000): Promise<MarketData> {
   // Without the Node server the browser fetches directly (Binance allows it; Yahoo does not, so stocks fall back to demo data).
-  if (STANDALONE) return loadMarketData(symbol, interval);
-  const res = await fetch(`/api/klines?symbol=${encodeURIComponent(symbol)}&interval=${interval}`);
+  if (STANDALONE) return loadMarketData(symbol, interval, limit);
+  const res = await fetch(`/api/klines?symbol=${encodeURIComponent(symbol)}&interval=${interval}&limit=${limit}`);
   const json = await res.json();
   if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
   return json as MarketData;
@@ -229,4 +229,12 @@ function connectLive(symbol: string, interval: Interval, seq: number) {
       return { bars };
     });
   };
+}
+
+export async function fetchOpenInterest(symbol: string, period: string, limit = 500): Promise<OpenInterestPoint[]> {
+  if (STANDALONE) return loadOpenInterest(symbol, period, limit);
+  const res = await fetch(`/api/open-interest?symbol=${encodeURIComponent(symbol)}&period=${period}&limit=${limit}`);
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
+  return json as OpenInterestPoint[];
 }

@@ -13,7 +13,10 @@ export const INTERVAL_SECONDS: Record<string, number> = {
   "15m": 900,
   "30m": 1800,
   "1h": 3600,
+  "2h": 7200,
   "4h": 14400,
+  "6h": 21600,
+  "12h": 43200,
   "1d": 86400,
   "1w": 604800,
 };
@@ -80,6 +83,7 @@ interface YahooChart {
 
 async function fromYahoo(symbol: string, interval: string, limit: number): Promise<Bar[]> {
   const cfg = YAHOO[interval];
+  if (!cfg) throw new Error(`Yahoo unterstützt ${interval} nicht`);
   const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=${cfg.interval}&range=${cfg.range}`;
   const json = (await fetchJson(url)) as YahooChart;
   const result = json.chart.result?.[0];
@@ -152,4 +156,17 @@ export async function loadMarketData(rawSymbol: string, interval: string, limit 
     }
   }
   return { symbol, interval, source: "demo", bars: demoBars(symbol, interval, Math.min(limit, 600)) };
+}
+
+export interface OpenInterestPoint {
+  time: number; // unix seconds
+  value: number; // open interest in quote currency (USDT)
+}
+
+/** Open-interest history from Binance USDⓈ-M futures (≈ last 30 days, max 500 points). */
+export async function loadOpenInterest(rawSymbol: string, period: string, limit = 500): Promise<OpenInterestPoint[]> {
+  const symbol = rawSymbol.trim().toUpperCase();
+  const url = `https://fapi.binance.com/futures/data/openInterestHist?symbol=${encodeURIComponent(symbol)}&period=${period}&limit=${Math.min(500, limit)}`;
+  const rows = (await fetchJson(url)) as { sumOpenInterestValue: string; timestamp: number }[];
+  return rows.map((r) => ({ time: Math.floor(r.timestamp / 1000), value: Number(r.sumOpenInterestValue) })).filter((p) => p.value > 0);
 }

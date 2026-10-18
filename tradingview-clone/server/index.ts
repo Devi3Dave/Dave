@@ -4,7 +4,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import express from "express";
 import { z } from "zod";
 import { DEFAULT_MODEL, runClaudeTurn, type TurnEvent } from "../shared/claudeTurn.js";
-import { loadMarketData } from "../shared/marketData.js";
+import { loadMarketData, loadOpenInterest } from "../shared/marketData.js";
 
 try {
   process.loadEnvFile(".env");
@@ -31,6 +31,14 @@ app.get("/api/klines", async (req, res) => {
     res.json(await loadMarketData(symbol, interval, limit));
   } catch (err) {
     res.status(400).json({ error: (err as Error).message });
+  }
+});
+
+app.get("/api/open-interest", async (req, res) => {
+  try {
+    res.json(await loadOpenInterest(String(req.query.symbol ?? "BTCUSDT"), String(req.query.period ?? "1h"), Number(req.query.limit ?? 500)));
+  } catch (err) {
+    res.status(502).json({ error: (err as Error).message });
   }
 });
 

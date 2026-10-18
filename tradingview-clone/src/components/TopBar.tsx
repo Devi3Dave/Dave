@@ -28,6 +28,8 @@ const INTERVAL_LABELS: Record<string, string> = {
 interface Props {
   onOpenIndicators: () => void;
   onOpenSettings: () => void;
+  heatmapOpen: boolean;
+  onToggleHeatmap: () => void;
   claudeOpen: boolean;
   onToggleClaude: () => void;
 }
@@ -53,7 +55,7 @@ function useHeaderPrice() {
   return { last, change };
 }
 
-export function TopBar({ onOpenIndicators, onOpenSettings, claudeOpen, onToggleClaude }: Props) {
+export function TopBar({ onOpenIndicators, onOpenSettings, heatmapOpen, onToggleHeatmap, claudeOpen, onToggleClaude }: Props) {
   const { symbol, interval, chartType } = useChartState((s) => s);
   const showPrice = useChartState((s) => s.settings.headerPrice);
   const { last, change } = useHeaderPrice();
@@ -122,6 +124,9 @@ export function TopBar({ onOpenIndicators, onOpenSettings, claudeOpen, onToggleC
       </button>
       <button className="pill" onClick={onOpenSettings} aria-label="Chart-Einstellungen" data-tip={"Chart-Einstellungen\nAchsen, Kurslabel, Countdown, Zeitzone, Gitter"}>
         ⚙
+      </button>
+      <button className={`pill ${heatmapOpen ? "active" : ""}`} onClick={onToggleHeatmap} data-tip={"Liquidations-Heatmap im CoinGlass-Stil\nVollbild mit Zeiträumen von 12 h bis 1 Jahr"}>
+        🔥 Heatmap
       </button>
       <div className="spacer" />
       <button className={`pill claude-toggle ${claudeOpen ? "active" : ""}`} onClick={onToggleClaude} data-tip={"Seitenleiste ein-/ausblenden\nClaude, Orderbuch, Liquidationen"}>

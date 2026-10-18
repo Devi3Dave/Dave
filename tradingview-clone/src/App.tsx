@@ -4,6 +4,7 @@ import { ChartArea } from "./components/ChartArea";
 import { ChartSettingsDialog } from "./components/ChartSettingsDialog";
 import { DrawingToolbar } from "./components/DrawingToolbar";
 import { IndicatorDialog, IndicatorSettings } from "./components/IndicatorDialog";
+import { LiqHeatmapView } from "./components/LiqHeatmapView";
 import { SidePanel, type SideTab } from "./components/SidePanel";
 import { TooltipLayer } from "./components/Tooltip";
 import { TopBar } from "./components/TopBar";
@@ -19,6 +20,7 @@ export default function App() {
   const [claudeOpen, setClaudeOpen] = useState(true);
   const [magnet, setMagnet] = useState(true);
   const [sideTab, setSideTab] = useState<SideTab>("claude");
+  const [heatmapOpen, setHeatmapOpen] = useState(false);
   const symbol = useChartState((s) => s.symbol);
   const liveLiquidations = useChartState((s) => s.settings.liveLiquidations);
 
@@ -41,12 +43,19 @@ export default function App() {
 
   return (
     <div className={`app ${claudeOpen ? "with-claude" : ""}`}>
-      <TopBar onOpenIndicators={() => setShowIndicators(true)} onOpenSettings={() => setShowSettings(true)} claudeOpen={claudeOpen} onToggleClaude={() => setClaudeOpen((o) => !o)} />
+      <TopBar
+        onOpenIndicators={() => setShowIndicators(true)}
+        onOpenSettings={() => setShowSettings(true)}
+        heatmapOpen={heatmapOpen}
+        onToggleHeatmap={() => setHeatmapOpen((o) => !o)}
+        claudeOpen={claudeOpen} onToggleClaude={() => setClaudeOpen((o) => !o)} />
       <DrawingToolbar magnet={magnet} onToggleMagnet={() => setMagnet((m) => !m)} />
       <ChartArea onEngine={onEngine} magnet={magnet} onEditIndicator={setEditing} />
+      {/* Drawn over the chart (same grid cell) so the chart engine stays alive for Claude. */}
+      {heatmapOpen && <LiqHeatmapView onClose={() => setHeatmapOpen(false)} />}
       {/* Kept mounted while hidden so the conversation survives toggling. */}
       <div className="claude-slot" hidden={!claudeOpen}>
-        <SidePanel tab={sideTab} onTab={setSideTab} getEngine={getEngine} />
+        <SidePanel tab={sideTab} onTab={setSideTab} getEngine={getEngine} onOpenHeatmap={() => setHeatmapOpen(true)} />
       </div>
       {showIndicators && <IndicatorDialog onClose={() => setShowIndicators(false)} />}
       {editing && <IndicatorSettings id={editing} onClose={() => setEditing(null)} />}

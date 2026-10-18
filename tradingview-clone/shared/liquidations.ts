@@ -41,60 +41,141 @@ export interface LiquidationCluster {
   distancePct: number;
 }
 
-/**
- * Builds the heatmap over the last `lookback` bars. Position size per bar is
- * estimated from its quote volume, split into longs/shorts by taker-buy share.
- */
-// The chart asks for the same heatmap twice per update (lines + drawing); cache per bars array.
-const cache = new WeakMap<Bar[], Map<string, Heatmap | null>>();
-
-export function liquidationHeatmap(bars: Bar[], lookback: number, rows: number, tiers = DEFAULT_TIERS): Heatmap | null {
-  const key = `${lookback}|${rows}|${tiers.map((t) => `${t.leverage}:${t.weight}`).join(",")}`;
-  let perBars = cache.get(bars);
-  if (!perBars) cache.set(bars, (perBars = new Map()));
-  if (!perBars.has(key)) perBars.set(key, computeHeatmap(bars, lookback, rows, tiers));
-  return perBars.get(key) ?? null;
+export interface HeatmapOptions {
+  /** First bar to include in the grid; earlier bars only warm the model up. */
+  fromIndex?: number;
+  rows: number;
+  tiers?: LiquidationTier[];
+  /** Newly opened position notional per bar (default: quote volume). */
+  inflow?: number[];
+  /** Share of open positions still open after each bar, e.g. OI(t)/OI(t-1) when OI falls (default: 1). */
+  retention?: number[];
+  /** Fixed price band (default: the bars' range widened by the lowest leverage). */
+  priceLow?: number;
+  priceHigh?: number;
 }
 
-function computeHeatmap(bars: Bar[], lookback: number, rows: number, tiers: LiquidationTier[]): Heatmap | null {
+interface Level {
+  price: number;
+  row: number;
+  side: "long" | "short";
+  value: number;
+}
+
+/**
+ * Forward simulation: each bar opens positions near its typical price for every
+ * leverage tier (split long/short by taker-buy share); a level is removed once
+ * price trades through it, and shrinks when open interest falls.
+ */
+export function simulateLiquidations(bars: Bar[], opts: HeatmapOptions): Heatmap | null {
   const n = bars.length;
   if (n < 2) return null;
-  const fromIndex = Math.max(0, n - lookback);
-  const win = bars.slice(fromIndex);
-  const lo = Math.min(...win.map((b) => b.low));
-  const hi = Math.max(...win.map((b) => b.high));
-  const minLev = Math.min(...tiers.map((t) => t.leverage));
-  // Price band wide enough for the lowest leverage's liquidation prices.
-  const priceLow = lo * (1 - 1 / minLev);
-  const priceHigh = hi * (1 + 1 / minLev);
+  const tiers = opts.tiers ?? DEFAULT_TIERS;
+  const fromIndex = Math.max(0, Math.min(n - 1, opts.fromIndex ?? 0));
+  const rows = opts.rows;
+  let priceLow = opts.priceLow;
+  let priceHigh = opts.priceHigh;
+  if (priceLow === undefined || priceHigh === undefined) {
+    const win = bars.slice(fromIndex);
+    const minLev = Math.min(...tiers.map((t) => t.leverage));
+    priceLow = Math.min(...win.map((b) => b.low)) * (1 - 1 / minLev);
+    priceHigh = Math.max(...win.map((b) => b.high)) * (1 + 1 / minLev);
+  }
   const priceStep = (priceHigh - priceLow) / rows;
-  const cols = n - fromIndex;
-  const grid = new Float32Array(cols * rows);
+  const grid = new Float32Array((n - fromIndex) * rows);
+  let active: Level[] = [];
 
-  for (let i = fromIndex; i < n; i++) {
-    const b = bars[i];
+  for (let j = 0; j < n; j++) {
+    const b = bars[j];
+    // 1. Positions closed (OI fell) and liquidations hit by this bar.
+    const keep = opts.retention?.[j] ?? 1;
+    active = active.filter((l) => {
+      l.value *= keep;
+      return l.side === "long" ? b.low > l.price : b.high < l.price;
+    });
+    // 2. What is still open at this bar.
+    if (j >= fromIndex) {
+      const base = (j - fromIndex) * rows;
+      for (const l of active) if (l.row >= 0 && l.row < rows) grid[base + l.row] += l.value;
+    }
+    // 3. New positions opened during this bar (alive from the next bar on).
     const entry = (b.high + b.low + b.close) / 3;
-    const notional = b.volume * entry;
+    const notional = opts.inflow ? opts.inflow[j] : b.volume * entry;
     if (!(notional > 0)) continue;
     const longShare = b.volume > 0 ? buyVolume(b) / b.volume : 0.5;
     for (const t of tiers) {
       for (const side of ["long", "short"] as const) {
         const price = liquidationPrice(entry, t.leverage, side);
-        const row = Math.floor((price - priceLow) / priceStep);
-        if (row < 0 || row >= rows) continue;
-        const value = notional * t.weight * (side === "long" ? longShare : 1 - longShare);
-        // The level lives from the next bar until price trades through it.
-        for (let j = i + 1; j < n; j++) {
-          const bj = bars[j];
-          if (side === "long" ? bj.low <= price : bj.high >= price) break;
-          grid[(j - fromIndex) * rows + row] += value;
-        }
+        active.push({
+          price,
+          row: Math.floor((price - priceLow) / priceStep),
+          side,
+          value: notional * t.weight * (side === "long" ? longShare : 1 - longShare),
+        });
       }
     }
   }
   let max = 0;
   for (let k = 0; k < grid.length; k++) if (grid[k] > max) max = grid[k];
   return { fromIndex, rows, priceLow, priceStep, grid, max };
+}
+
+// The chart asks for the same heatmap twice per update (lines + drawing); cache per bars array.
+const cache = new WeakMap<Bar[], Map<string, Heatmap | null>>();
+
+/** Volume-based heatmap over the last `lookback` bars (used by the chart indicator). */
+export function liquidationHeatmap(bars: Bar[], lookback: number, rows: number, tiers = DEFAULT_TIERS): Heatmap | null {
+  const key = `${lookback}|${rows}|${tiers.map((t) => `${t.leverage}:${t.weight}`).join(",")}`;
+  let perBars = cache.get(bars);
+  if (!perBars) cache.set(bars, (perBars = new Map()));
+  if (!perBars.has(key)) perBars.set(key, simulateLiquidations(bars, { fromIndex: bars.length - lookback, rows, tiers }));
+  return perBars.get(key) ?? null;
+}
+
+export interface OiPoint {
+  time: number;
+  value: number;
+}
+
+/**
+ * Turns an open-interest history into per-bar inflow (OI increases) and retention
+ * (OI decreases). Bars without OI data fall back to quote volume scaled to the same
+ * order of magnitude (median ratio over the bars that have both).
+ */
+export function openInterestModel(bars: Bar[], oi: OiPoint[]): { inflow: number[]; retention: number[]; coverage: number } {
+  const n = bars.length;
+  const oiAt: (number | null)[] = new Array(n).fill(null);
+  const step = n > 1 ? bars[n - 1].time - bars[n - 2].time : 3600;
+  // Each OI snapshot goes to the bar whose open time is closest (within half a bar).
+  const index = new Map(bars.map((b, i) => [Math.round(b.time / step), i]));
+  for (const p of oi) {
+    const i = index.get(Math.round(p.time / step));
+    if (i !== undefined && Math.abs(bars[i].time - p.time) <= step / 2) oiAt[i] = p.value;
+  }
+  const volNotional = bars.map((b) => b.volume * ((b.high + b.low + b.close) / 3));
+  const inflow: number[] = new Array(n).fill(0);
+  const retention: number[] = new Array(n).fill(1);
+  const ratios: number[] = [];
+  let covered = 0;
+  for (let i = 1; i < n; i++) {
+    const a = oiAt[i - 1];
+    const b = oiAt[i];
+    if (a === null || b === null) continue;
+    covered++;
+    const d = b - a;
+    if (d > 0) {
+      inflow[i] = d;
+      if (volNotional[i] > 0) ratios.push(d / volNotional[i]);
+    } else if (a > 0) {
+      retention[i] = b / a;
+    }
+  }
+  ratios.sort((x, y) => x - y);
+  const scale = ratios.length ? ratios[Math.floor(ratios.length / 2)] : 0.1;
+  for (let i = 0; i < n; i++) {
+    if (oiAt[i] === null || (i > 0 && oiAt[i - 1] === null)) inflow[i] = volNotional[i] * scale;
+  }
+  return { inflow, retention, coverage: n > 1 ? covered / (n - 1) : 0 };
 }
 
 /** Strongest still-open clusters above (shorts) and below (longs) the last close. */
