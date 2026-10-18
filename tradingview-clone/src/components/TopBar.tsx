@@ -124,7 +124,7 @@ export function TopBar({ onOpenIndicators, onOpenSettings, claudeOpen, onToggleC
         ⚙
       </button>
       <div className="spacer" />
-      <button className={`pill claude-toggle ${claudeOpen ? "active" : ""}`} onClick={onToggleClaude} data-tip="Claude-Panel ein-/ausblenden">
+      <button className={`pill claude-toggle ${claudeOpen ? "active" : ""}`} onClick={onToggleClaude} data-tip={"Seitenleiste ein-/ausblenden\nClaude, Orderbuch, Liquidationen"}>
         ✦ Claude
       </button>
     </header>

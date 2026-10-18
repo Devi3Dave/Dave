@@ -119,6 +119,20 @@ export const toolSchemas = {
     description: "Löscht Zeichnungen und Marker. scope='claude' nur deine eigenen, 'all' alle.",
     schema: z.object({ scope: z.enum(["claude", "all"]) }),
   },
+  get_orderbook: {
+    description:
+      "Liest das Live-Orderbuch von Binance (nur Krypto): beste Bids/Asks gruppiert, Spread, Kauf-/Verkaufsverhältnis und die größten Orderwände. Gut für Unterstützungen/Widerstände durch Limit-Orders.",
+    schema: z.object({
+      market: z.enum(["spot", "futures"]).optional().describe("Standard: spot"),
+      levels: z.number().int().min(5).max(100).optional().describe("Stufen je Seite (Standard 20)"),
+      group: z.number().positive().optional().describe("Preisstufe zum Zusammenfassen, z. B. 10 für BTC"),
+    }),
+  },
+  get_liquidations: {
+    description:
+      "Liefert die geschätzten Liquidations-Cluster (Heatmap-Modell aus Volumen und 10×–100× Hebel) über und unter dem Kurs sowie die echten Live-Liquidationen von Binance Futures seit App-Start.",
+    schema: z.object({}),
+  },
   take_screenshot: {
     description: "Macht ein Bild des aktuellen Charts inkl. Indikatoren und Zeichnungen, um das Ergebnis visuell zu prüfen.",
     schema: z.object({}),

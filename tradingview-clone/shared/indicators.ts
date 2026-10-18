@@ -1,3 +1,4 @@
+import { liquidationHeatmap, strongestLevels, type Heatmap } from "./liquidations.js";
 import * as m from "./math.js";
 import type { Bar, Series } from "./math.js";
 
@@ -45,6 +46,10 @@ export interface IndicatorDef {
   compute: (bars: Bar[], p: Record<string, number>) => Record<string, Series>;
   // Horizontal volume histogram drawn next to the price axis.
   profile?: (bars: Bar[], p: Record<string, number>) => m.VolumeProfile | null;
+  // Time × price intensity grid drawn behind the candles.
+  heatmap?: (bars: Bar[], p: Record<string, number>) => Heatmap | null;
+  // Contrast exponent for the heatmap colors (param key).
+  heatmapContrastKey?: string;
 }
 
 // Rising/falling coloring shared by momentum histograms.
@@ -799,6 +804,31 @@ export const INDICATORS: IndicatorDef[] = [
     compute: (b) => {
       const ma = m.onHigherTimeframe(b, 86400, (c) => m.smaLast(c, 200));
       return { value: b.map((x, i) => (ma[i] ? x.close / (ma[i] as number) : null)) };
+    },
+  },
+  {
+    id: "liqheatmap",
+    name: "Liquidations-Heatmap (geschätzt)",
+    short: "Liq-Heatmap",
+    category: "Krypto",
+    overlay: true,
+    description:
+      "Geschätzte Liquidationsniveaus wie bei CoinGlass: aus Volumen, Taker-Käufen und 10×–100× Hebel. Helle Zonen = viele offene Liquidationen; Linien = stärkster Cluster unter (Longs) und über (Shorts) dem Kurs.",
+    params: [
+      { key: "lookback", label: "Kerzen", default: 300, min: 50, max: 1000 },
+      { key: "rows", label: "Preisstufen", default: 120, min: 30, max: 300 },
+      { key: "contrast", label: "Kontrast", default: 0.6, min: 0.2, max: 2, step: 0.1 },
+    ],
+    outputs: [
+      { key: "below", label: "Long-Liq-Cluster", color: "#26a69a", dashed: true, lineWidth: 1, noAutoscale: true },
+      { key: "above", label: "Short-Liq-Cluster", color: "#ef5350", dashed: true, lineWidth: 1, noAutoscale: true },
+    ],
+    heatmap: (b, p) => liquidationHeatmap(b, p.lookback, p.rows),
+    heatmapContrastKey: "contrast",
+    compute: (b, p) => {
+      const hm = liquidationHeatmap(b, p.lookback, p.rows);
+      if (!hm) return { below: b.map(() => null), above: b.map(() => null) };
+      return strongestLevels(b, hm);
     },
   },
   {

@@ -51,8 +51,8 @@ und zusammen mit der Fill & Sign-App auf GitHub Pages veröffentlicht.
 - Hinweise beim Überfahren mit der Maus für alle Buttons (auf Touch-Geräten ausgeblendet)
 - Layout (Symbol, Indikatoren, Zeichnungen, Einstellungen) wird im Browser gespeichert
 
-**Indikatoren (78)**
-- *Krypto:* Bull Market Support Band (20W SMA / 21W EMA), Pi Cycle Top, Mayer Multiple,
+**Indikatoren (79)**
+- *Krypto:* Liquidations-Heatmap (geschätzt), Bull Market Support Band (20W SMA / 21W EMA), Pi Cycle Top, Mayer Multiple,
   Cumulative Volume Delta (CVD), Volume Delta (mit Binance-Taker-Volumen)
 - *Gleitende Durchschnitte:* SMA, EMA, WMA, HMA, VWMA, DEMA, TEMA, SMMA/RMA, KAMA, ALMA, LSMA,
   McGinley Dynamic, EMA Ribbon (8/13/21/34/55), MA Cross (Golden/Death Cross)
@@ -66,6 +66,16 @@ und zusammen mit der Fill & Sign-App auf GitHub Pages veröffentlicht.
 - *Volumen:* Volumen, Volume Profile (Fixed Range, POC/VAH/VAL), VWAP, VWAP mit σ-Bändern,
   Anchored VWAP, OBV, MFI, CMF, A/D, Chaikin Oscillator, Elder Force Index, Klinger, Ease of Movement,
   Volume Oscillator, PVT, Relative Volume (RVOL)
+
+**Orderbuch & Liquidationen** (Seitenleiste rechts, nur Binance-Krypto)
+- *Orderbuch:* Live-Orderbuch von Binance Spot oder USDⓈ-M Futures (lokal synchronisiert aus
+  Snapshot + Diff-Stream, automatischer Resync bei Lücken), Gruppierung, Tiefenbalken, Spread,
+  Kauf-/Verkaufsverhältnis; Antippen einer Stufe zeichnet sie als Linie in den Chart
+- *Liquidations-Heatmap (geschätzt):* Modell wie bei CoinGlass – je Kerze neue Positionen mit 10×/25×/50×/100×
+  Hebel, Niveaus verschwinden, sobald der Kurs sie erreicht; dazu die stärksten Cluster über/unter dem Kurs
+- *Live-Liquidationen:* echte Liquidationen von Binance Futures als Blasen im Chart und als Liste
+  (Binance liefert höchstens eine pro Sekunde und Symbol)
+- Claude kann beides über `get_orderbook` und `get_liquidations` auswerten
 
 **Zeichenwerkzeuge**
 Trendlinie, Strahl, horizontale/vertikale Linie, Rechteck/Zone, Fibonacci-Retracement, Text,
@@ -85,6 +95,8 @@ Radierer, Magnet (rastet an OHLC ein). `Esc` bricht ab.
 | `set_chart` | Symbol, Zeiteinheit oder Charttyp wechseln |
 | `draw_trendline`, `draw_horizontal_line`, `draw_vertical_line`, `draw_zone`, `draw_fibonacci`, `add_text`, `add_markers` | Zeichnen |
 | `remove_drawing`, `clear_drawings` | Zeichnungen entfernen |
+| `get_orderbook` | Live-Orderbuch mit Wänden und Kauf-/Verkaufsverhältnis |
+| `get_liquidations` | Geschätzte Liquidations-Cluster und Live-Liquidationen |
 | `take_screenshot` | Chart als Bild prüfen |
 
 Von Claude erstellte Objekte sind mit ✦ markiert und lassen sich über „Zeichnungen ✕“ im Panel
