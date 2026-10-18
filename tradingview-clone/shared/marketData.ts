@@ -7,7 +7,7 @@ export interface MarketData {
   bars: Bar[];
 }
 
-const INTERVAL_SECONDS: Record<string, number> = {
+export const INTERVAL_SECONDS: Record<string, number> = {
   "1m": 60,
   "5m": 300,
   "15m": 900,

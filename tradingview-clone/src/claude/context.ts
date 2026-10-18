@@ -1,6 +1,7 @@
 import { getIndicator, indicatorLabel, resolveParams } from "../../shared/indicators";
 import type { Bar } from "../../shared/math";
 import type { ChartEngine } from "../chart/ChartEngine";
+import { resolveTimeZone } from "../chartSettings";
 import type { ChartState, Drawing } from "../store";
 
 export const num = (v: number | null | undefined): string => (v === null || v === undefined || !Number.isFinite(v) ? "–" : String(+v.toPrecision(7)));
@@ -34,7 +35,7 @@ export function buildChartState(s: ChartState, engine: ChartEngine | null, recen
   const bars = s.bars;
   const last = bars[bars.length - 1];
   const lines: string[] = ["<chart_state>"];
-  lines.push(`Symbol: ${s.symbol} (Quelle: ${s.source ?? "?"}) | Zeiteinheit: ${s.interval} | Charttyp: ${s.chartType} | Zeiten in UTC`);
+  lines.push(`Symbol: ${s.symbol} (Quelle: ${s.source ?? "?"}) | Zeiteinheit: ${s.interval} | Charttyp: ${s.chartType} | Daten in UTC, der Nutzer sieht Zeiten in ${resolveTimeZone(s.settings.timeZone)}`);
   if (!last) {
     lines.push("Keine Kursdaten geladen.", "</chart_state>");
     return lines.join("\n");

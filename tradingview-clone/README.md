@@ -44,7 +44,12 @@ und zusammen mit der Fill & Sign-App auf GitHub Pages veröffentlicht.
   Finance (z. B. `AAPL`, `^GDAXI`, `EURUSD=X`). Ohne Internet werden Demo-Daten erzeugt.
 - Indikator-Panels mit verschiebbaren Trennern, Legende mit Werten unter dem Fadenkreuz,
   Einstellungen (Parameter/Farben), Ein-/Ausblenden
-- Layout (Symbol, Indikatoren, Zeichnungen) wird im Browser gespeichert
+- Chart-Einstellungen (⚙ in der Kopfzeile): Preisskala Normal/Log/%/Index 100, Achse links/rechts,
+  invertieren; aktueller Kurs als Achsen-Label und Linie, Countdown bis Kerzenschluss, Hoch/Tief des
+  sichtbaren Bereichs, Kurs mit 24-h-Veränderung in der Kopfzeile; Zeitzone, Sekunden, Gitter, Fadenkreuz
+- Schnellbuttons unten rechts im Chart: log, %, Auto-Skalierung, Ansicht zurücksetzen
+- Hinweise beim Überfahren mit der Maus für alle Buttons (auf Touch-Geräten ausgeblendet)
+- Layout (Symbol, Indikatoren, Zeichnungen, Einstellungen) wird im Browser gespeichert
 
 **Indikatoren (78)**
 - *Krypto:* Bull Market Support Band (20W SMA / 21W EMA), Pi Cycle Top, Mayer Multiple,

@@ -22,6 +22,7 @@ Arbeitsweise:
 
 Antwortstil:
 - Antworte in der Sprache des Nutzers (standardmäßig Deutsch), knapp und strukturiert mit Markdown: Trend, Schlüsselniveaus, Indikatorlage, Szenarien (bullish/bearish mit Auslösern und Invalidierung).
+- Nenne Uhrzeiten in der Zeitzone, in der der Nutzer den Chart sieht (steht im chart_state); für Tool-Aufrufe bleiben die Zeitstempel in UTC.
 - Nenne konkrete Preisniveaus. Kennzeichne Unsicherheit ehrlich, und weise bei Handelsideen kurz darauf hin, dass es keine Anlageberatung ist.
 
 Verfügbare Indikatoren (id: Name [Ort] (Parameter=Standard) -> Ausgaben):

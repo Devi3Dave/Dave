@@ -17,7 +17,9 @@ export function IndicatorDialog({ onClose }: { onClose: () => void }) {
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
           <h2>Indikatoren</h2>
-          <button onClick={onClose}>✕</button>
+          <button onClick={onClose} data-tip="Schließen" aria-label="Schließen">
+            ✕
+          </button>
         </div>
         <input autoFocus className="search" placeholder="Suchen …" value={query} onChange={(e) => setQuery(e.target.value)} />
         <div className="indicator-list">
@@ -59,7 +61,9 @@ export function IndicatorSettings({ id, onClose }: { id: string; onClose: () => 
       <div className="modal small" onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
           <h2>{def.name}</h2>
-          <button onClick={onClose}>✕</button>
+          <button onClick={onClose} data-tip="Schließen" aria-label="Schließen">
+            ✕
+          </button>
         </div>
         <div className="settings-grid">
           {def.params.map((p) => (
