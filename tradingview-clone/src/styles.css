@@ -725,6 +725,15 @@ select,
   .quick button {
     min-height: 40px;
   }
+
+  .scale-bar button {
+    font-size: 13px;
+    padding: 6px 10px;
+  }
+
+  .segmented button {
+    padding: 8px 12px;
+  }
 }
 
 @media (pointer: coarse) and (max-width: 900px) {
@@ -748,4 +757,145 @@ select,
     grid-template-columns: 52px 1fr;
     grid-template-rows: 50px 1fr 45vh;
   }
+}
+
+/* ---------- hover hints ---------- */
+
+.tooltip {
+  position: fixed;
+  z-index: 100;
+  pointer-events: none;
+  max-width: 280px;
+  padding: 5px 9px;
+  border-radius: 4px;
+  background: #e0e3eb;
+  color: #131722;
+  font-size: 12px;
+  line-height: 1.35;
+  white-space: pre-line;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  animation: tip-in 0.12s ease-out;
+}
+
+.tooltip-right {
+  transform: translateY(-50%);
+}
+
+.tooltip-left {
+  transform: translate(-100%, -50%);
+}
+
+.tooltip-below {
+  transform: translateX(-50%);
+}
+
+.tooltip-above {
+  transform: translate(-50%, -100%);
+}
+
+@keyframes tip-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* ---------- chart settings ---------- */
+
+.settings-modal {
+  width: min(520px, calc(100vw - 32px));
+}
+
+.settings-body {
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.settings-body section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.settings-body h3 {
+  font-size: 11px;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0;
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.settings-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.segmented {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.segmented button {
+  border-radius: 0;
+  padding: 4px 10px;
+}
+
+.segmented button + button {
+  border-left: 1px solid var(--border);
+}
+
+.segmented button.active {
+  background: var(--accent);
+  color: #fff;
+}
+
+/* ---------- quick scale buttons (bottom right of the price pane) ---------- */
+
+.scale-bar {
+  position: absolute;
+  z-index: 4;
+  display: flex;
+  gap: 2px;
+}
+
+.scale-bar button {
+  font-size: 11px;
+  padding: 2px 6px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--muted);
+}
+
+.scale-bar button.active {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+/* ---------- header price ---------- */
+
+.header-price {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.header-price strong {
+  font-size: 15px;
+}
+
+.header-price span {
+  font-size: 12px;
 }

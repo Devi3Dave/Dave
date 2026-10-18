@@ -7,6 +7,8 @@ import {
   HistogramSeries,
   LineSeries,
   LineStyle,
+  PriceScaleMode,
+  TickMarkType,
   createChart,
   createSeriesMarkers,
   type IChartApi,
@@ -19,7 +21,10 @@ import {
 } from "lightweight-charts";
 import { getIndicator, resolveParams, type IndicatorDef, type OutputDef } from "../../shared/indicators";
 import { heikinAshi, type Bar, type Series } from "../../shared/math";
+import { INTERVAL_SECONDS } from "../../shared/marketData";
+import { resolveTimeZone, type ChartSettings } from "../chartSettings";
 import type { ChartMarker, ChartState, ChartType, IndicatorInstance } from "../store";
+import { AxisLabelsPrimitive } from "./AxisLabelsPrimitive";
 import { BandFillPrimitive, type BandPoint } from "./BandFillPrimitive";
 import { DrawingsPrimitive } from "./DrawingsPrimitive";
 import { VolumeProfilePrimitive } from "./VolumeProfilePrimitive";
@@ -68,6 +73,10 @@ export class ChartEngine {
   private indicatorKey = "";
   private built: BuiltIndicator[] = [];
   private markers: ChartMarker[] = [];
+  private readonly axisLabels = new AxisLabelsPrimitive();
+  private side: "left" | "right" = "right";
+  private settingsKey = "";
+  private intervalSeconds = 3600;
 
   onCrosshair: (logical: number | null, point: PointerEvent | null) => void = () => {};
   onClick: (e: PointerEvent) => void = () => {};
@@ -103,9 +112,10 @@ export class ChartEngine {
       if (!down || Math.hypot(ev.clientX - down.x, ev.clientY - down.y) > 4) return;
       down = null;
       const rect = container.getBoundingClientRect();
-      const x = ev.clientX - rect.left;
+      // Pane x starts after a left-side price scale.
+      const x = ev.clientX - rect.left - (this.side === "left" ? this.priceScaleWidth() : 0);
       const y = ev.clientY - rect.top;
-      if (x > this.chart.timeScale().width()) return; // price scale
+      if (x < 0 || x > this.chart.timeScale().width()) return; // price scale
       const logical = this.chart.timeScale().coordinateToLogical(x);
       const paneIndex = this.paneLayout().findIndex((p) => y >= p.top && y < p.top + p.height);
       if (logical === null || paneIndex < 0) return;
@@ -113,19 +123,25 @@ export class ChartEngine {
     });
   }
 
+  private destroyed = false;
+
   destroy() {
+    this.destroyed = true;
     this.chart.remove();
   }
 
   // ---------------- state sync ----------------
 
   update(s: ChartState) {
-    const typeChanged = s.chartType !== this.chartType;
+    // A new chart type or price-scale side recreates the price series and all indicators.
+    const typeChanged = s.chartType !== this.chartType || s.settings.scalePosition !== this.side;
     if (typeChanged) {
       // Clear indicator panes first so removing the old price series cannot shift pane indices.
       this.clearIndicators();
+      this.side = s.settings.scalePosition;
       this.createMainSeries(s.chartType);
     }
+    this.intervalSeconds = INTERVAL_SECONDS[s.interval] ?? 3600;
 
     const symbolKey = `${s.symbol}|${s.interval}`;
     const prev = this.bars;
@@ -156,6 +172,20 @@ export class ChartEngine {
       this.fillIndicators();
     }
 
+    const settingsKey = `${JSON.stringify(s.settings)}|${s.interval}`;
+    if (typeChanged || settingsKey !== this.settingsKey) {
+      this.settingsKey = settingsKey;
+      this.applySettings(s.settings);
+    }
+    this.axisLabels.setData(s.bars, {
+      countdown: s.settings.countdown,
+      highLow: s.settings.highLowLabels,
+      lastPriceLabel: s.settings.lastPriceLabel,
+      intervalSeconds: this.intervalSeconds,
+      upColor: THEME.up,
+      downColor: THEME.down,
+    });
+
     this.drawings.setData(s.drawings, s.bars);
     if (s.markers !== this.markers || barsChanged) {
       this.markers = s.markers;
@@ -166,10 +196,11 @@ export class ChartEngine {
   private createMainSeries(type: ChartType) {
     if (this.main) {
       this.main.detachPrimitive(this.drawings);
+      this.main.detachPrimitive(this.axisLabels);
       this.markersApi?.detach();
       this.chart.removeSeries(this.main);
     }
-    const common = { priceLineVisible: true, lastValueVisible: true };
+    const common = { priceLineVisible: true, lastValueVisible: true, priceScaleId: this.side };
     switch (type) {
       case "bars":
         this.main = this.chart.addSeries(BarSeries, { ...common, upColor: THEME.up, downColor: THEME.down, thinBars: false });
@@ -199,7 +230,80 @@ export class ChartEngine {
     }
     this.chartType = type;
     this.main.attachPrimitive(this.drawings);
+    this.main.attachPrimitive(this.axisLabels);
     this.markersApi = createSeriesMarkers(this.main, []);
+  }
+
+  private applySettings(st: ChartSettings) {
+    const scale = { visible: true, borderColor: THEME.border };
+    const hidden = { visible: false };
+    const tz = resolveTimeZone(st.timeZone);
+    const daily = this.intervalSeconds >= 86400;
+    const fmt = (o: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat("de-DE", { timeZone: tz, ...o });
+    const tick = {
+      [TickMarkType.Year]: fmt({ year: "numeric" }),
+      [TickMarkType.Month]: fmt({ month: "short" }),
+      [TickMarkType.DayOfMonth]: fmt({ day: "numeric" }),
+      [TickMarkType.Time]: fmt({ hour: "2-digit", minute: "2-digit", hourCycle: "h23" }),
+      [TickMarkType.TimeWithSeconds]: fmt({ hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" }),
+    };
+    const crosshairFmt = fmt({
+      weekday: "short",
+      day: "2-digit",
+      month: "short",
+      year: "2-digit",
+      ...(daily ? {} : { hour: "2-digit", minute: "2-digit", hourCycle: "h23" as const }),
+      ...(st.showSeconds && !daily ? { second: "2-digit" as const } : {}),
+    });
+    const toDate = (t: Time) => new Date((t as number) * 1000);
+
+    this.chart.applyOptions({
+      rightPriceScale: this.side === "right" ? scale : hidden,
+      leftPriceScale: this.side === "left" ? scale : hidden,
+      grid: {
+        vertLines: { visible: st.grid === "both" || st.grid === "vert", color: THEME.grid },
+        horzLines: { visible: st.grid === "both" || st.grid === "horz", color: THEME.grid },
+      },
+      crosshair: { mode: st.crosshair === "magnet" ? CrosshairMode.Magnet : st.crosshair === "hidden" ? CrosshairMode.Hidden : CrosshairMode.Normal },
+      timeScale: {
+        secondsVisible: st.showSeconds,
+        tickMarkFormatter: (t: Time, type: TickMarkType) => tick[type].format(toDate(t)),
+      },
+      localization: { locale: "de-DE", timeFormatter: (t: Time) => crosshairFmt.format(toDate(t)) },
+    });
+    // Scale mode and inversion only for the price pane; indicator panes stay linear.
+    this.chart.priceScale(this.side, 0).applyOptions({
+      mode: { normal: PriceScaleMode.Normal, log: PriceScaleMode.Logarithmic, percent: PriceScaleMode.Percentage, indexed: PriceScaleMode.IndexedTo100 }[st.scaleMode],
+      invertScale: st.invertScale,
+    });
+    this.main?.applyOptions({ lastValueVisible: st.lastPriceLabel, priceLineVisible: st.lastPriceLine });
+    this.onLayout();
+  }
+
+  /** Re-enables automatic price scaling (after the user dragged the scale). */
+  autoScale() {
+    this.chart.priceScale(this.side, 0).applyOptions({ autoScale: true });
+  }
+
+  /** Scrolls back to the latest candles and re-fits the price scale. */
+  resetView() {
+    const n = this.bars.length;
+    this.chart.timeScale().setVisibleLogicalRange({ from: n - 160, to: n + 8 });
+    this.autoScale();
+  }
+
+  priceScaleWidth(): number {
+    if (this.destroyed) return 0;
+    try {
+      return this.chart.priceScale(this.side).width();
+    } catch {
+      // A freshly shown left scale has no axis widget until the next render.
+      return 0;
+    }
+  }
+
+  get scaleSide() {
+    return this.side;
   }
 
   private displayBars(): Bar[] {
@@ -277,7 +381,7 @@ export class ChartEngine {
       priceLineVisible: false,
       lastValueVisible: !def.overlay && !isVolume,
       title: "",
-      ...(isVolume ? { priceScaleId: "volume" } : {}),
+      priceScaleId: isVolume ? "volume" : this.side,
     };
     let s: ISeriesApi<SeriesType>;
     if (o.style === "histogram") {
@@ -361,6 +465,7 @@ export class ChartEngine {
 
   /** Top offset and height (CSS px) of every pane, for overlay legends. */
   paneLayout(): { top: number; height: number }[] {
+    if (this.destroyed) return [];
     let top = 0;
     return this.chart.panes().map((p) => {
       const h = p.getHeight();

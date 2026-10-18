@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { indicatorLabel } from "../../shared/indicators";
 import { ChartEngine, type ComputedIndicator, type PointerEvent } from "../chart/ChartEngine";
 import { DEFAULT_FIB_LEVELS, formatPrice } from "../chart/DrawingsPrimitive";
-import { addDrawing, newId, removeDrawing, removeIndicator, store, updateIndicator, useChartState, type Drawing, type Point } from "../store";
+import { addDrawing, newId, removeDrawing, removeIndicator, store, updateIndicator, updateSettings, useChartState, type Drawing, type Point } from "../store";
 
 interface Props {
   onEngine: (engine: ChartEngine | null) => void;
@@ -44,6 +44,8 @@ export function ChartArea({ onEngine, magnet, onEditIndicator }: Props) {
   magnetRef.current = magnet;
   const [hover, setHover] = useState<number | null>(null);
   const [layout, setLayout] = useState<{ top: number; height: number }[]>([]);
+  const [scale, setScale] = useState<{ side: "left" | "right"; width: number }>({ side: "right", width: 0 });
+  const scaleMode = useChartState((s) => s.settings.scaleMode);
   const [computed, setComputed] = useState<ComputedIndicator[]>([]);
 
   const { symbol, interval, bars, source, tool, loading, error } = useChartState((s) => s);
@@ -54,6 +56,7 @@ export function ChartArea({ onEngine, magnet, onEditIndicator }: Props) {
     const refreshLayout = () => {
       setLayout(engine.paneLayout());
       setComputed(engine.computed);
+      setScale({ side: engine.scaleSide, width: engine.priceScaleWidth() });
     };
     engine.onLayout = () => requestAnimationFrame(refreshLayout);
 
@@ -150,6 +153,7 @@ export function ChartArea({ onEngine, magnet, onEditIndicator }: Props) {
     if (!engine) return;
     setLayout(engine.paneLayout());
     setComputed(engine.computed);
+    setScale({ side: engine.scaleSide, width: engine.priceScaleWidth() });
   }, [hover, bars]);
 
   const idx = hover !== null && hover >= 0 && hover < bars.length ? hover : bars.length - 1;
@@ -165,7 +169,7 @@ export function ChartArea({ onEngine, magnet, onEditIndicator }: Props) {
         <div className="legend-row indicator" key={c.instance.id}>
           <span className={`legend-name ${c.instance.hidden ? "muted" : ""}`}>
             {indicatorLabel(c.def, c.params)}
-            {c.instance.author === "claude" && <span className="by-claude" title="Von Claude hinzugefügt">✦</span>}
+            {c.instance.author === "claude" && <span className="by-claude" data-tip="Von Claude hinzugefügt">✦</span>}
           </span>
           {!c.instance.hidden &&
             c.def.outputs.map((o, k) => {
@@ -177,13 +181,13 @@ export function ChartArea({ onEngine, magnet, onEditIndicator }: Props) {
               );
             })}
           <span className="legend-actions">
-            <button title={c.instance.hidden ? "Einblenden" : "Ausblenden"} onClick={() => updateIndicator(c.instance.id, { hidden: !c.instance.hidden })}>
+            <button data-tip={c.instance.hidden ? "Einblenden" : "Ausblenden"} aria-label={c.instance.hidden ? "Einblenden" : "Ausblenden"} onClick={() => updateIndicator(c.instance.id, { hidden: !c.instance.hidden })}>
               {c.instance.hidden ? "◌" : "◉"}
             </button>
-            <button title="Einstellungen" onClick={() => onEditIndicator(c.instance.id)}>
+            <button data-tip="Einstellungen: Parameter und Farben" aria-label="Einstellungen" onClick={() => onEditIndicator(c.instance.id)}>
               ⚙
             </button>
-            <button title="Entfernen" onClick={() => removeIndicator(c.instance.id)}>
+            <button data-tip="Indikator entfernen" aria-label="Entfernen" onClick={() => removeIndicator(c.instance.id)}>
               ✕
             </button>
           </span>
@@ -194,7 +198,7 @@ export function ChartArea({ onEngine, magnet, onEditIndicator }: Props) {
     <div className={`chart-area tool-${tool}`}>
       <div ref={containerRef} className="chart-container" />
       {layout.map((pane, i) => (
-        <div key={i} className="legend" style={{ top: pane.top + 6 }}>
+        <div key={i} className="legend" style={{ top: pane.top + 6, left: scale.side === "left" ? scale.width + 8 : 8 }}>
           {i === 0 && (
             <div className="legend-row main">
               <span className="legend-symbol">
@@ -212,6 +216,33 @@ export function ChartArea({ onEngine, magnet, onEditIndicator }: Props) {
           {legendFor(i)}
         </div>
       ))}
+      {layout[0] && (
+        <div
+          className="scale-bar"
+          style={{ top: layout[0].top + layout[0].height - 28, ...(scale.side === "right" ? { right: scale.width + 6 } : { right: 6 }) }}
+        >
+          <button
+            className={scaleMode === "log" ? "active" : ""}
+            onClick={() => updateSettings({ scaleMode: scaleMode === "log" ? "normal" : "log" })}
+            data-tip={"Logarithmische Skala ein/aus\nGleiche Prozentbewegungen sind gleich hoch"}
+          >
+            log
+          </button>
+          <button
+            className={scaleMode === "percent" ? "active" : ""}
+            onClick={() => updateSettings({ scaleMode: scaleMode === "percent" ? "normal" : "percent" })}
+            data-tip={"Prozent-Skala ein/aus\nVeränderung ab der ersten sichtbaren Kerze"}
+          >
+            %
+          </button>
+          <button onClick={() => engineRef.current?.autoScale()} data-tip={"Auto-Skalierung\nPreisachse wieder an die sichtbaren Kerzen anpassen"}>
+            A
+          </button>
+          <button onClick={() => engineRef.current?.resetView()} data-tip={"Ansicht zurücksetzen\nZu den neuesten Kerzen springen"}>
+            ⟲
+          </button>
+        </div>
+      )}
       {loading && <div className="chart-overlay">Lade {symbol} …</div>}
       {error && <div className="chart-overlay error">Fehler: {error}</div>}
     </div>

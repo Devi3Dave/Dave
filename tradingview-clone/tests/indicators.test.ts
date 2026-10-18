@@ -119,3 +119,14 @@ describe("tools", () => {
     }
   });
 });
+
+describe("countdown", () => {
+  it("formats like TradingView", async () => {
+    const { formatCountdown } = await import("../src/chart/AxisLabelsPrimitive");
+    expect(formatCountdown(42)).toBe("00:42");
+    expect(formatCountdown(59 * 60 + 5)).toBe("59:05");
+    expect(formatCountdown(3 * 3600 + 7 * 60 + 9)).toBe("03:07:09");
+    expect(formatCountdown(2 * 86400 + 5 * 3600 + 30 * 60)).toBe("2T 05:30");
+    expect(formatCountdown(-5)).toBe("00:00");
+  });
+});

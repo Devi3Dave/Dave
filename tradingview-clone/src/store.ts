@@ -2,6 +2,7 @@ import { useSyncExternalStore } from "react";
 import { loadMarketData, type MarketData } from "../shared/marketData";
 import type { Bar } from "../shared/math";
 import type { CHART_TYPES, INTERVALS } from "../shared/tools";
+import { DEFAULT_SETTINGS, type ChartSettings } from "./chartSettings";
 import { STANDALONE } from "./config";
 
 export type Interval = (typeof INTERVALS)[number];
@@ -64,6 +65,7 @@ export interface ChartState {
   drawings: Drawing[];
   markers: ChartMarker[];
   tool: Tool;
+  settings: ChartSettings;
 }
 
 type Listener = () => void;
@@ -96,6 +98,7 @@ let state: ChartState = {
   drawings: saved.drawings ?? [],
   markers: saved.markers ?? [],
   tool: "cursor",
+  settings: { ...DEFAULT_SETTINGS, ...saved.settings },
 };
 
 const listeners = new Set<Listener>();
@@ -118,9 +121,9 @@ let persistTimer: number | undefined;
 function persist() {
   window.clearTimeout(persistTimer);
   persistTimer = window.setTimeout(() => {
-    const { symbol, interval, chartType, indicators, drawings, markers } = state;
+    const { symbol, interval, chartType, indicators, drawings, markers, settings } = state;
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ symbol, interval, chartType, indicators, drawings, markers }));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ symbol, interval, chartType, indicators, drawings, markers, settings }));
     } catch {
       // storage unavailable (private mode) - layout just isn't remembered
     }
@@ -135,6 +138,10 @@ let counter = 0;
 export const newId = (prefix: string) => `${prefix}-${Date.now().toString(36)}${(counter++).toString(36)}`;
 
 // ---------------- Actions ----------------
+
+export function updateSettings(patch: Partial<ChartSettings>) {
+  store.set((s) => ({ settings: { ...s.settings, ...patch } }));
+}
 
 export function addIndicator(type: string, params: Record<string, number>, author: Author, colors?: string[]): IndicatorInstance {
   const inst: IndicatorInstance = { id: newId(type), type, params, author, colors };

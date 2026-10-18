@@ -103,14 +103,14 @@ export function ClaudePanel({ getEngine }: { getEngine: () => ChartEngine | null
           {model && <span className="model">{model}</span>}
         </div>
         <div className="claude-head-actions">
-          <button title="Claudes Zeichnungen entfernen" onClick={() => clearDrawings("claude")}>
+          <button data-tip="Alle von Claude erstellten Zeichnungen und Marker entfernen" onClick={() => clearDrawings("claude")}>
             Zeichnungen ✕
           </button>
-          <button title="Neues Gespräch" onClick={reset}>
+          <button data-tip="Neues Gespräch beginnen (spart Kosten bei langen Verläufen)" onClick={reset}>
             Neu
           </button>
           {STANDALONE && (
-            <button title="Einstellungen" onClick={() => setShowSettings(true)}>
+            <button data-tip={"Claude-Einstellungen\nAPI-Schlüssel und Modell"} aria-label="Claude-Einstellungen" onClick={() => setShowSettings(true)}>
               ⚙
             </button>
           )}
@@ -173,7 +173,7 @@ export function ClaudePanel({ getEngine }: { getEngine: () => ChartEngine | null
           }}
         />
         <div className="claude-input-row">
-          <label title="Denktiefe / Aufwand">
+          <label data-tip={"Denktiefe von Claude\nHöher = gründlicher, aber langsamer und teurer"}>
             Aufwand
             <select value={effort} onChange={(e) => setEffort(e.target.value as Effort)}>
               <option value="low">niedrig</option>
@@ -183,15 +183,15 @@ export function ClaudePanel({ getEngine }: { getEngine: () => ChartEngine | null
               <option value="max">maximal</option>
             </select>
           </label>
-          <label title="Screenshot des Charts mitsenden">
+          <label data-tip={"Screenshot des Charts mitsenden\nClaude sieht dann auch die Grafik (etwas höhere Kosten)"}>
             <input type="checkbox" checked={screenshot} onChange={(e) => setScreenshot(e.target.checked)} /> Screenshot
           </label>
           {busy ? (
-            <button className="send stop" onClick={stop}>
+            <button className="send stop" onClick={stop} data-tip="Antwort abbrechen">
               Stopp
             </button>
           ) : (
-            <button className="send" onClick={() => submit()} disabled={!input.trim()}>
+            <button className="send" onClick={() => submit()} disabled={!input.trim()} data-tip="Nachricht senden (Enter)">
               Senden
             </button>
           )}
@@ -211,7 +211,9 @@ function SettingsDialog({ onClose }: { onClose: () => void }) {
       <div className="modal small" onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
           <h2>Claude-Einstellungen</h2>
-          <button onClick={onClose}>✕</button>
+          <button onClick={onClose} data-tip="Schließen" aria-label="Schließen">
+            ✕
+          </button>
         </div>
         <label className="field">
           API-Schlüssel
