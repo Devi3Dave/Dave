@@ -1,8 +1,9 @@
 import { getIndicator, indicatorLabel, resolveParams } from "../../shared/indicators";
 import type { Bar } from "../../shared/math";
 import type { ChartEngine } from "../chart/ChartEngine";
+import { positionStats } from "../../shared/position";
 import { resolveTimeZone } from "../chartSettings";
-import type { ChartState, Drawing } from "../store";
+import { charts, layoutCount, workspace, type ChartState, type Drawing } from "../store";
 
 export const num = (v: number | null | undefined): string => (v === null || v === undefined || !Number.isFinite(v) ? "–" : String(+v.toPrecision(7)));
 export const iso = (t: number) => new Date(t * 1000).toISOString().replace(".000Z", "Z");
@@ -11,7 +12,7 @@ export function barRows(bars: Bar[]): string {
   return bars.map((b) => `${iso(b.time)},${b.time},${num(b.open)},${num(b.high)},${num(b.low)},${num(b.close)},${num(b.volume)}`).join("\n");
 }
 
-export function describeDrawing(d: Drawing): string {
+export function describeDrawing(d: Drawing, bars: Bar[] = []): string {
   const p = (pt: { time: number; price: number }) => `(${iso(pt.time)}, ${num(pt.price)})`;
   const tag = `id=${d.id} [${d.author === "claude" ? "von dir" : "vom Nutzer"}]${d.label ? ` "${d.label}"` : ""}`;
   switch (d.kind) {
@@ -27,6 +28,10 @@ export function describeDrawing(d: Drawing): string {
       return `${tag} Fibonacci ${p(d.a)} -> ${p(d.b)}`;
     case "text":
       return `${tag} Text "${d.text}" bei ${p(d.at)}`;
+    case "position": {
+      const st = positionStats(d, bars);
+      return `${tag} ${d.side === "long" ? "Long" : "Short"}-Position Einstieg ${num(d.entry)}, Stop ${num(d.stop)}, Ziel ${num(d.target)} (${iso(d.from)} bis ${iso(d.to)}), CRV ${st.rr.toFixed(2)}, Konto ${num(d.account)}, Risiko ${num(d.risk)} %, Hebel ${num(d.leverage)}×, Menge ${num(st.qty)}, Status ${st.status}, PnL ${num(st.pnl)}`;
+    }
   }
 }
 
@@ -35,6 +40,16 @@ export function buildChartState(s: ChartState, engine: ChartEngine | null, recen
   const bars = s.bars;
   const last = bars[bars.length - 1];
   const lines: string[] = ["<chart_state>"];
+  const ws = workspace.get();
+  const count = layoutCount(ws.layout);
+  if (count > 1) {
+    const others = charts
+      .slice(0, count)
+      .map((c, i) => (i === ws.active ? null : `Chart ${i + 1}: ${c.get().symbol} ${c.get().interval}`))
+      .filter(Boolean)
+      .join(", ");
+    lines.push(`Der Nutzer sieht ${count} Charts gleichzeitig. Dies ist der aktive Chart ${ws.active + 1}; deine Tools wirken nur auf ihn. Weitere: ${others}`);
+  }
   lines.push(`Symbol: ${s.symbol} (Quelle: ${s.source ?? "?"}) | Zeiteinheit: ${s.interval} | Charttyp: ${s.chartType} | Daten in UTC, der Nutzer sieht Zeiten in ${resolveTimeZone(s.settings.timeZone)}`);
   if (!last) {
     lines.push("Keine Kursdaten geladen.", "</chart_state>");
@@ -78,7 +93,7 @@ export function buildChartState(s: ChartState, engine: ChartEngine | null, recen
 
   lines.push("\nZeichnungen:");
   if (s.drawings.length === 0) lines.push("- keine");
-  for (const d of s.drawings) lines.push(`- ${describeDrawing(d)}`);
+  for (const d of s.drawings) lines.push(`- ${describeDrawing(d, bars)}`);
   if (s.markers.length) {
     lines.push("\nMarker:");
     for (const m of s.markers) lines.push(`- id=${m.id} ${m.position} ${iso(m.time)} ${m.text ?? ""}`);

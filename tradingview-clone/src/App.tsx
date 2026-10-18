@@ -1,22 +1,24 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ChartEngine } from "./chart/ChartEngine";
-import { ChartArea } from "./components/ChartArea";
+import { ChartGrid } from "./components/ChartGrid";
 import { ChartSettingsDialog } from "./components/ChartSettingsDialog";
 import { DrawingToolbar } from "./components/DrawingToolbar";
 import { IndicatorDialog, IndicatorSettings } from "./components/IndicatorDialog";
 import { LiqHeatmapView } from "./components/LiqHeatmapView";
+import { PositionDialog } from "./components/PositionDialog";
 import { SidePanel, type SideTab } from "./components/SidePanel";
 import { TooltipLayer } from "./components/Tooltip";
 import { TopBar } from "./components/TopBar";
 import { isCryptoSymbol } from "../shared/marketData";
 import { liquidationFeed } from "./market/liquidationFeed";
-import { loadChart, store, useChartState } from "./store";
+import { MAX_CHARTS, useChartState, workspace } from "./store";
 
 export default function App() {
-  const engineRef = useRef<ChartEngine | null>(null);
+  const enginesRef = useRef<(ChartEngine | null)[]>(Array(MAX_CHARTS).fill(null));
   const [showIndicators, setShowIndicators] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
+  const [editingPosition, setEditingPosition] = useState<string | null>(null);
   const [claudeOpen, setClaudeOpen] = useState(true);
   const [magnet, setMagnet] = useState(true);
   const [sideTab, setSideTab] = useState<SideTab>("claude");
@@ -31,15 +33,11 @@ export default function App() {
     else liquidationFeed.stop();
   }, [wantLiquidations, symbol]);
 
-  useEffect(() => {
-    const { symbol, interval } = store.get();
-    void loadChart(symbol, interval);
+  const onEngine = useCallback((slot: number, e: ChartEngine | null) => {
+    enginesRef.current[slot] = e;
   }, []);
-
-  const onEngine = useCallback((e: ChartEngine | null) => {
-    engineRef.current = e;
-  }, []);
-  const getEngine = useCallback(() => engineRef.current, []);
+  // Claude always works with the active chart.
+  const getEngine = useCallback(() => enginesRef.current[workspace.get().active] ?? null, []);
 
   return (
     <div className={`app ${claudeOpen ? "with-claude" : ""}`}>
@@ -50,7 +48,7 @@ export default function App() {
         onToggleHeatmap={() => setHeatmapOpen((o) => !o)}
         claudeOpen={claudeOpen} onToggleClaude={() => setClaudeOpen((o) => !o)} />
       <DrawingToolbar magnet={magnet} onToggleMagnet={() => setMagnet((m) => !m)} />
-      <ChartArea onEngine={onEngine} magnet={magnet} onEditIndicator={setEditing} />
+      <ChartGrid onEngine={onEngine} magnet={magnet} onEditIndicator={setEditing} onEditPosition={setEditingPosition} />
       {/* Drawn over the chart (same grid cell) so the chart engine stays alive for Claude. */}
       {heatmapOpen && <LiqHeatmapView onClose={() => setHeatmapOpen(false)} />}
       {/* Kept mounted while hidden so the conversation survives toggling. */}
@@ -59,6 +57,7 @@ export default function App() {
       </div>
       {showIndicators && <IndicatorDialog onClose={() => setShowIndicators(false)} />}
       {editing && <IndicatorSettings id={editing} onClose={() => setEditing(null)} />}
+      {editingPosition && <PositionDialog id={editingPosition} onClose={() => setEditingPosition(null)} />}
       {showSettings && <ChartSettingsDialog onClose={() => setShowSettings(false)} />}
       <TooltipLayer />
     </div>

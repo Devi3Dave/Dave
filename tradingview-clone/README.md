@@ -49,9 +49,16 @@ und zusammen mit der Fill & Sign-App auf GitHub Pages veröffentlicht.
   sichtbaren Bereichs, Kurs mit 24-h-Veränderung in der Kopfzeile; Zeitzone, Sekunden, Gitter, Fadenkreuz
 - Schnellbuttons unten rechts im Chart: log, %, Auto-Skalierung, Ansicht zurücksetzen
 - Hinweise beim Überfahren mit der Maus für alle Buttons (auf Touch-Geräten ausgeblendet)
-- Layout (Symbol, Indikatoren, Zeichnungen, Einstellungen) wird im Browser gespeichert
+- Mehrere Charts gleichzeitig (Layout-Button ▢ in der Kopfzeile): 1, 2 nebeneinander/übereinander,
+  3 (einer groß) oder 2 × 2 – jeder mit eigenem Symbol, Zeiteinheit, Indikatoren und Zeichnungen.
+  Der angetippte Chart ist aktiv (blauer Rahmen); Kopfzeile, Werkzeuge und Claude wirken auf ihn.
+  Optional wird die Zeiteinheit in allen Charts synchron gewechselt
+- Layout (Symbol, Indikatoren, Zeichnungen, Einstellungen) wird je Chart im Browser gespeichert
+- Versionsnummer neben dem Logo; sie zeigt „Update“, sobald eine neuere Version online ist –
+  Antippen lädt sie
 
 **Indikatoren (79)**
+- Favoriten: im Indikator-Dialog mit ☆ markieren; sie stehen dort oben und im ★-Menü der Kopfzeile
 - *Krypto:* Liquidations-Heatmap (geschätzt), Bull Market Support Band (20W SMA / 21W EMA), Pi Cycle Top, Mayer Multiple,
   Cumulative Volume Delta (CVD), Volume Delta (mit Binance-Taker-Volumen)
 - *Gleitende Durchschnitte:* SMA, EMA, WMA, HMA, VWMA, DEMA, TEMA, SMMA/RMA, KAMA, ALMA, LSMA,
@@ -83,7 +90,12 @@ und zusammen mit der Fill & Sign-App auf GitHub Pages veröffentlicht.
 
 **Zeichenwerkzeuge**
 Trendlinie, Strahl, horizontale/vertikale Linie, Rechteck/Zone, Fibonacci-Retracement, Text,
-Radierer, Magnet (rastet an OHLC ein). `Esc` bricht ab.
+Long-/Short-Position, Radierer, Magnet (rastet an OHLC ein). `Esc` bricht ab.
+
+*Long-/Short-Position (▲/▼):* Einstieg, Stop-Loss und Take-Profit nacheinander antippen (der letzte Tipp
+legt auch das Ende der Zeitspanne fest). Angezeigt werden Chance/Risiko, Abstand in % und Betrag,
+Positionsgröße aus Kontogröße × Risiko-%, bei Hebel die geschätzte Liquidation, und ob Ziel oder Stop
+erreicht wurde (Gewinn/Verlust). Antippen der Position öffnet ihre Einstellungen.
 
 **Claude**
 - Chat-Panel mit Streaming, Schnell-Prompts, wählbarem Aufwand (Effort) und optionalem Screenshot
@@ -98,6 +110,7 @@ Radierer, Magnet (rastet an OHLC ein). `Esc` bricht ab.
 | `add_indicator` / `remove_indicator` | Indikatoren hinzufügen/entfernen |
 | `set_chart` | Symbol, Zeiteinheit oder Charttyp wechseln |
 | `draw_trendline`, `draw_horizontal_line`, `draw_vertical_line`, `draw_zone`, `draw_fibonacci`, `add_text`, `add_markers` | Zeichnen |
+| `draw_position` | Handelsidee als Long-/Short-Position mit Stop, Ziel und Positionsgröße |
 | `remove_drawing`, `clear_drawings` | Zeichnungen entfernen |
 | `get_orderbook` | Live-Orderbuch mit Wänden und Kauf-/Verkaufsverhältnis |
 | `get_liquidations` | Geschätzte Liquidations-Cluster und Live-Liquidationen |

@@ -11,6 +11,7 @@ import type {
   Time,
 } from "lightweight-charts";
 import type { Bar } from "../../shared/math";
+import { positionStats } from "../../shared/position";
 import type { Drawing, LineStyleName, Point } from "../store";
 
 export const DEFAULT_FIB_LEVELS = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1, 1.618];
@@ -175,6 +176,21 @@ export class DrawingsPrimitive implements ISeriesPrimitive<Time> {
         if (p) g.anchors.push(p);
         break;
       }
+      case "position": {
+        const x1 = this.timeToX(d.from);
+        const x2 = this.timeToX(d.to);
+        const yEntry = this.priceToY(d.entry);
+        const yStop = this.priceToY(d.stop);
+        const yTarget = this.priceToY(d.target);
+        if (x1 === null || x2 === null || yEntry === null || yStop === null || yTarget === null) break;
+        const x = Math.min(x1, x2);
+        const w = Math.max(Math.abs(x2 - x1), 2);
+        // rects[0] = reward, rects[1] = risk
+        g.rects.push({ x, y: Math.min(yEntry, yTarget), w, h: Math.abs(yTarget - yEntry) });
+        g.rects.push({ x, y: Math.min(yEntry, yStop), w, h: Math.abs(yStop - yEntry) });
+        g.anchors.push({ x, y: yEntry });
+        break;
+      }
     }
     return g;
   }
@@ -277,8 +293,11 @@ export class DrawingsPrimitive implements ISeriesPrimitive<Time> {
         }
         break;
       }
+      case "position":
+        this.drawPosition(ctx, d, g, preview);
+        break;
     }
-    if (!preview || d.kind === "text") return;
+    if (!preview || d.kind === "text" || d.kind === "position") return;
     ctx.fillStyle = "#ffffff";
     ctx.strokeStyle = d.color;
     ctx.lineWidth = 1.5;
@@ -289,6 +308,80 @@ export class DrawingsPrimitive implements ISeriesPrimitive<Time> {
       ctx.stroke();
     }
   }
+
+  private drawPosition(ctx: CanvasRenderingContext2D, d: Extract<Drawing, { kind: "position" }>, g: Geometry, preview: boolean) {
+    const [reward, risk] = g.rects;
+    if (!reward || !risk) return;
+    const st = positionStats(d, this.bars);
+    const done = st.status === "target" || st.status === "stop";
+    ctx.globalAlpha = preview ? 0.6 : 1;
+    ctx.fillStyle = withAlpha(UP, done && st.status !== "target" ? 0.1 : 0.22);
+    ctx.fillRect(reward.x, reward.y, reward.w, reward.h);
+    ctx.fillStyle = withAlpha(DOWN, done && st.status !== "stop" ? 0.1 : 0.22);
+    ctx.fillRect(risk.x, risk.y, risk.w, risk.h);
+
+    const yEntry = g.anchors[0].y;
+    const right = reward.x + reward.w;
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = "#b2b5be";
+    line(ctx, { x1: reward.x, y1: yEntry, x2: right, y2: yEntry });
+    ctx.strokeStyle = UP;
+    const yTarget = d.side === "long" ? reward.y : reward.y + reward.h;
+    line(ctx, { x1: reward.x, y1: yTarget, x2: right, y2: yTarget });
+    ctx.strokeStyle = DOWN;
+    const yStop = d.side === "long" ? risk.y + risk.h : risk.y;
+    line(ctx, { x1: risk.x, y1: yStop, x2: right, y2: yStop });
+
+    // Path of the trade from entry to the exit (or the latest price).
+    if (st.exitPrice !== null) {
+      const xEnd = st.exitTime !== null ? this.timeToX(st.exitTime) : this.timeToX(Math.min(d.to, this.bars[this.bars.length - 1]?.time ?? d.to));
+      const yEnd = this.priceToY(st.exitPrice);
+      if (xEnd !== null && yEnd !== null) {
+        ctx.strokeStyle = st.pnl >= 0 ? UP : DOWN;
+        ctx.setLineDash([4, 3]);
+        line(ctx, { x1: reward.x, y1: yEntry, x2: xEnd, y2: yEnd });
+        ctx.setLineDash([]);
+      }
+    }
+
+    if (st.liqPrice !== null) {
+      const yLiq = this.priceToY(st.liqPrice);
+      if (yLiq !== null) {
+        ctx.strokeStyle = "#ff9800";
+        ctx.setLineDash([2, 3]);
+        line(ctx, { x1: reward.x, y1: yLiq, x2: right, y2: yLiq });
+        ctx.setLineDash([]);
+        label(ctx, `Liq. ${d.leverage}× ${formatPrice(st.liqPrice)}`, reward.x + 4, yLiq + (d.side === "long" ? 9 : -9), "#ff9800");
+      }
+    }
+
+    const cx = reward.x + 4;
+    const above = (y: number) => y - 10;
+    const below = (y: number) => y + 10;
+    const targetText = `Ziel ${formatPrice(d.target)} · +${fmtPct(st.rewardPct)} · +${fmtMoney(st.rewardAmount)}`;
+    const stopText = `Stop ${formatPrice(d.stop)} · −${fmtPct(st.riskPct)} · −${fmtMoney(st.riskAmount)}`;
+    label(ctx, targetText, cx, d.side === "long" ? above(yTarget) : below(yTarget), UP);
+    label(ctx, stopText, cx, d.side === "long" ? below(yStop) : above(yStop), DOWN);
+    if (!st.valid) {
+      label(ctx, "Ungültig: Stop/Ziel auf falscher Seite", cx, yEntry, DOWN);
+      return;
+    }
+    const state =
+      st.status === "target" ? `Ziel erreicht +${fmtMoney(st.pnl)}` : st.status === "stop" ? `Stop −${fmtMoney(Math.abs(st.pnl))}` : `${st.status === "expired" ? "Ende" : "Offen"} ${st.pnl >= 0 ? "+" : "−"}${fmtMoney(Math.abs(st.pnl))}`;
+    const head = `${d.side === "long" ? "Long" : "Short"} ${formatPrice(d.entry)} · CRV ${st.rr.toLocaleString("de-DE", { maximumFractionDigits: 2 })} · Menge ${st.qty.toLocaleString("de-DE", { maximumSignificantDigits: 5 })} · ${state}`;
+    label(ctx, d.label ? `${d.label} · ${head}` : head, cx, yEntry, st.status === "stop" ? DOWN : st.status === "target" ? UP : "#d1d4dc");
+  }
+}
+
+const UP = "#089981";
+const DOWN = "#f23645";
+
+function fmtPct(v: number) {
+  return `${v.toLocaleString("de-DE", { maximumFractionDigits: 2 })} %`;
+}
+
+function fmtMoney(v: number) {
+  return v.toLocaleString("de-DE", { maximumFractionDigits: 2, minimumFractionDigits: 2 });
 }
 
 function line(ctx: CanvasRenderingContext2D, s: Segment) {
