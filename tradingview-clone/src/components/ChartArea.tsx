@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { indicatorLabel } from "../../shared/indicators";
 import { ChartEngine, type ComputedIndicator, type PointerEvent } from "../chart/ChartEngine";
+import { liquidationFeed } from "../market/liquidationFeed";
 import { DEFAULT_FIB_LEVELS, formatPrice } from "../chart/DrawingsPrimitive";
 import { addDrawing, newId, removeDrawing, removeIndicator, store, updateIndicator, updateSettings, useChartState, type Drawing, type Point } from "../store";
 
@@ -124,6 +125,8 @@ export function ChartArea({ onEngine, magnet, onEditIndicator }: Props) {
         engine.drawings.setPreview(null);
       }
     });
+    const pushLiquidations = () => engine.setLiquidations(liquidationFeed.get().items, store.get().settings.liveLiquidations);
+    const unsubscribeLiq = liquidationFeed.subscribe(pushLiquidations);
     const ro = new ResizeObserver(() => requestAnimationFrame(refreshLayout));
     ro.observe(containerRef.current!);
     const onKey = (ev: KeyboardEvent) => {
@@ -141,6 +144,7 @@ export function ChartArea({ onEngine, magnet, onEditIndicator }: Props) {
       window.removeEventListener("keydown", onKey);
       ro.disconnect();
       unsubscribe();
+      unsubscribeLiq();
       onEngine(null);
       engine.destroy();
       engineRef.current = null;

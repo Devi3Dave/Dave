@@ -24,9 +24,12 @@ import { heikinAshi, type Bar, type Series } from "../../shared/math";
 import { INTERVAL_SECONDS } from "../../shared/marketData";
 import { resolveTimeZone, type ChartSettings } from "../chartSettings";
 import type { ChartMarker, ChartState, ChartType, IndicatorInstance } from "../store";
+import type { LiveLiquidation } from "../market/liquidationFeed";
 import { AxisLabelsPrimitive } from "./AxisLabelsPrimitive";
 import { BandFillPrimitive, type BandPoint } from "./BandFillPrimitive";
 import { DrawingsPrimitive } from "./DrawingsPrimitive";
+import { HeatmapPrimitive } from "./HeatmapPrimitive";
+import { LiquidationBubblesPrimitive } from "./LiquidationBubblesPrimitive";
 import { VolumeProfilePrimitive } from "./VolumeProfilePrimitive";
 
 export const THEME = {
@@ -51,6 +54,7 @@ interface BuiltIndicator {
   series: ISeriesApi<SeriesType>[];
   bands: { primitive: BandFillPrimitive; host: ISeriesApi<SeriesType>; upper: string; lower: string }[];
   profile?: { primitive: VolumeProfilePrimitive; host: ISeriesApi<SeriesType> };
+  heatmap?: { primitive: HeatmapPrimitive; host: ISeriesApi<SeriesType> };
 }
 
 export interface PointerEvent {
@@ -74,6 +78,8 @@ export class ChartEngine {
   private built: BuiltIndicator[] = [];
   private markers: ChartMarker[] = [];
   private readonly axisLabels = new AxisLabelsPrimitive();
+  private readonly liquidationBubbles = new LiquidationBubblesPrimitive();
+  private liquidations: LiveLiquidation[] = [];
   private side: "left" | "right" = "right";
   private settingsKey = "";
   private intervalSeconds = 3600;
@@ -187,6 +193,7 @@ export class ChartEngine {
     });
 
     this.drawings.setData(s.drawings, s.bars);
+    this.liquidationBubbles.setData(s.settings.liveLiquidations ? this.liquidations : [], s.bars);
     if (s.markers !== this.markers || barsChanged) {
       this.markers = s.markers;
       this.applyMarkers();
@@ -197,6 +204,7 @@ export class ChartEngine {
     if (this.main) {
       this.main.detachPrimitive(this.drawings);
       this.main.detachPrimitive(this.axisLabels);
+      this.main.detachPrimitive(this.liquidationBubbles);
       this.markersApi?.detach();
       this.chart.removeSeries(this.main);
     }
@@ -231,6 +239,7 @@ export class ChartEngine {
     this.chartType = type;
     this.main.attachPrimitive(this.drawings);
     this.main.attachPrimitive(this.axisLabels);
+    this.main.attachPrimitive(this.liquidationBubbles);
     this.markersApi = createSeriesMarkers(this.main, []);
   }
 
@@ -278,6 +287,12 @@ export class ChartEngine {
     });
     this.main?.applyOptions({ lastValueVisible: st.lastPriceLabel, priceLineVisible: st.lastPriceLine });
     this.onLayout();
+  }
+
+  /** Live liquidations to draw as bubbles (only when the setting is on). */
+  setLiquidations(items: LiveLiquidation[], visible: boolean) {
+    this.liquidations = items;
+    this.liquidationBubbles.setData(visible ? items : [], this.bars);
   }
 
   /** Re-enables automatic price scaling (after the user dragged the scale). */
@@ -332,6 +347,7 @@ export class ChartEngine {
     for (const b of this.built) {
       for (const band of b.bands) band.host.detachPrimitive(band.primitive);
       if (b.profile) b.profile.host.detachPrimitive(b.profile.primitive);
+      if (b.heatmap) b.heatmap.host.detachPrimitive(b.heatmap.primitive);
       for (const s of b.series) this.chart.removeSeries(s);
     }
     this.built = [];
@@ -365,7 +381,12 @@ export class ChartEngine {
         profile = { primitive: new VolumeProfilePrimitive(), host: series[0] };
         series[0].attachPrimitive(profile.primitive);
       }
-      this.built.push({ computed: { instance, def, params, outputs: {}, paneIndex }, series, bands, profile });
+      let heatmap: BuiltIndicator["heatmap"];
+      if (def.heatmap && series[0]) {
+        heatmap = { primitive: new HeatmapPrimitive(), host: series[0] };
+        series[0].attachPrimitive(heatmap.primitive);
+      }
+      this.built.push({ computed: { instance, def, params, outputs: {}, paneIndex }, series, bands, profile, heatmap });
     }
 
     const panes = this.chart.panes();
@@ -456,6 +477,10 @@ export class ChartEngine {
         band.primitive.setPoints(pts);
       }
       if (b.profile) b.profile.primitive.setProfile(b.computed.instance.hidden ? null : (def.profile?.(bars, params) ?? null));
+      if (b.heatmap) {
+        const contrast = def.heatmapContrastKey ? params[def.heatmapContrastKey] : 1;
+        b.heatmap.primitive.setHeatmap(b.computed.instance.hidden ? null : (def.heatmap?.(bars, params) ?? null), contrast);
+      }
     }
   }
 

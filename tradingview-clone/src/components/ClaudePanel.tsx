@@ -22,6 +22,8 @@ const TOOL_LABELS: Record<string, string> = {
   remove_drawing: "Zeichnung entfernen",
   clear_drawings: "Zeichnungen löschen",
   take_screenshot: "Screenshot prüfen",
+  get_orderbook: "Orderbuch lesen",
+  get_liquidations: "Liquidationen lesen",
 };
 
 const QUICK_PROMPTS = [
@@ -31,6 +33,7 @@ const QUICK_PROMPTS = [
   "Zeichne ein Fibonacci-Retracement über den letzten großen Swing.",
   "Füge RSI und MACD hinzu und markiere Divergenzen im Chart.",
   "Erstelle ein Long- und ein Short-Szenario mit Einstieg, Stop und Zielen im Chart.",
+  "Wo liegen die großen Liquidations-Cluster und Orderbuch-Wände? Zeichne sie ein.",
 ];
 
 function Part({ part }: { part: AssistantPart }) {

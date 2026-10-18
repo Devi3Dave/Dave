@@ -86,6 +86,11 @@ export function ChartSettingsDialog({ onClose }: { onClose: () => void }) {
           </section>
 
           <section>
+            <h3>Krypto</h3>
+            <Toggle settingKey="liveLiquidations" label="Live-Liquidationen im Chart" tip="Echte Liquidationen von Binance Futures als Blasen (rot = Longs, grün = Shorts)" />
+          </section>
+
+          <section>
             <h3>Zeitachse</h3>
             <Row label="Zeitzone" tip="Zeitzone für Zeitachse und Fadenkreuz">
               <select value={st.timeZone} onChange={(e) => updateSettings({ timeZone: e.target.value })}>

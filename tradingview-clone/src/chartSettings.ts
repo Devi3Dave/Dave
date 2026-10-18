@@ -17,6 +17,7 @@ export interface ChartSettings {
   showSeconds: boolean;
   grid: GridMode;
   crosshair: CrosshairSetting;
+  liveLiquidations: boolean;
 }
 
 export const DEFAULT_SETTINGS: ChartSettings = {
@@ -32,6 +33,7 @@ export const DEFAULT_SETTINGS: ChartSettings = {
   showSeconds: false,
   grid: "both",
   crosshair: "normal",
+  liveLiquidations: true,
 };
 
 export const TIME_ZONES: { id: string; label: string }[] = [

@@ -1,9 +1,14 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { getIndicator, indicatorLabel, resolveParams } from "../../shared/indicators";
 import type { Bar } from "../../shared/math";
+import { liquidationClusters, liquidationHeatmap } from "../../shared/liquidations";
+import { isCryptoSymbol } from "../../shared/marketData";
+import { groupLevels, groupingSteps, type Level } from "../../shared/orderbook";
 import { toolSchemas, type ToolInput, type ToolName } from "../../shared/tools";
 import type { ChartEngine } from "../chart/ChartEngine";
 import { DEFAULT_FIB_LEVELS } from "../chart/DrawingsPrimitive";
+import { liquidationFeed, liquidationTotals } from "../market/liquidationFeed";
+import { orderBookFeed } from "../market/orderBookFeed";
 import {
   addDrawing,
   addIndicator,
@@ -58,6 +63,15 @@ function snapTime(raw: number | string, bars: Bar[], allowFuture = true): number
     else hi = mid;
   }
   return t - bars[lo].time <= bars[hi].time - t ? bars[lo].time : bars[hi].time;
+}
+
+async function waitFor<T>(probe: () => T | null, timeoutMs: number): Promise<T | null> {
+  const end = Date.now() + timeoutMs;
+  for (;;) {
+    const v = probe();
+    if (v || Date.now() > end) return v;
+    await new Promise((r) => setTimeout(r, 150));
+  }
 }
 
 const nextFrame = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
@@ -229,6 +243,64 @@ async function run(name: ToolName, input: unknown, engine: ChartEngine | null): 
       const { scope } = input as ToolInput<"clear_drawings">;
       clearDrawings(scope);
       return ok(scope === "all" ? "Alle Zeichnungen gelöscht" : "Claudes Zeichnungen gelöscht", "ok");
+    }
+
+    case "get_orderbook": {
+      const { market = "spot", levels = 20, group } = input as ToolInput<"get_orderbook">;
+      if (!isCryptoSymbol(s.symbol)) return fail(`Kein Binance-Orderbuch für ${s.symbol}`);
+      const before = orderBookFeed.get();
+      const startedHere = before.symbol !== s.symbol || before.market !== market || before.status === "off";
+      if (startedHere) orderBookFeed.start(s.symbol, market);
+      const book = await waitFor(() => {
+        const b = orderBookFeed.get();
+        return b.status === "live" && b.bids.length > 0 ? b : null;
+      }, 6000);
+      // Leave the feed as the order book panel had it.
+      if (startedHere) {
+        if (before.status === "off" || !before.symbol) orderBookFeed.stop();
+        else orderBookFeed.start(before.symbol, before.market);
+      }
+      if (!book) return fail(`Orderbuch nicht erreichbar: ${orderBookFeed.get().error ?? "Zeitüberschreitung"}`);
+      const step = group ?? groupingSteps(book.bids[0][0])[2];
+      const bids = groupLevels(book.bids, step, "bid").slice(0, levels);
+      const asks = groupLevels(book.asks, step, "ask").slice(0, levels);
+      const sum = (ls: Level[]) => ls.reduce((a, [, q]) => a + q, 0);
+      const walls = (ls: Level[]) => [...ls].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([p, q]) => ({ price: num(p), qty: num(q), notional: num(p * q) }));
+      const bv = sum(bids);
+      const av = sum(asks);
+      return ok(`Orderbuch ${market} gelesen`, {
+        symbol: s.symbol,
+        market,
+        group: step,
+        best_bid: num(book.bids[0][0]),
+        best_ask: num(book.asks[0][0]),
+        spread: num(book.asks[0][0] - book.bids[0][0]),
+        bid_share_pct: num((100 * bv) / (bv + av || 1)),
+        bid_walls: walls(bids),
+        ask_walls: walls(asks),
+        bids: bids.map(([p, q]) => [num(p), num(q)]),
+        asks: asks.map(([p, q]) => [num(p), num(q)]),
+      });
+    }
+
+    case "get_liquidations": {
+      const inst = s.indicators.find((i) => i.type === "liqheatmap");
+      const def = getIndicator("liqheatmap")!;
+      const p = resolveParams(def, inst?.params);
+      const hm = liquidationHeatmap(bars, p.lookback, p.rows);
+      const clusters = hm ? liquidationClusters(bars, hm, 5) : { above: [], below: [] };
+      const fmt = (c: { price: number; value: number; distancePct: number }) => ({ price: num(c.price), distance_pct: num(c.distancePct), est_notional: num(c.value) });
+      const feed = liquidationFeed.get();
+      const t5 = liquidationTotals(feed.items, 300);
+      const t60 = liquidationTotals(feed.items, 3600);
+      return ok("Liquidationen gelesen", {
+        note: "Cluster sind Modellschätzungen (keine echten Orderdaten); Live-Liquidationen sind eine Stichprobe von Binance (max. 1/Sekunde) seit App-Start.",
+        short_liquidation_clusters_above: clusters.above.map(fmt),
+        long_liquidation_clusters_below: clusters.below.map(fmt),
+        live_feed: feed.status,
+        live_totals: { long_5m: num(t5.long), short_5m: num(t5.short), long_1h: num(t60.long), short_1h: num(t60.short) },
+        recent: feed.items.slice(-15).map((l) => ({ time: iso(l.time), side: l.side, price: num(l.price), notional: num(l.notional) })),
+      });
     }
 
     case "take_screenshot": {
