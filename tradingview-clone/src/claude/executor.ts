@@ -4,10 +4,11 @@ import type { Bar } from "../../shared/math";
 import { liquidationClusters, liquidationHeatmap } from "../../shared/liquidations";
 import { isCryptoSymbol } from "../../shared/marketData";
 import { groupLevels, groupingSteps, type Level } from "../../shared/orderbook";
+import { autoFibonacci, detectCandlePatterns, detectFormations } from "../../shared/patterns";
 import { isValidPosition, positionStats } from "../../shared/position";
 import { toolSchemas, type ToolInput, type ToolName } from "../../shared/tools";
 import type { ChartEngine } from "../chart/ChartEngine";
-import { DEFAULT_FIB_LEVELS } from "../chart/DrawingsPrimitive";
+import { DEFAULT_FIBEXT_LEVELS, DEFAULT_FIB_LEVELS } from "../chart/DrawingsPrimitive";
 import { lastPositionDefaults } from "../components/PositionDialog";
 import { liquidationFeed, liquidationTotals } from "../market/liquidationFeed";
 import { orderBookFeed } from "../market/orderBookFeed";
@@ -212,6 +213,62 @@ async function run(name: ToolName, input: unknown, engine: ChartEngine | null): 
       addDrawing(d);
       const levels = Object.fromEntries(d.levels.map((l) => [l, num(d.b.price + (d.a.price - d.b.price) * l)]));
       return ok("Fibonacci-Retracement", { id: d.id, levels });
+    }
+
+    case "draw_fib_extension": {
+      const i = input as ToolInput<"draw_fib_extension">;
+      const d: Extract<Drawing, { kind: "fibext" }> = {
+        id: newId("claude-fibext"),
+        author: "claude",
+        kind: "fibext",
+        a: pt(i.start),
+        b: pt(i.end),
+        c: pt(i.retrace),
+        levels: i.levels?.length ? i.levels : DEFAULT_FIBEXT_LEVELS,
+        color: i.color ?? "auto",
+      };
+      addDrawing(d);
+      const levels = Object.fromEntries(d.levels.map((l) => [l, num(d.c.price + (d.b.price - d.a.price) * l)]));
+      return ok("Fibonacci-Extension", { id: d.id, levels });
+    }
+
+    case "draw_auto_fibonacci": {
+      const { last_n = 150 } = input as ToolInput<"draw_auto_fibonacci">;
+      const swing = autoFibonacci(bars, bars.length - last_n, bars.length - 1);
+      if (!swing) return fail("Kein Swing gefunden");
+      const d: Extract<Drawing, { kind: "fib" }> = { id: newId("claude-autofib"), author: "claude", kind: "fib", a: swing.a, b: swing.b, levels: DEFAULT_FIB_LEVELS, color: "auto", label: "Auto-Fib" };
+      addDrawing(d);
+      const levels = Object.fromEntries(d.levels.map((l) => [l, num(d.b.price + (d.a.price - d.b.price) * l)]));
+      return ok("Auto-Fibonacci", { id: d.id, from: { time: iso(swing.a.time), price: num(swing.a.price) }, to: { time: iso(swing.b.time), price: num(swing.b.price) }, levels });
+    }
+
+    case "draw_parallel_channel": {
+      const i = input as ToolInput<"draw_parallel_channel">;
+      const a = pt(i.start);
+      const b = pt(i.end);
+      const c = pt(i.width_point);
+      if (a.time === b.time) return fail("start und end brauchen verschiedene Zeitpunkte");
+      const onLine = a.price + ((b.price - a.price) * (c.time - a.time)) / (b.time - a.time);
+      const d: Drawing = { id: newId("claude-channel"), author: "claude", kind: "channel", a, b, offset: c.price - onLine, color: i.color ?? "#2962ff", label: i.label };
+      addDrawing(d);
+      return ok(`Kanal${i.label ? ` „${i.label}“` : ""}`, { id: d.id, offset: num(c.price - onLine) });
+    }
+
+    case "get_patterns": {
+      const { last_n = 100, pivot = 5, tolerance_pct = 1.5 } = input as ToolInput<"get_patterns">;
+      const candles = detectCandlePatterns(bars, last_n, false);
+      const formations = detectFormations(bars, pivot, tolerance_pct);
+      return ok(`${candles.length} Kerzenmuster, ${formations.length} Formationen`, {
+        candle_patterns: candles.map((c) => ({ time: iso(c.time), pattern: c.name, direction: c.direction })),
+        formations: formations.map((f) => ({
+          pattern: f.name,
+          direction: f.direction,
+          confirmed: f.confirmed,
+          target: f.target !== undefined ? num(f.target) : undefined,
+          neckline: f.neckline?.map((p) => ({ time: iso(p.time), price: num(p.price) })),
+          points: f.points.map((p) => ({ time: iso(p.time), price: num(p.price), type: p.type })),
+        })),
+      });
     }
 
     case "draw_position": {

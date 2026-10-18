@@ -54,11 +54,18 @@ und zusammen mit der Fill & Sign-App auf GitHub Pages veröffentlicht.
   Der angetippte Chart ist aktiv (blauer Rahmen); Kopfzeile, Werkzeuge und Claude wirken auf ihn.
   Optional wird die Zeiteinheit in allen Charts synchron gewechselt
 - Layout (Symbol, Indikatoren, Zeichnungen, Einstellungen) wird je Chart im Browser gespeichert
+- Vorlagen (▤ Vorlagen): fertige Setups Scalping, Daytrading, Swing, Krypto-Zyklus und
+  Mustererkennung; eigene Vorlagen aus dem aktiven Chart speichern (Indikatoren mit Parametern/Farben,
+  optional Zeiteinheit, Symbol und Zeichnungen) und ganze Arbeitsbereiche (Layout mit allen Charts)
 - Versionsnummer neben dem Logo; sie zeigt „Update“, sobald eine neuere Version online ist –
   Antippen lädt sie
 
-**Indikatoren (79)**
+**Indikatoren (81)**
 - Favoriten: im Indikator-Dialog mit ☆ markieren; sie stehen dort oben und im ★-Menü der Kopfzeile
+- *Muster:* Kerzenmuster (Engulfing, Hammer, Hanging Man, Inverted Hammer, Shooting Star, Morning/Evening
+  Star, Harami, Piercing Line, Dark Cloud Cover, Three White Soldiers/Black Crows, optional Doji) als Marker;
+  Chartformationen (Doppeltop/-boden, Schulter-Kopf-Schulter auch invers, aktuelles Dreieck) mit
+  Nackenlinie, Bestätigung und Kursziel
 - *Krypto:* Liquidations-Heatmap (geschätzt), Bull Market Support Band (20W SMA / 21W EMA), Pi Cycle Top, Mayer Multiple,
   Cumulative Volume Delta (CVD), Volume Delta (mit Binance-Taker-Volumen)
 - *Gleitende Durchschnitte:* SMA, EMA, WMA, HMA, VWMA, DEMA, TEMA, SMMA/RMA, KAMA, ALMA, LSMA,
@@ -89,8 +96,10 @@ und zusammen mit der Fill & Sign-App auf GitHub Pages veröffentlicht.
 - Claude kann beides über `get_orderbook` und `get_liquidations` auswerten
 
 **Zeichenwerkzeuge**
-Trendlinie, Strahl, horizontale/vertikale Linie, Rechteck/Zone, Fibonacci-Retracement, Text,
-Long-/Short-Position, Radierer, Magnet (rastet an OHLC ein). `Esc` bricht ab.
+Trendlinie, Strahl, horizontale/vertikale Linie, Rechteck/Zone, Fibonacci-Retracement,
+Fibonacci-Extension, Auto-Fibonacci (größter Swing im sichtbaren Bereich), paralleler Kanal,
+Messwerkzeug (Δ Preis, Δ %, Kerzen, Δ Zeit), Pinsel (Freihand), Text, Long-/Short-Position,
+Radierer, Magnet (rastet an OHLC ein). `Esc` bricht ab.
 
 *Long-/Short-Position (▲/▼):* Einstieg, Stop-Loss und Take-Profit nacheinander antippen (der letzte Tipp
 legt auch das Ende der Zeitspanne fest). Angezeigt werden Chance/Risiko, Abstand in % und Betrag,
@@ -110,6 +119,8 @@ erreicht wurde (Gewinn/Verlust). Antippen der Position öffnet ihre Einstellunge
 | `add_indicator` / `remove_indicator` | Indikatoren hinzufügen/entfernen |
 | `set_chart` | Symbol, Zeiteinheit oder Charttyp wechseln |
 | `draw_trendline`, `draw_horizontal_line`, `draw_vertical_line`, `draw_zone`, `draw_fibonacci`, `add_text`, `add_markers` | Zeichnen |
+| `draw_fib_extension`, `draw_auto_fibonacci`, `draw_parallel_channel` | Fib-Extension, Auto-Fib, Kanal |
+| `get_patterns` | Kerzenmuster und Chartformationen erkennen |
 | `draw_position` | Handelsidee als Long-/Short-Position mit Stop, Ziel und Positionsgröße |
 | `remove_drawing`, `clear_drawings` | Zeichnungen entfernen |
 | `get_orderbook` | Live-Orderbuch mit Wänden und Kauf-/Verkaufsverhältnis |

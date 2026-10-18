@@ -30,6 +30,10 @@ export type Drawing =
   | (DrawingBase & { kind: "zone"; top: number; bottom: number; from?: number; to?: number; extendRight: boolean })
   | (DrawingBase & { kind: "fib"; a: Point; b: Point; levels: number[] })
   | (DrawingBase & { kind: "text"; at: Point; text: string })
+  | (DrawingBase & { kind: "fibext"; a: Point; b: Point; c: Point; levels: number[] })
+  | (DrawingBase & { kind: "channel"; a: Point; b: Point; offset: number })
+  | (DrawingBase & { kind: "measure"; a: Point; b: Point })
+  | (DrawingBase & { kind: "path"; points: Point[]; width: number })
   | (DrawingBase & { kind: "position" } & PositionInput);
 
 export type DrawingKind = Drawing["kind"];
@@ -53,7 +57,7 @@ export interface IndicatorInstance {
   author: Author;
 }
 
-export type Tool = "cursor" | "trendline" | "ray" | "hline" | "vline" | "zone" | "fib" | "text" | "long" | "short" | "erase";
+export type Tool = "cursor" | "trendline" | "ray" | "hline" | "vline" | "zone" | "fib" | "text" | "fibext" | "channel" | "measure" | "brush" | "long" | "short" | "erase";
 
 export interface ChartState {
   symbol: string;

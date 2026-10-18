@@ -3,7 +3,7 @@ import { INDICATORS, getIndicator, resolveParams, type IndicatorCategory, type I
 import { toggleFavorite, useFavorites } from "../favorites";
 import { addIndicator, updateIndicator, useChartState } from "../store";
 
-const CATEGORY_ORDER: IndicatorCategory[] = ["Krypto", "Gleitende Durchschnitte", "Trend", "Momentum", "Volatilität", "Volumen"];
+const CATEGORY_ORDER: IndicatorCategory[] = ["Krypto", "Muster", "Gleitende Durchschnitte", "Trend", "Momentum", "Volatilität", "Volumen"];
 
 export function IndicatorDialog({ onClose }: { onClose: () => void }) {
   const [query, setQuery] = useState("");

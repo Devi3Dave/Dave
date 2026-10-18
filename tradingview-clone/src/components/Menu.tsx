@@ -31,7 +31,7 @@ export function Menu({ label, tip, className, ariaLabel, children }: Props) {
       <button className={`pill ${className ?? ""} ${open ? "active" : ""}`} onClick={(e) => {
           // Fixed position: the top bar scrolls horizontally and would clip an absolute panel.
           const r = e.currentTarget.getBoundingClientRect();
-          setPos({ top: r.bottom + 4, left: Math.max(8, Math.min(r.left, window.innerWidth - 268)) });
+          setPos({ top: r.bottom + 4, left: Math.max(8, Math.min(r.left, window.innerWidth - 308)) });
           setOpen((o) => !o);
         }} data-tip={open ? undefined : tip} aria-label={ariaLabel} aria-expanded={open}>
         {label}

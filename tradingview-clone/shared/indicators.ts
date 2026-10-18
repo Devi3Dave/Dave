@@ -1,5 +1,6 @@
 import { liquidationHeatmap, strongestLevels, type Heatmap } from "./liquidations.js";
 import * as m from "./math.js";
+import { detectCandlePatterns, detectFormations, type CandlePattern, type Formation } from "./patterns.js";
 import type { Bar, Series } from "./math.js";
 
 export type { Bar, Series };
@@ -28,7 +29,7 @@ export interface OutputDef {
   pointColor?: (ctx: { values: Series; i: number; bar: Bar; outputs: Record<string, Series>; base: string }) => string;
 }
 
-export type IndicatorCategory = "Gleitende Durchschnitte" | "Trend" | "Momentum" | "Volatilität" | "Volumen" | "Krypto";
+export type IndicatorCategory = "Gleitende Durchschnitte" | "Trend" | "Momentum" | "Volatilität" | "Volumen" | "Krypto" | "Muster";
 
 export interface IndicatorDef {
   id: string;
@@ -50,6 +51,13 @@ export interface IndicatorDef {
   heatmap?: (bars: Bar[], p: Record<string, number>) => Heatmap | null;
   // Contrast exponent for the heatmap colors (param key).
   heatmapContrastKey?: string;
+  // Candle patterns (as markers) and chart formations (as lines) found in the data.
+  patterns?: (bars: Bar[], p: Record<string, number>) => PatternResult;
+}
+
+export interface PatternResult {
+  candles: CandlePattern[];
+  formations: Formation[];
 }
 
 // Rising/falling coloring shared by momentum histograms.
@@ -67,6 +75,36 @@ const risingFalling =
 const len = (def = 14, label = "Länge"): ParamDef => ({ key: "length", label, default: def, min: 1, max: 500, step: 1 });
 
 export const INDICATORS: IndicatorDef[] = [
+  {
+    id: "candlepatterns",
+    name: "Kerzenmuster",
+    category: "Muster",
+    overlay: true,
+    description:
+      "Erkennt Engulfing, Hammer, Hanging Man, (Inverted) Hammer, Shooting Star, Morning/Evening Star, Harami, Piercing Line, Dark Cloud Cover, Three White Soldiers/Black Crows und optional Doji – als Marker an der Kerze.",
+    params: [
+      { key: "lookback", label: "Kerzen durchsuchen", default: 150, min: 20, max: 1000 },
+      { key: "doji", label: "Doji zeigen (0/1)", default: 0, min: 0, max: 1 },
+    ],
+    outputs: [],
+    compute: () => ({}),
+    patterns: (b, p) => ({ candles: detectCandlePatterns(b, p.lookback, p.doji >= 1), formations: [] }),
+  },
+  {
+    id: "chartpatterns",
+    name: "Chartformationen",
+    category: "Muster",
+    overlay: true,
+    description:
+      "Erkennt Doppeltop/-boden, Schulter-Kopf-Schulter (auch invers) und das aktuelle Dreieck (aufsteigend, absteigend, symmetrisch) aus Swing-Hochs/-Tiefs. Durchgezogen = Nackenlinie gebrochen, gestrichelt = noch unbestätigt; mit Kursziel.",
+    params: [
+      { key: "pivot", label: "Swing-Länge", default: 5, min: 2, max: 30 },
+      { key: "tolerance", label: "Toleranz %", default: 1.5, min: 0.2, max: 10, step: 0.1 },
+    ],
+    outputs: [],
+    compute: () => ({}),
+    patterns: (b, p) => ({ candles: [], formations: detectFormations(b, p.pivot, p.tolerance) }),
+  },
   // ---------------- Trend / overlays ----------------
   {
     id: "sma",

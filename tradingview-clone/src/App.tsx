@@ -47,7 +47,7 @@ export default function App() {
         heatmapOpen={heatmapOpen}
         onToggleHeatmap={() => setHeatmapOpen((o) => !o)}
         claudeOpen={claudeOpen} onToggleClaude={() => setClaudeOpen((o) => !o)} />
-      <DrawingToolbar magnet={magnet} onToggleMagnet={() => setMagnet((m) => !m)} />
+      <DrawingToolbar magnet={magnet} onToggleMagnet={() => setMagnet((m) => !m)} getEngine={getEngine} />
       <ChartGrid onEngine={onEngine} magnet={magnet} onEditIndicator={setEditing} onEditPosition={setEditingPosition} />
       {/* Drawn over the chart (same grid cell) so the chart engine stays alive for Claude. */}
       {heatmapOpen && <LiqHeatmapView onClose={() => setHeatmapOpen(false)} />}
