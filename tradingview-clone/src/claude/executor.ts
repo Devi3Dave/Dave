@@ -4,9 +4,11 @@ import type { Bar } from "../../shared/math";
 import { liquidationClusters, liquidationHeatmap } from "../../shared/liquidations";
 import { isCryptoSymbol } from "../../shared/marketData";
 import { groupLevels, groupingSteps, type Level } from "../../shared/orderbook";
+import { isValidPosition, positionStats } from "../../shared/position";
 import { toolSchemas, type ToolInput, type ToolName } from "../../shared/tools";
 import type { ChartEngine } from "../chart/ChartEngine";
 import { DEFAULT_FIB_LEVELS } from "../chart/DrawingsPrimitive";
+import { lastPositionDefaults } from "../components/PositionDialog";
 import { liquidationFeed, liquidationTotals } from "../market/liquidationFeed";
 import { orderBookFeed } from "../market/orderBookFeed";
 import {
@@ -210,6 +212,46 @@ async function run(name: ToolName, input: unknown, engine: ChartEngine | null): 
       addDrawing(d);
       const levels = Object.fromEntries(d.levels.map((l) => [l, num(d.b.price + (d.a.price - d.b.price) * l)]));
       return ok("Fibonacci-Retracement", { id: d.id, levels });
+    }
+
+    case "draw_position": {
+      const i = input as ToolInput<"draw_position">;
+      if (!isValidPosition(i)) return fail(i.side === "long" ? "Long: Stop < Einstieg < Ziel erforderlich" : "Short: Ziel < Einstieg < Stop erforderlich");
+      const last = bars[bars.length - 1];
+      const step = bars.length > 1 ? last.time - bars[bars.length - 2].time : 3600;
+      const from = i.start_time !== undefined ? snapTime(i.start_time, bars) : (last?.time ?? Math.floor(Date.now() / 1000));
+      const to = i.end_time !== undefined ? snapTime(i.end_time, bars) : from + 20 * step;
+      if (to <= from) return fail("end_time muss nach start_time liegen");
+      const defaults = lastPositionDefaults();
+      const d: Extract<Drawing, { kind: "position" }> = {
+        id: newId("claude-pos"),
+        author: "claude",
+        kind: "position",
+        color: i.side === "long" ? "#089981" : "#f23645",
+        label: i.label,
+        side: i.side,
+        entry: i.entry,
+        stop: i.stop,
+        target: i.target,
+        from,
+        to,
+        account: i.account_size ?? defaults.account,
+        risk: i.risk_percent ?? defaults.risk,
+        leverage: i.leverage ?? defaults.leverage,
+      };
+      addDrawing(d);
+      const st = positionStats(d, bars);
+      return ok(`${i.side === "long" ? "Long" : "Short"}-Position CRV ${st.rr.toFixed(2)}`, {
+        id: d.id,
+        rr: num(st.rr),
+        risk_pct: num(st.riskPct),
+        reward_pct: num(st.rewardPct),
+        qty: num(st.qty),
+        risk_amount: num(st.riskAmount),
+        liquidation: st.liqPrice !== null ? num(st.liqPrice) : null,
+        liquidation_before_stop: st.liqBeforeStop,
+        status: st.status,
+      });
     }
 
     case "add_text": {

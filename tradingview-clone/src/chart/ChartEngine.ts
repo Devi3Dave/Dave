@@ -133,6 +133,10 @@ export class ChartEngine {
 
   destroy() {
     this.destroyed = true;
+    // remove() does not detach primitives; the countdown timer would keep redrawing the disposed chart.
+    this.main?.detachPrimitive(this.drawings);
+    this.main?.detachPrimitive(this.axisLabels);
+    this.main?.detachPrimitive(this.liquidationBubbles);
     this.chart.remove();
   }
 

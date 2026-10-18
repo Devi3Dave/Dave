@@ -93,6 +93,22 @@ export const toolSchemas = {
       color: color.optional(),
     }),
   },
+  draw_position: {
+    description:
+      "Zeichnet ein Long/Short-Positionswerkzeug wie in TradingView: grüne Zone Einstieg→Ziel, rote Zone Einstieg→Stop, mit Chance/Risiko-Verhältnis, Positionsgröße aus Kontogröße und Risiko-% sowie Status (läuft / Ziel / Stop). Stop und Ziel müssen auf der richtigen Seite liegen (Long: Stop < Einstieg < Ziel).",
+    schema: z.object({
+      side: z.enum(["long", "short"]),
+      entry: z.number(),
+      stop: z.number(),
+      target: z.number(),
+      start_time: time.optional().describe("Einstiegszeitpunkt, Standard: letzte Kerze"),
+      end_time: time.optional().describe("Ende des Handelsfensters, Standard: 20 Kerzen nach dem Einstieg"),
+      account_size: z.number().positive().optional().describe("Standard: letzte Einstellung des Nutzers"),
+      risk_percent: z.number().positive().max(100).optional(),
+      leverage: z.number().min(1).max(125).optional(),
+      label: z.string().optional(),
+    }),
+  },
   add_text: {
     description: "Setzt eine Textnotiz an eine Position im Chart.",
     schema: z.object({ time, price: z.number(), text: z.string(), color: color.optional() }),

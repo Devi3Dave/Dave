@@ -9,6 +9,8 @@ const TOOLS: { id: Tool; icon: string; label: string }[] = [
   { id: "zone", icon: "▭", label: "Rechteck / Zone\nZwei Ecken antippen" },
   { id: "fib", icon: "≣", label: "Fibonacci-Retracement\nVon Swing-Tief zu Swing-Hoch ziehen" },
   { id: "text", icon: "T", label: "Text" },
+  { id: "long", icon: "▲", label: "Long-Position\nEinstieg, dann Stop-Loss, dann Take-Profit antippen\nAntippen der Position öffnet die Einstellungen" },
+  { id: "short", icon: "▼", label: "Short-Position\nEinstieg, dann Stop-Loss, dann Take-Profit antippen\nAntippen der Position öffnet die Einstellungen" },
   { id: "erase", icon: "⌫", label: "Radierer\nZeichnung anklicken zum Löschen" },
 ];
 
@@ -22,7 +24,7 @@ export function DrawingToolbar({ magnet, onToggleMagnet }: Props) {
   return (
     <nav className="toolbar">
       {TOOLS.map((t) => (
-        <button key={t.id} data-tip={t.label} aria-label={t.label} className={tool === t.id ? "active" : ""} onClick={() => store.set({ tool: t.id })}>
+        <button key={t.id} data-tip={t.label} aria-label={t.label} className={`${tool === t.id ? "active" : ""} tool-${t.id}`} onClick={() => store.set({ tool: t.id })}>
           {t.icon}
         </button>
       ))}
