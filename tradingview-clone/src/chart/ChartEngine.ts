@@ -23,6 +23,7 @@ import {
 import { getIndicator, resolveParams, type IndicatorDef, type OutputDef } from "../../shared/indicators";
 import { heikinAshi, type Bar, type Series } from "../../shared/math";
 import { INTERVAL_SECONDS } from "../../shared/marketData";
+import type { OrderBlock, OrderBlockSignal } from "../../shared/orderblocks";
 import type { CandlePattern, Formation } from "../../shared/patterns";
 import { resolveTimeZone, type ChartSettings } from "../chartSettings";
 import type { ChartMarker, ChartState, ChartType, IndicatorInstance } from "../store";
@@ -536,14 +537,19 @@ export class ChartEngine {
   private fillPatterns() {
     const candles: CandlePattern[] = [];
     const formations: Formation[] = [];
+    const zones: OrderBlock[] = [];
+    const signals: OrderBlockSignal[] = [];
     for (const b of this.built) {
       const { def, params, instance } = b.computed;
       if (!def.patterns || instance.hidden) continue;
       const r = def.patterns(this.bars, params);
       candles.push(...r.candles);
       formations.push(...r.formations);
+      zones.push(...(r.zones ?? []));
+      signals.push(...(r.signals ?? []));
     }
     this.patterns.setFormations(formations);
+    this.patterns.setZones(zones);
     const markers: SeriesMarker<Time>[] = candles.map((c) => ({
       time: ts(c.time),
       position: c.direction === "bullish" ? "belowBar" : "aboveBar",
@@ -552,6 +558,10 @@ export class ChartEngine {
       text: c.name,
       size: 0.6,
     }));
+    for (const sg of signals) {
+      const buy = sg.side === "buy";
+      markers.push({ time: ts(sg.time), position: buy ? "belowBar" : "aboveBar", shape: buy ? "arrowUp" : "arrowDown", color: buy ? "#00e676" : "#ff1744", text: `${buy ? "Buy" : "Sell"} ${sg.tf}` });
+    }
     const key = JSON.stringify(markers);
     if (key === this.patternKey) return;
     this.patternKey = key;

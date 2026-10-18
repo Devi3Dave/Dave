@@ -55,13 +55,17 @@ und zusammen mit der Fill & Sign-App auf GitHub Pages veröffentlicht.
   Optional wird die Zeiteinheit in allen Charts synchron gewechselt
 - Layout (Symbol, Indikatoren, Zeichnungen, Einstellungen) wird je Chart im Browser gespeichert
 - Vorlagen (▤ Vorlagen): fertige Setups Scalping, Daytrading, Swing, Krypto-Zyklus und
-  Mustererkennung; eigene Vorlagen aus dem aktiven Chart speichern (Indikatoren mit Parametern/Farben,
+  Smart Money, Mustererkennung; eigene Vorlagen aus dem aktiven Chart speichern (Indikatoren mit Parametern/Farben,
   optional Zeiteinheit, Symbol und Zeichnungen) und ganze Arbeitsbereiche (Layout mit allen Charts)
 - Versionsnummer neben dem Logo; sie zeigt „Update“, sobald eine neuere Version online ist –
   Antippen lädt sie
 
-**Indikatoren (81)**
+**Indikatoren (82)**
 - Favoriten: im Indikator-Dialog mit ☆ markieren; sie stehen dort oben und im ★-Menü der Kopfzeile
+- *Orderblöcke & Buy/Sell-Signale (MTF):* Smart-Money-Orderblöcke (letzte Gegenkerze vor einem
+  Strukturbruch) auf dem Chart-Zeitrahmen und zwei wählbaren höheren Zeitrahmen (Standard 4h und 1d),
+  als Zonen bis zur Invalidierung; Buy/Sell-Signal beim ersten Retest mit Reaktionskerze.
+  Höhere Zeitrahmen werden aus abgeschlossenen Kerzen gebildet (kein Repainting)
 - *Muster:* Kerzenmuster (Engulfing, Hammer, Hanging Man, Inverted Hammer, Shooting Star, Morning/Evening
   Star, Harami, Piercing Line, Dark Cloud Cover, Three White Soldiers/Black Crows, optional Doji) als Marker;
   Chartformationen (Doppeltop/-boden, Schulter-Kopf-Schulter auch invers, aktuelles Dreieck) mit
@@ -120,6 +124,7 @@ erreicht wurde (Gewinn/Verlust). Antippen der Position öffnet ihre Einstellunge
 | `set_chart` | Symbol, Zeiteinheit oder Charttyp wechseln |
 | `draw_trendline`, `draw_horizontal_line`, `draw_vertical_line`, `draw_zone`, `draw_fibonacci`, `add_text`, `add_markers` | Zeichnen |
 | `draw_fib_extension`, `draw_auto_fibonacci`, `draw_parallel_channel` | Fib-Extension, Auto-Fib, Kanal |
+| `get_order_blocks` | Aktive Orderblöcke (mehrere Zeitrahmen) und letzte Buy/Sell-Signale |
 | `get_patterns` | Kerzenmuster und Chartformationen erkennen |
 | `draw_position` | Handelsidee als Long-/Short-Position mit Stop, Ziel und Positionsgröße |
 | `remove_drawing`, `clear_drawings` | Zeichnungen entfernen |

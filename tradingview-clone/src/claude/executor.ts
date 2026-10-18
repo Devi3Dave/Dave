@@ -4,6 +4,7 @@ import type { Bar } from "../../shared/math";
 import { liquidationClusters, liquidationHeatmap } from "../../shared/liquidations";
 import { isCryptoSymbol } from "../../shared/marketData";
 import { groupLevels, groupingSteps, type Level } from "../../shared/orderbook";
+import { orderBlocks } from "../../shared/orderblocks";
 import { autoFibonacci, detectCandlePatterns, detectFormations } from "../../shared/patterns";
 import { isValidPosition, positionStats } from "../../shared/position";
 import { toolSchemas, type ToolInput, type ToolName } from "../../shared/tools";
@@ -252,6 +253,24 @@ async function run(name: ToolName, input: unknown, engine: ChartEngine | null): 
       const d: Drawing = { id: newId("claude-channel"), author: "claude", kind: "channel", a, b, offset: c.price - onLine, color: i.color ?? "#2962ff", label: i.label };
       addDrawing(d);
       return ok(`Kanal${i.label ? ` „${i.label}“` : ""}`, { id: d.id, offset: num(c.price - onLine) });
+    }
+
+    case "get_order_blocks": {
+      const { higher_tf_minutes = [240, 1440], swing = 5 } = input as ToolInput<"get_order_blocks">;
+      const r = orderBlocks(bars, { swing, higher: higher_tf_minutes.map((m) => m * 60), maxZones: 6, showBroken: false });
+      const last = bars[bars.length - 1]?.close ?? 0;
+      return ok(`${r.zones.length} Orderblöcke, ${r.signals.length} Signale`, {
+        price: num(last),
+        order_blocks: r.zones.map((z) => ({
+          tf: z.tf,
+          side: z.side === "bull" ? "bullish (Nachfrage)" : "bearish (Angebot)",
+          top: num(z.top),
+          bottom: num(z.bottom),
+          since: iso(z.from),
+          distance_pct: num(((z.side === "bull" ? z.top : z.bottom) - last) / last * 100),
+        })),
+        recent_signals: r.signals.slice(-10).map((sg) => ({ time: iso(sg.time), signal: sg.side, tf: sg.tf, price: num(sg.price) })),
+      });
     }
 
     case "get_patterns": {

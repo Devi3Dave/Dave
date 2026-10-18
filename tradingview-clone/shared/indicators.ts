@@ -1,5 +1,6 @@
 import { liquidationHeatmap, strongestLevels, type Heatmap } from "./liquidations.js";
 import * as m from "./math.js";
+import { orderBlocks, type OrderBlock, type OrderBlockSignal } from "./orderblocks.js";
 import { detectCandlePatterns, detectFormations, type CandlePattern, type Formation } from "./patterns.js";
 import type { Bar, Series } from "./math.js";
 
@@ -58,7 +59,11 @@ export interface IndicatorDef {
 export interface PatternResult {
   candles: CandlePattern[];
   formations: Formation[];
+  zones?: OrderBlock[];
+  signals?: OrderBlockSignal[];
 }
+
+const MINUTES = 60;
 
 // Rising/falling coloring shared by momentum histograms.
 const prevOf = (values: Series, i: number) => (i > 0 ? values[i - 1] : null);
@@ -89,6 +94,29 @@ export const INDICATORS: IndicatorDef[] = [
     outputs: [],
     compute: () => ({}),
     patterns: (b, p) => ({ candles: detectCandlePatterns(b, p.lookback, p.doji >= 1), formations: [] }),
+  },
+  {
+    id: "orderblocks",
+    name: "Orderblöcke & Buy/Sell-Signale (MTF)",
+    short: "Orderblöcke MTF",
+    category: "Muster",
+    overlay: true,
+    description:
+      "Smart-Money-Orderblöcke auf dem Chart-Zeitrahmen und zwei höheren Zeitrahmen: letzte Gegenkerze vor einem Strukturbruch (BOS). Grün = bullisch (Nachfrage), rot = bärisch (Angebot); höhere Zeitrahmen kräftiger. Buy/Sell-Signal beim ersten Retest mit Reaktionskerze; ein Schlusskurs durch die Zone macht sie ungültig.",
+    params: [
+      { key: "swing", label: "Swing-Länge", default: 5, min: 2, max: 30 },
+      { key: "tf2", label: "Zeitrahmen 2 (Min., 0 = aus)", default: 240, min: 0, max: 43200 },
+      { key: "tf3", label: "Zeitrahmen 3 (Min., 0 = aus)", default: 1440, min: 0, max: 43200 },
+      { key: "zones", label: "Zonen je Zeitrahmen", default: 4, min: 1, max: 20 },
+      { key: "broken", label: "Gebrochene zeigen (0/1)", default: 0, min: 0, max: 1 },
+      { key: "signals", label: "Buy/Sell-Signale (0/1)", default: 1, min: 0, max: 1 },
+    ],
+    outputs: [],
+    compute: () => ({}),
+    patterns: (b, p) => {
+      const r = orderBlocks(b, { swing: p.swing, higher: [p.tf2 * MINUTES, p.tf3 * MINUTES].filter((s) => s > 0), maxZones: p.zones, showBroken: p.broken >= 1 });
+      return { candles: [], formations: [], zones: r.zones, signals: p.signals >= 1 ? r.signals : [] };
+    },
   },
   {
     id: "chartpatterns",

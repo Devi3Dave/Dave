@@ -1,4 +1,5 @@
 import type { IPrimitivePaneRenderer, IPrimitivePaneView, ISeriesApi, ISeriesPrimitive, SeriesAttachedParameter, SeriesType, Time } from "lightweight-charts";
+import type { OrderBlock } from "../../shared/orderblocks";
 import type { Formation } from "../../shared/patterns";
 import { formatPrice, withAlpha } from "./DrawingsPrimitive";
 
@@ -9,7 +10,9 @@ export class PatternsPrimitive implements ISeriesPrimitive<Time> {
   private series: ISeriesApi<SeriesType> | null = null;
   private requestUpdate: (() => void) | null = null;
   private formations: Formation[] = [];
+  private zones: OrderBlock[] = [];
   private readonly view: IPrimitivePaneView;
+  private readonly zoneView: IPrimitivePaneView;
 
   constructor(private readonly timeToX: (time: number) => number | null) {
     const renderer: IPrimitivePaneRenderer = {
@@ -23,6 +26,19 @@ export class PatternsPrimitive implements ISeriesPrimitive<Time> {
         }),
     };
     this.view = { renderer: () => renderer, zOrder: () => "top" };
+    const zoneRenderer: IPrimitivePaneRenderer = {
+      draw: () => {},
+      drawBackground: (target) =>
+        target.useMediaCoordinateSpace(({ context: ctx, mediaSize }) => {
+          ctx.save();
+          ctx.font = "10px -apple-system, BlinkMacSystemFont, 'Trebuchet MS', Roboto, sans-serif";
+          ctx.textBaseline = "middle";
+          this.drawZones(ctx, mediaSize.width);
+          ctx.restore();
+        }),
+    };
+    // Order blocks sit behind the candles.
+    this.zoneView = { renderer: () => zoneRenderer, zOrder: () => "bottom" };
   }
 
   attached(param: SeriesAttachedParameter<Time>) {
@@ -36,12 +52,47 @@ export class PatternsPrimitive implements ISeriesPrimitive<Time> {
   }
 
   paneViews() {
-    return [this.view];
+    return [this.zoneView, this.view];
   }
 
   setFormations(formations: Formation[]) {
     this.formations = formations;
     this.requestUpdate?.();
+  }
+
+  setZones(zones: OrderBlock[]) {
+    this.zones = zones;
+    this.requestUpdate?.();
+  }
+
+  /** Order blocks as boxes from their candle to the right edge (or to where they broke). */
+  private drawZones(ctx: CanvasRenderingContext2D, width: number) {
+    // Higher time frames first so the finer zones stay visible on top.
+    const sorted = [...this.zones].sort((a, b) => b.tfSeconds - a.tfSeconds);
+    const maxTf = Math.max(1, ...sorted.map((z) => z.tfSeconds));
+    for (const z of sorted) {
+      const x1 = this.timeToX(z.from);
+      const yTop = this.series?.priceToCoordinate(z.top) ?? null;
+      const yBottom = this.series?.priceToCoordinate(z.bottom) ?? null;
+      if (x1 === null || yTop === null || yBottom === null) continue;
+      const x2 = z.end !== null ? (this.timeToX(z.end) ?? width) : width;
+      if (x2 < 0 || x1 > width) continue;
+      const broken = z.end !== null;
+      const color = z.side === "bull" ? COLORS.bullish : COLORS.bearish;
+      // Weight grows with the time frame: 0.10 (chart) … 0.22 (highest).
+      const weight = 0.1 + 0.12 * (z.tfSeconds / maxTf);
+      const h = Math.max(1, yBottom - yTop);
+      ctx.fillStyle = withAlpha(broken ? "#787b86" : color, broken ? 0.06 : weight);
+      ctx.fillRect(x1, yTop, x2 - x1, h);
+      ctx.strokeStyle = withAlpha(broken ? "#787b86" : color, broken ? 0.3 : 0.4 + weight);
+      ctx.lineWidth = z.tfSeconds === maxTf && sorted.length > 1 ? 1.5 : 1;
+      ctx.setLineDash(broken ? [3, 3] : []);
+      ctx.strokeRect(x1, yTop, x2 - x1, h);
+      ctx.setLineDash([]);
+      const text = `OB ${z.tf}${broken ? " ✕" : ""}`;
+      ctx.fillStyle = withAlpha(broken ? "#787b86" : color, 0.95);
+      ctx.fillText(text, Math.max(x1, 0) + 4, yTop + Math.min(8, h / 2));
+    }
   }
 
   private xy(time: number, price: number): { x: number; y: number } | null {
