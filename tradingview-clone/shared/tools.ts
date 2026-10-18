@@ -127,6 +127,14 @@ export const toolSchemas = {
     description: "Zeichnet einen parallelen Kanal: Basislinie start→end und eine parallele Linie durch den Preis width_point (z. B. gegenüberliegendes Swing-Hoch/-Tief).",
     schema: z.object({ start: point, end: point, width_point: point, color: color.optional(), label: z.string().optional() }),
   },
+  get_order_blocks: {
+    description:
+      "Liefert aktive Smart-Money-Orderblöcke (bullisch = Nachfrage, bärisch = Angebot) auf dem Chart-Zeitrahmen und höheren Zeitrahmen sowie die letzten Buy/Sell-Signale (erster Retest mit Reaktionskerze). Zum Anzeigen den Indikator orderblocks hinzufügen.",
+    schema: z.object({
+      higher_tf_minutes: z.array(z.number().int().min(1).max(43200)).max(3).optional().describe("Standard [240, 1440]"),
+      swing: z.number().int().min(2).max(30).optional().describe("Standard 5"),
+    }),
+  },
   get_patterns: {
     description:
       "Erkennt Kerzenmuster (Engulfing, Hammer, Shooting Star, Morning/Evening Star, Harami, …) und Chartformationen (Doppeltop/-boden, Schulter-Kopf-Schulter, Dreiecke) in den geladenen Kerzen. Zum Einzeichnen die Indikatoren candlepatterns bzw. chartpatterns hinzufügen.",

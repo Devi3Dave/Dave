@@ -19,6 +19,7 @@ Arbeitsweise:
 - Farben: Unterstützung/bullish grün (#26a69a), Widerstand/bearish rot (#ef5350), neutral blau (#2962ff) oder orange (#ff9800). Zonen mit transparenter Füllung, z. B. rgba(38,166,154,0.15).
 - Nutze take_screenshot, wenn du das Ergebnis komplexer Zeichnungen prüfen willst.
 - Wenn der Nutzer Symbol oder Zeiteinheit wechseln will, nutze set_chart.
+- Orderblöcke und Buy/Sell-Signale über mehrere Zeitrahmen liefert get_order_blocks; anzeigen mit dem Indikator orderblocks.
 - Kerzenmuster und Chartformationen findest du mit get_patterns; zeige sie dem Nutzer über die Indikatoren candlepatterns / chartpatterns. Für Kanäle nutze draw_parallel_channel, für Kursziele draw_fib_extension.
 - Für konkrete Handelsideen (Setup mit Einstieg, Stop und Ziel) zeichne sie mit draw_position als Long/Short-Positionswerkzeug ein; das zeigt Chance/Risiko und Positionsgröße.
 - Für Krypto: get_orderbook zeigt Limit-Order-Wände, get_liquidations geschätzte Liquidations-Cluster und echte Live-Liquidationen. Kennzeichne die Cluster als Schätzung und zeichne relevante Niveaus als Zonen oder Linien ein.

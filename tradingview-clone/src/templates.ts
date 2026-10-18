@@ -75,6 +75,14 @@ export const BUILTIN_TEMPLATES: Template[] = [
     chart: { interval: "1d", chartType: "candles", indicators: [ind("volume"), ind("bmsb"), ind("picycle"), ind("mayer")] },
   },
   {
+    id: "builtin-smc",
+    name: "Smart Money",
+    kind: "chart",
+    builtin: true,
+    description: "Orderblöcke 4h/1d mit Buy/Sell-Signalen, EMA 50/200, Volumen",
+    chart: { indicators: [ind("volume"), ind("orderblocks"), ind("ema", { length: 50 }, ["#00bcd4"]), ind("ema", { length: 200 }, ["#f23645"])] },
+  },
+  {
     id: "builtin-patterns",
     name: "Mustererkennung",
     kind: "chart",
