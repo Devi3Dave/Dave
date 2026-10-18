@@ -213,7 +213,7 @@ function connectLive(symbol: string, interval: Interval, seq: number) {
     if (seq !== loadSeq) return;
     const k = JSON.parse(ev.data).k;
     if (!k) return;
-    const bar: Bar = { time: Math.floor(k.t / 1000), open: +k.o, high: +k.h, low: +k.l, close: +k.c, volume: +k.v };
+    const bar: Bar = { time: Math.floor(k.t / 1000), open: +k.o, high: +k.h, low: +k.l, close: +k.c, volume: +k.v, buyVolume: +k.V };
     store.set((s) => {
       const bars = s.bars.slice();
       const last = bars[bars.length - 1];

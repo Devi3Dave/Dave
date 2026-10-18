@@ -22,6 +22,7 @@ import { heikinAshi, type Bar, type Series } from "../../shared/math";
 import type { ChartMarker, ChartState, ChartType, IndicatorInstance } from "../store";
 import { BandFillPrimitive, type BandPoint } from "./BandFillPrimitive";
 import { DrawingsPrimitive } from "./DrawingsPrimitive";
+import { VolumeProfilePrimitive } from "./VolumeProfilePrimitive";
 
 export const THEME = {
   bg: "#131722",
@@ -44,6 +45,7 @@ interface BuiltIndicator {
   computed: ComputedIndicator;
   series: ISeriesApi<SeriesType>[];
   bands: { primitive: BandFillPrimitive; host: ISeriesApi<SeriesType>; upper: string; lower: string }[];
+  profile?: { primitive: VolumeProfilePrimitive; host: ISeriesApi<SeriesType> };
 }
 
 export interface PointerEvent {
@@ -225,6 +227,7 @@ export class ChartEngine {
   private clearIndicators() {
     for (const b of this.built) {
       for (const band of b.bands) band.host.detachPrimitive(band.primitive);
+      if (b.profile) b.profile.host.detachPrimitive(b.profile.primitive);
       for (const s of b.series) this.chart.removeSeries(s);
     }
     this.built = [];
@@ -253,7 +256,12 @@ export class ChartEngine {
         host.attachPrimitive(primitive);
         return { primitive, host, upper: f.upper, lower: f.lower };
       });
-      this.built.push({ computed: { instance, def, params, outputs: {}, paneIndex }, series, bands });
+      let profile: BuiltIndicator["profile"];
+      if (def.profile && series[0]) {
+        profile = { primitive: new VolumeProfilePrimitive(), host: series[0] };
+        series[0].attachPrimitive(profile.primitive);
+      }
+      this.built.push({ computed: { instance, def, params, outputs: {}, paneIndex }, series, bands, profile });
     }
 
     const panes = this.chart.panes();
@@ -265,6 +273,7 @@ export class ChartEngine {
   private addOutputSeries(def: IndicatorDef, o: OutputDef, color: string, paneIndex: number, isVolume: boolean, hidden: boolean) {
     const base = {
       visible: !hidden,
+      ...(o.noAutoscale ? { autoscaleInfoProvider: () => null } : {}),
       priceLineVisible: false,
       lastValueVisible: !def.overlay && !isVolume,
       title: "",
@@ -307,6 +316,7 @@ export class ChartEngine {
       def.outputs.forEach((o, k) => {
         const values = outputs[o.key] ?? [];
         const offset = o.offset?.(params) ?? 0;
+        const isLine = o.style !== "histogram" && o.style !== "dots";
         const data: { time: UTCTimestamp; value?: number; color?: string }[] = [];
         for (let i = 0; i < values.length; i++) {
           const j = i + offset;
@@ -317,7 +327,13 @@ export class ChartEngine {
             continue;
           }
           const point: { time: UTCTimestamp; value: number; color?: string } = { time: ts(timeAt(j)), value: v };
-          if (o.style === "histogram") point.color = histogramColor(def.id, values, i, bars[i], b.computed.instance.colors?.[k] ?? o.color);
+          const next = values[i + 1];
+          if (isLine && i + 1 < values.length && (next === null || !Number.isFinite(next))) {
+            // A line segment takes the color of its start point; hide the one bridging a gap.
+            point.color = "transparent";
+          } else if (o.pointColor) {
+            point.color = o.pointColor({ values, i, bar: bars[i], outputs, base: b.computed.instance.colors?.[k] ?? o.color });
+          }
           data.push(point);
         }
         b.series[k].setData(data as never);
@@ -335,6 +351,7 @@ export class ChartEngine {
         }
         band.primitive.setPoints(pts);
       }
+      if (b.profile) b.profile.primitive.setProfile(b.computed.instance.hidden ? null : (def.profile?.(bars, params) ?? null));
     }
   }
 
@@ -421,17 +438,4 @@ export class ChartEngine {
     out.getContext("2d")?.drawImage(canvas, 0, 0, out.width, out.height);
     return out.toDataURL("image/jpeg", 0.85);
   }
-}
-
-function histogramColor(id: string, values: Series, i: number, bar: Bar | undefined, color: string): string {
-  const v = values[i] as number;
-  const prev = values[i - 1];
-  if (id === "volume" && bar) return bar.close >= bar.open ? "rgba(38,166,154,0.5)" : "rgba(239,83,80,0.5)";
-  if (id === "macd") {
-    const rising = prev === null || prev === undefined || v >= prev;
-    if (v >= 0) return rising ? "#26a69a" : "#b2dfdb";
-    return rising ? "#ffcdd2" : "#ef5350";
-  }
-  if (id === "ao") return prev === null || prev === undefined || v >= prev ? "#26a69a" : "#ef5350";
-  return color;
 }

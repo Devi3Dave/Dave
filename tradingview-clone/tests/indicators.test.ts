@@ -5,6 +5,8 @@ import { demoBars } from "../shared/marketData";
 import { toolDefinitions } from "../shared/tools";
 
 const bars = demoBars("TEST", "1h", 400);
+// Daily bars: the crypto cycle indicators need up to 350 days of history.
+const daily = demoBars("TEST", "1d", 1000);
 
 describe("math", () => {
   it("sma / ema basics", () => {
@@ -46,11 +48,56 @@ describe("math", () => {
   });
 });
 
+describe("crypto indicators", () => {
+  it("zigzag joins alternating pivots that differ by at least the threshold", () => {
+    const z = m.zigzag(daily, 10);
+    const pivots: number[] = [];
+    for (let i = 1; i < z.length - 1; i++) {
+      const [a, b, c] = [z[i - 1], z[i], z[i + 1]];
+      if (a !== null && b !== null && c !== null && (b - a) * (c - b) < 0) pivots.push(b);
+    }
+    expect(pivots.length).toBeGreaterThan(2);
+    for (let k = 1; k < pivots.length; k++) expect(Math.abs(pivots[k] / pivots[k - 1] - 1)).toBeGreaterThanOrEqual(0.0999);
+  });
+
+  it("volume profile conserves volume and puts the POC inside the value area", () => {
+    const vp = m.volumeProfile(daily, 300, 30, 70)!;
+    const total = daily.slice(-300).reduce((s, b) => s + b.volume, 0);
+    expect(vp.rows.reduce((s, r) => s + r.volume, 0)).toBeCloseTo(total, 3);
+    expect(vp.val).toBeLessThanOrEqual(vp.poc);
+    expect(vp.vah).toBeGreaterThanOrEqual(vp.poc);
+    const inVa = vp.rows.filter((r) => r.inValueArea).reduce((s, r) => s + r.volume, 0);
+    expect(inVa / total).toBeGreaterThanOrEqual(0.7);
+  });
+
+  it("CVD uses taker-buy volume when present", () => {
+    const b = [
+      { time: 0, open: 1, high: 2, low: 1, close: 2, volume: 10, buyVolume: 7 },
+      { time: 60, open: 2, high: 2, low: 1, close: 1, volume: 10, buyVolume: 2 },
+    ];
+    expect(m.cvd(b, false)).toEqual([4, -2]);
+  });
+
+  it("higher-timeframe SMA equals the SMA of daily closes on daily bars", () => {
+    const htf = m.onHigherTimeframe(daily, 86400, (c) => m.smaLast(c, 111));
+    const direct = m.sma(m.closes(daily), 111);
+    expect(htf.at(-1)).toBeCloseTo(direct.at(-1) as number);
+  });
+
+  it("squeeze state is 0 or 1 and WaveTrend is centered", () => {
+    const sq = m.squeezeMomentum(daily, 20, 2, 1.5);
+    for (const v of sq.squeeze) if (v !== null) expect([0, 1]).toContain(v);
+    const wt = m.waveTrend(daily, 10, 21);
+    const vals = wt.wt1.filter((v): v is number => v !== null);
+    expect(Math.abs(vals.reduce((a, b) => a + b, 0) / vals.length)).toBeLessThan(40);
+  });
+});
+
 describe("registry", () => {
   it.each(INDICATORS.map((d) => [d.id, d] as const))("%s computes aligned, finite outputs", (_id, def) => {
-    const out = def.compute(bars, resolveParams(def));
+    const out = def.compute(daily, resolveParams(def));
     for (const o of def.outputs) {
-      expect(out[o.key], o.key).toHaveLength(bars.length);
+      expect(out[o.key], o.key).toHaveLength(daily.length);
       const defined = out[o.key].filter((v) => v !== null);
       expect(defined.length, `${def.id}.${o.key} has values`).toBeGreaterThan(0);
       for (const v of defined) expect(Number.isFinite(v)).toBe(true);
@@ -59,8 +106,8 @@ describe("registry", () => {
 
   it("resolveParams clamps and rounds", () => {
     const rsi = INDICATORS.find((d) => d.id === "rsi")!;
-    expect(resolveParams(rsi, { length: 0 })).toEqual({ length: 1 });
-    expect(resolveParams(rsi, { length: 14.6 })).toEqual({ length: 15 });
+    expect(resolveParams(rsi, { length: 0 })).toEqual({ length: 1, maLength: 14 });
+    expect(resolveParams(rsi, { length: 14.6, maLength: 500 })).toEqual({ length: 15, maLength: 200 });
   });
 });
 

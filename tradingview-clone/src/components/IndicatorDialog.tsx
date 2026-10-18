@@ -1,6 +1,8 @@
 import { useMemo, useState } from "react";
-import { INDICATORS, getIndicator, resolveParams } from "../../shared/indicators";
+import { INDICATORS, getIndicator, resolveParams, type IndicatorCategory } from "../../shared/indicators";
 import { addIndicator, updateIndicator, useChartState } from "../store";
+
+const CATEGORY_ORDER: IndicatorCategory[] = ["Krypto", "Gleitende Durchschnitte", "Trend", "Momentum", "Volatilität", "Volumen"];
 
 export function IndicatorDialog({ onClose }: { onClose: () => void }) {
   const [query, setQuery] = useState("");
@@ -8,7 +10,7 @@ export function IndicatorDialog({ onClose }: { onClose: () => void }) {
     const q = query.toLowerCase();
     return INDICATORS.filter((d) => !q || d.name.toLowerCase().includes(q) || d.id.includes(q) || d.description.toLowerCase().includes(q));
   }, [query]);
-  const categories = [...new Set(filtered.map((d) => d.category))];
+  const categories = CATEGORY_ORDER.filter((c) => filtered.some((d) => d.category === c));
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
