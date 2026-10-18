@@ -46,11 +46,21 @@ und zusammen mit der Fill & Sign-App auf GitHub Pages veröffentlicht.
   Einstellungen (Parameter/Farben), Ein-/Ausblenden
 - Layout (Symbol, Indikatoren, Zeichnungen) wird im Browser gespeichert
 
-**Indikatoren (32)**
-SMA, EMA, WMA, HMA, VWMA, VWAP, Bollinger Bands, Keltner Channels, Donchian Channels, Envelope,
-Ichimoku Cloud, Parabolic SAR, Supertrend, Pivot Points, Volumen, OBV, MFI, CMF, RSI, MACD,
-Stochastic, Stochastic RSI, CCI, Williams %R, ROC, Momentum, Awesome Oscillator, TRIX, ADX/DMI,
-ATR, Bollinger Band Width, Standardabweichung.
+**Indikatoren (78)**
+- *Krypto:* Bull Market Support Band (20W SMA / 21W EMA), Pi Cycle Top, Mayer Multiple,
+  Cumulative Volume Delta (CVD), Volume Delta (mit Binance-Taker-Volumen)
+- *Gleitende Durchschnitte:* SMA, EMA, WMA, HMA, VWMA, DEMA, TEMA, SMMA/RMA, KAMA, ALMA, LSMA,
+  McGinley Dynamic, EMA Ribbon (8/13/21/34/55), MA Cross (Golden/Death Cross)
+- *Trend:* Ichimoku, Supertrend, Parabolic SAR, Chandelier Exit, Williams Alligator, Williams Fractals,
+  ZigZag, Lineare Regression (Kanal), Envelope, Pivot Points, ADX/DMI, Aroon, Vortex
+- *Momentum:* RSI (mit MA), MACD, Stochastic, Stochastic RSI, WaveTrend (LazyBear),
+  Squeeze Momentum (LazyBear), KDJ, CCI, Williams %R, ROC, Momentum, Awesome Oscillator, TRIX,
+  Ultimate Oscillator, Fisher Transform, Connors RSI, Schaff Trend Cycle, PPO, KST, Coppock Curve, DPO
+- *Volatilität:* Bollinger Bands, %B, Band Width, Keltner, Donchian, ATR, Historische Volatilität,
+  Choppiness Index, Standardabweichung
+- *Volumen:* Volumen, Volume Profile (Fixed Range, POC/VAH/VAL), VWAP, VWAP mit σ-Bändern,
+  Anchored VWAP, OBV, MFI, CMF, A/D, Chaikin Oscillator, Elder Force Index, Klinger, Ease of Movement,
+  Volume Oscillator, PVT, Relative Volume (RVOL)
 
 **Zeichenwerkzeuge**
 Trendlinie, Strahl, horizontale/vertikale Linie, Rechteck/Zone, Fibonacci-Retracement, Text,

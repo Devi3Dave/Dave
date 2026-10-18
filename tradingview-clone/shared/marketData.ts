@@ -49,6 +49,7 @@ async function fromBinance(symbol: string, interval: string, limit: number): Pro
         low: Number(r[3]),
         close: Number(r[4]),
         volume: Number(r[5]),
+        buyVolume: Number(r[9]),
       }));
     } catch (err) {
       lastError = err;
