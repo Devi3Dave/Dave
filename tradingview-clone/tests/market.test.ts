@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { liquidationClusters, liquidationHeatmap, liquidationPrice } from "../shared/liquidations";
+import { liquidationClusters, liquidationHeatmap, liquidationPrice, openInterestModel, simulateLiquidations } from "../shared/liquidations";
 import { demoBars } from "../shared/marketData";
 import { LocalBook, groupLevels, groupingSteps } from "../shared/orderbook";
 
@@ -80,5 +80,33 @@ describe("liquidation heatmap", () => {
 
   it("is cached per bars array", () => {
     expect(liquidationHeatmap(bars, 300, 120)).toBe(liquidationHeatmap(bars, 300, 120));
+  });
+});
+
+describe("open-interest model", () => {
+  const bars = demoBars("ETHUSDT", "1h", 200);
+
+  it("turns OI increases into inflow and decreases into retention", () => {
+    const oi = bars.map((b, i) => ({ time: b.time, value: 1e9 + (i % 2 === 0 ? 0 : 5e7) }));
+    const m = openInterestModel(bars, oi);
+    expect(m.coverage).toBeCloseTo(1);
+    expect(m.inflow[1]).toBeCloseTo(5e7); // +50M
+    expect(m.retention[2]).toBeCloseTo(1e9 / 1.05e9); // -50M
+    expect(m.inflow[2]).toBe(0);
+  });
+
+  it("falls back to scaled volume where OI is missing", () => {
+    const oi = bars.slice(100).map((b, i) => ({ time: b.time, value: 1e9 + i * 1e6 }));
+    const m = openInterestModel(bars, oi);
+    expect(m.coverage).toBeGreaterThan(0.4);
+    expect(m.coverage).toBeLessThan(0.6);
+    expect(m.inflow[10]).toBeGreaterThan(0);
+  });
+
+  it("shrinks open levels when positions are closed", () => {
+    const full = simulateLiquidations(bars, { rows: 80 })!;
+    const halved = simulateLiquidations(bars, { rows: 80, retention: bars.map((_, i) => (i === bars.length - 1 ? 0.5 : 1)) })!;
+    const lastCol = (hm: typeof full) => hm.grid.slice((bars.length - 1 - hm.fromIndex) * 80).reduce((a, b) => a + b, 0);
+    expect(lastCol(halved)).toBeCloseTo(lastCol(full) * 0.5, 0);
   });
 });

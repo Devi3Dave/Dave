@@ -73,6 +73,10 @@ und zusammen mit der Fill & Sign-App auf GitHub Pages veröffentlicht.
   Kauf-/Verkaufsverhältnis; Antippen einer Stufe zeichnet sie als Linie in den Chart
 - *Liquidations-Heatmap (geschätzt):* Modell wie bei CoinGlass – je Kerze neue Positionen mit 10×/25×/50×/100×
   Hebel, Niveaus verschwinden, sobald der Kurs sie erreicht; dazu die stärksten Cluster über/unter dem Kurs
+- *Heatmap-Ansicht im CoinGlass-Stil (🔥 Heatmap in der Kopfzeile):* Vollbild mit Kurslinie, Farblegende,
+  Zeiträumen 12 h bis 1 Jahr, Kontrast/Schwelle und Tooltip mit geschätztem Liquidationsvolumen je Preis.
+  Das Modell nutzt wie CoinGlass das Open Interest von Binance Futures (neue Positionen bei steigendem,
+  anteilig geschlossene bei fallendem OI; ≈ letzte 30 Tage), davor kalibriertes Volumen
 - *Live-Liquidationen:* echte Liquidationen von Binance Futures als Blasen im Chart und als Liste
   (Binance liefert höchstens eine pro Sekunde und Symbol)
 - Claude kann beides über `get_orderbook` und `get_liquidations` auswerten

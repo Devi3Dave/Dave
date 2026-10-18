@@ -11,7 +11,14 @@ const TABS: { id: SideTab; label: string; tip: string }[] = [
   { id: "liq", label: "Liquidationen", tip: "Liquidations-Heatmap und Live-Liquidationen" },
 ];
 
-export function SidePanel({ tab, onTab, getEngine }: { tab: SideTab; onTab: (t: SideTab) => void; getEngine: () => ChartEngine | null }) {
+interface Props {
+  tab: SideTab;
+  onTab: (t: SideTab) => void;
+  getEngine: () => ChartEngine | null;
+  onOpenHeatmap: () => void;
+}
+
+export function SidePanel({ tab, onTab, getEngine, onOpenHeatmap }: Props) {
   return (
     <div className="side-panel">
       <div className="side-tabs" role="tablist">
@@ -33,7 +40,7 @@ export function SidePanel({ tab, onTab, getEngine }: { tab: SideTab; onTab: (t: 
         )}
         {tab === "liq" && (
           <div className="side-page">
-            <LiquidationsPanel />
+            <LiquidationsPanel onOpenHeatmap={onOpenHeatmap} />
           </div>
         )}
       </div>

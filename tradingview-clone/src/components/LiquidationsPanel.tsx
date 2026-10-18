@@ -10,7 +10,7 @@ const usd = (v: number) => (v >= 1e9 ? `${(v / 1e9).toFixed(2)} Mrd. $` : v >= 1
 const clock = (t: number) => new Date(t * 1000).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 
 /** Estimated liquidation clusters (heatmap model) plus the live Binance liquidation feed. */
-export function LiquidationsPanel() {
+export function LiquidationsPanel({ onOpenHeatmap }: { onOpenHeatmap: () => void }) {
   const symbol = useChartState((s) => s.symbol);
   const bars = useChartState((s) => s.bars);
   const indicators = useChartState((s) => s.indicators);
@@ -73,6 +73,9 @@ export function LiquidationsPanel() {
             </tbody>
           </table>
         )}
+        <button className="pill heatmap-open" onClick={onOpenHeatmap} data-tip="Große Heatmap-Ansicht wie auf coinglass.com öffnen">
+          🔥 Heatmap-Ansicht öffnen
+        </button>
         <p className="hint">
           Modell wie bei CoinGlass: Je Kerze werden neue Positionen mit 10×, 25×, 50× und 100× Hebel angenommen; ein Niveau verschwindet, sobald der Kurs es erreicht. Werte sind
           Schätzungen.
