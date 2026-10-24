@@ -34,6 +34,8 @@ interface Props {
   onOpenSettings: () => void;
   heatmapOpen: boolean;
   onToggleHeatmap: () => void;
+  calcOpen: boolean;
+  onToggleCalc: () => void;
   claudeOpen: boolean;
   onToggleClaude: () => void;
 }
@@ -150,7 +152,7 @@ function FavoritesMenu() {
   );
 }
 
-export function TopBar({ onOpenIndicators, onOpenSettings, heatmapOpen, onToggleHeatmap, claudeOpen, onToggleClaude }: Props) {
+export function TopBar({ onOpenIndicators, onOpenSettings, heatmapOpen, onToggleHeatmap, calcOpen, onToggleCalc, claudeOpen, onToggleClaude }: Props) {
   const { symbol, interval, chartType } = useChartState((s) => s);
   const showPrice = useChartState((s) => s.settings.headerPrice);
   const { last, change } = useHeaderPrice();
@@ -226,6 +228,9 @@ export function TopBar({ onOpenIndicators, onOpenSettings, heatmapOpen, onToggle
       </button>
       <button className={`pill ${heatmapOpen ? "active" : ""}`} onClick={onToggleHeatmap} data-tip={"Liquidations-Heatmap im CoinGlass-Stil\nVollbild mit Zeiträumen von 12 h bis 1 Jahr"}>
         🔥 Heatmap
+      </button>
+      <button className={`pill ${calcOpen ? "active" : ""}`} onClick={onToggleCalc} data-tip={"Trading-Rechner\nPositionsgröße, Erwartungswert, R-Multiple, Fibonacci, Hebel"}>
+        🧮 Rechner
       </button>
       <div className="spacer" />
       <button className={`pill claude-toggle ${claudeOpen ? "active" : ""}`} onClick={onToggleClaude} data-tip={"Seitenleiste ein-/ausblenden\nClaude, Orderbuch, Liquidationen"}>

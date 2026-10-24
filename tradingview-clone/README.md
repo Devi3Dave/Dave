@@ -110,6 +110,21 @@ legt auch das Ende der Zeitspanne fest). Angezeigt werden Chance/Risiko, Abstand
 Positionsgröße aus Kontogröße × Risiko-%, bei Hebel die geschätzte Liquidation, und ob Ziel oder Stop
 erreicht wurde (Gewinn/Verlust). Antippen der Position öffnet ihre Einstellungen.
 
+**Trading-Rechner (🧮 Rechner in der Kopfzeile)**
+Vollbild-Seite mit editierbaren Rechnern; Startwerte sind die Beispiele aus der Strategie, Eingaben
+werden im Browser gespeichert, „↺ Beispielwerte“ setzt sie zurück. Das Risiko pro Trade (1 R) gilt
+für alle Rechner.
+- *Positionsgröße:* Risiko ÷ |Einstieg − Stop| mit Stop-Abstand, Positionswert und Preisleiter
+  (Stop, Einstieg, Ziel im gewählten R-Multiple)
+- *Erwartungswert:* Trefferquote × Ø Gewinn − Verlustquote × Ø Verlust, in R und $, Break-even-Trefferquote,
+  Kurve Erwartungswert vs. Trefferquote
+- *Simulation:* 30 zufällige Trade-Serien als Equity-Kurven mit Drawdown, längster Verlustserie und
+  Wahrscheinlichkeit langer Verlustserien
+- *R-Multiple & Gewinn:* Gewinn und Zielpreis je R (Standard 1:4), Balkendiagramm 1R–15R
+- *Fibonacci:* Retracement (23,6 / 38,2 / 50 / 61,8 / 78,6 %) und Trend-based Extension
+  (1,618 / 2,618 / 3,618) aus den Punkten A, B, C mit Grafik
+- *Hebel & Margin:* Positionswert ÷ Hebel, geschätzte Liquidation und Warnung, wenn sie vor dem Stop liegt
+
 **Claude**
 - Chat-Panel mit Streaming, Schnell-Prompts, wählbarem Aufwand (Effort) und optionalem Screenshot
 - Jede Nachricht enthält einen `<chart_state>` mit den letzten Kerzen, aktiven Indikatoren
