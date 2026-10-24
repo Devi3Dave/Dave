@@ -14,8 +14,10 @@ import {
 } from "../../shared/calculators";
 import { liquidationPrice } from "../../shared/liquidations";
 import { BarChart, LineChart, niceTicks, useWidth, type Series } from "./CalcCharts";
+import { BASICS, HELP, HelpBody, type Help } from "./calcHelp";
 
 const STORAGE_KEY = "chartai.calculators.v1";
+const HELP_KEY = "chartai.calculators.help";
 
 // Start values are the examples from the strategy notes.
 const DEFAULTS = {
@@ -92,7 +94,19 @@ function NumInput({ label, value, onChange, unit, min, max, step, hint }: { labe
   );
 }
 
-function Card({ n, title, formula, children }: { n: number | string; title: string; formula: ReactNode; children: ReactNode }) {
+/** Collapsible plain-language explanation; the header button opens or closes all of them. */
+function HelpBox({ help, allOpen, title = "So funktioniert's" }: { help: Help; allOpen: boolean; title?: string }) {
+  const [open, setOpen] = useState(allOpen);
+  useEffect(() => setOpen(allOpen), [allOpen]);
+  return (
+    <details className="calc-help" open={open} onToggle={(e) => setOpen(e.currentTarget.open)}>
+      <summary>💡 {title}</summary>
+      <HelpBody help={help} />
+    </details>
+  );
+}
+
+function Card({ n, title, formula, help, helpOpen, children }: { n: number | string; title: string; formula: ReactNode; help: Help; helpOpen: boolean; children: ReactNode }) {
   return (
     <section className="calc-card">
       <h3>
@@ -100,6 +114,7 @@ function Card({ n, title, formula, children }: { n: number | string; title: stri
         {title}
       </h3>
       <div className="calc-formula">{formula}</div>
+      <HelpBox help={help} allOpen={helpOpen} />
       {children}
     </section>
   );
@@ -222,6 +237,23 @@ function FibChart({ a, b, c }: { a: number; b: number; c: number }) {
 
 export function CalculatorView({ onClose }: { onClose: () => void }) {
   const [v, setV] = useState<Values>(load);
+  const [helpOpen, setHelpOpen] = useState(() => {
+    try {
+      return localStorage.getItem(HELP_KEY) !== "0";
+    } catch {
+      return true;
+    }
+  });
+  const toggleHelp = () => {
+    setHelpOpen((o) => {
+      try {
+        localStorage.setItem(HELP_KEY, o ? "0" : "1");
+      } catch {
+        // not remembered
+      }
+      return !o;
+    });
+  };
   const set = <K extends keyof Values>(k: K) => (value: Values[K]) => setV((s) => ({ ...s, [k]: value }));
 
   useEffect(() => {
@@ -295,6 +327,9 @@ export function CalculatorView({ onClose }: { onClose: () => void }) {
         <strong>Trading-Rechner</strong>
         <span className="heatmap-symbol">Positionsgröße · Erwartungswert · R-Multiple · Fibonacci · Hebel</span>
         <div className="spacer" />
+        <button className={helpOpen ? "active" : ""} onClick={toggleHelp} data-tip="Alle Erklärungen ein- oder ausklappen">
+          💡 Erklärungen {helpOpen ? "aus" : "ein"}
+        </button>
         <button onClick={() => setV(DEFAULTS)} data-tip="Alle Werte auf die Beispiele aus den Quellen zurücksetzen">
           ↺ Beispielwerte
         </button>
@@ -308,9 +343,12 @@ export function CalculatorView({ onClose }: { onClose: () => void }) {
           Day-Trading als mathematisches System: Jeder Trade riskiert genau <strong>1 R</strong> (hier {usd(v.risk, 0)}). Alle Felder sind editierbar,
           Werte werden im Browser gespeichert. Das Risiko pro Trade gilt für alle Rechner.
         </p>
+        <div className="calc-basics">
+          <HelpBox help={BASICS} allOpen={helpOpen} title="Grundidee: Was ist 1 R?" />
+        </div>
 
         <div className="calc-grid-cards">
-          <Card n={1} title="Positionsgröße" formula={<>Positionsgröße = Risiko ÷ |Einstieg − Stop-Loss|</>}>
+          <Card n={1} title="Positionsgröße" help={HELP.position} helpOpen={helpOpen} formula={<>Positionsgröße = Risiko ÷ |Einstieg − Stop-Loss|</>}>
             <div className="calc-examples">
               <span>Beispiele:</span>
               <button onClick={() => setV((s) => ({ ...s, entry: 135.5, stop: 130, risk: 100 }))}>135,50 / 130,00</button>
@@ -333,7 +371,7 @@ export function CalculatorView({ onClose }: { onClose: () => void }) {
 
           <Card
             n={2}
-            title="Erwartungswert (Edge)"
+            title="Erwartungswert (Edge)" help={HELP.expectancy} helpOpen={helpOpen}
             formula={<>E = Trefferquote × Ø Gewinn (R) − Verlustquote × Ø Verlust (R)</>}
           >
             <div className="calc-inputs">
@@ -366,7 +404,7 @@ export function CalculatorView({ onClose }: { onClose: () => void }) {
             />
           </Card>
 
-          <Card n="2b" title="Simulation einer Trade-Serie" formula={<>{SIM_PATHS} zufällige Serien mit Trefferquote {num(v.winRate, 0)} %, +{num(v.avgWin, 1)}R / −{num(v.avgLoss, 1)}R</>}>
+          <Card n="2b" title="Simulation einer Trade-Serie" help={HELP.simulation} helpOpen={helpOpen} formula={<>{SIM_PATHS} zufällige Serien mit Trefferquote {num(v.winRate, 0)} %, +{num(v.avgWin, 1)}R / −{num(v.avgLoss, 1)}R</>}>
             <div className="calc-inputs">
               <NumInput label="Anzahl Trades" value={v.trades} onChange={(x) => set("trades")(Math.round(x))} min={1} max={500} step={1} />
               <label className="calc-field">
@@ -399,7 +437,7 @@ export function CalculatorView({ onClose }: { onClose: () => void }) {
             />
           </Card>
 
-          <Card n={3} title="R-Multiple & Gewinn" formula={<>Gewinn = R-Multiple × Risiko · Zielpreis = Einstieg + R × (Einstieg − Stop)</>}>
+          <Card n={3} title="R-Multiple & Gewinn" help={HELP.rmultiple} helpOpen={helpOpen} formula={<>Gewinn = R-Multiple × Risiko · Zielpreis = Einstieg + R × (Einstieg − Stop)</>}>
             <div className="calc-inputs">
               <NumInput label="Take-Profit (R-Multiple)" value={v.rTarget} onChange={set("rTarget")} unit="R" min={0.5} max={15} step={0.5} hint={"Standard: 1:4 (4R)\n15-Minuten-Struktur: 8R bis 15R"} />
               <NumInput label="Risiko pro Trade (1 R)" value={v.risk} onChange={set("risk")} unit="$" min={0} />
@@ -417,7 +455,7 @@ export function CalculatorView({ onClose }: { onClose: () => void }) {
             />
           </Card>
 
-          <Card n={4} title="Fibonacci" formula={<>Retracement = B − Stufe × (B − A) · Extension = C + Faktor × (B − A)</>}>
+          <Card n={4} title="Fibonacci" help={HELP.fibonacci} helpOpen={helpOpen} formula={<>Retracement = B − Stufe × (B − A) · Extension = C + Faktor × (B − A)</>}>
             <div className="calc-inputs">
               <NumInput label="A: Impuls-Start" value={v.fibA} onChange={set("fibA")} unit="$" />
               <NumInput label="B: Impuls-Ende" value={v.fibB} onChange={set("fibB")} unit="$" />
@@ -477,7 +515,7 @@ export function CalculatorView({ onClose }: { onClose: () => void }) {
             </div>
           </Card>
 
-          <Card n={5} title="Hebel & Margin" formula={<>Benötigtes Kapital (Margin) = Positionswert ÷ Hebel</>}>
+          <Card n={5} title="Hebel & Margin" help={HELP.leverage} helpOpen={helpOpen} formula={<>Benötigtes Kapital (Margin) = Positionswert ÷ Hebel</>}>
             <div className="calc-inputs">
               <NumInput label="Positionswert" value={v.notional} onChange={set("notional")} unit="$" min={0} />
               <NumInput label="Hebel" value={v.leverage} onChange={set("leverage")} unit="x" min={1} max={125} step={1} />

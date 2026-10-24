@@ -112,7 +112,9 @@ erreicht wurde (Gewinn/Verlust). Antippen der Position öffnet ihre Einstellunge
 
 **Trading-Rechner (🧮 Rechner in der Kopfzeile)**
 Vollbild-Seite mit editierbaren Rechnern; Startwerte sind die Beispiele aus der Strategie, Eingaben
-werden im Browser gespeichert, „↺ Beispielwerte“ setzt sie zurück. Das Risiko pro Trade (1 R) gilt
+werden im Browser gespeichert, „↺ Beispielwerte“ setzt sie zurück. Zu jedem Rechner gibt es eine
+ausklappbare Erklärung in einfacher Sprache (was die Formel bedeutet, wie man sie anwendet, Beispiel),
+„💡 Erklärungen“ klappt alle ein oder aus. Das Risiko pro Trade (1 R) gilt
 für alle Rechner.
 - *Positionsgröße:* Risiko ÷ |Einstieg − Stop| mit Stop-Abstand, Positionswert und Preisleiter
   (Stop, Einstieg, Ziel im gewählten R-Multiple)

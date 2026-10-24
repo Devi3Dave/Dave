@@ -1838,3 +1838,59 @@ select,
     display: none;
   }
 }
+
+.calc-basics {
+  max-width: 900px;
+  margin-bottom: 12px;
+}
+
+.calc-help {
+  margin: 0 0 10px;
+  border: 1px solid rgba(245, 197, 24, 0.25);
+  border-radius: 6px;
+  background: rgba(245, 197, 24, 0.04);
+}
+
+.calc-help summary {
+  cursor: pointer;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #f5c518;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.calc-help-body {
+  padding: 0 12px 10px;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.calc-help-body p {
+  margin: 4px 0 8px;
+}
+
+.calc-help-body ol {
+  margin: 4px 0 8px;
+  padding-left: 20px;
+}
+
+.calc-help-body li + li {
+  margin-top: 3px;
+}
+
+.calc-help-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.calc-help-tip {
+  color: var(--muted);
+}
+
+.calc-view .heatmap-head button.active {
+  color: #f5c518;
+}
