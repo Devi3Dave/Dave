@@ -2099,3 +2099,158 @@ select,
   background: var(--down);
   border-radius: 4px;
 }
+
+/* ---------- exchange hours ---------- */
+
+.ex-zone {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  max-width: 1100px;
+  margin: 0 0 10px;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.ex-clock {
+  margin-left: auto;
+  font-size: 20px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.ex-muted {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.ex-view .jr-verdict .pill {
+  margin-left: 6px;
+}
+
+.ex-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 1100px;
+}
+
+.ex-row {
+  display: grid;
+  grid-template-columns: 28px minmax(120px, 1fr) minmax(120px, 0.8fr) minmax(190px, 1.5fr);
+  align-items: center;
+  gap: 6px 12px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  cursor: pointer;
+}
+
+.ex-row.on {
+  background: var(--panel-2);
+}
+
+.ex-row input {
+  width: 20px;
+  height: 20px;
+}
+
+.ex-name {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.ex-name .ex-muted {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ex-status {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.ex-status.open {
+  color: var(--up);
+}
+
+.ex-status.lunch {
+  color: #f5c518;
+}
+
+.ex-status.closed {
+  color: var(--muted);
+}
+
+.ex-times {
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.ex-change {
+  color: #f5c518;
+  font-size: 12px;
+}
+
+.ex-times strong {
+  white-space: nowrap;
+}
+
+.ex-strip {
+  grid-column: 2 / -1;
+  position: relative;
+  height: 22px;
+  border-radius: 4px;
+  background: var(--bg);
+  overflow: hidden;
+}
+
+.ex-strip-tick {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+  padding-left: 2px;
+  font-size: 9px;
+  line-height: 22px;
+  color: var(--muted);
+}
+
+.ex-strip-seg {
+  position: absolute;
+  top: 5px;
+  bottom: 5px;
+  border-radius: 2px;
+  opacity: 0.85;
+}
+
+.ex-strip-now {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: #fff;
+}
+
+@media (max-width: 700px) {
+  .ex-row {
+    grid-template-columns: 28px minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .ex-times {
+    grid-column: 2 / -1;
+  }
+}
+
+.ex-status {
+  display: flex;
+  flex-direction: column;
+}

@@ -138,6 +138,17 @@ liest sie wieder ein, „⇩ CSV“ exportiert sie für Excel/Numbers.
 - Balken je Trade und je Monat, Filter nach Symbol oder Setup, Trades bearbeiten und löschen
 - Menge auf Knopfdruck aus dem 1 R des Rechners
 
+**Börsenzeiten (🕐 Börsen in der Kopfzeile)**
+Öffnungs- und Schließzeiten von 16 großen Börsen (NYSE, Nasdaq, TSX, LSE, Xetra, Börse Frankfurt,
+Euronext, SIX, Tokio, Hongkong, Shanghai, Shenzhen, KRX, SGX, NSE, ASX) in der automatisch erkannten
+Zeitzone des Geräts.
+- Status live: offen, Mittagspause oder geschlossen, mit Countdown bis zur nächsten Änderung
+- Zeiten vor Ort und auf deiner Uhr, Mittagspausen der asiatischen Börsen, 24-h-Leiste je Börse
+- Sommer-/Winterzeit auf beiden Seiten; Hinweis, wenn sich die Zeit auf deiner Uhr demnächst
+  verschiebt (z. B. NYSE 14:30 statt 15:30 in der Woche zwischen EU- und US-Umstellung)
+- Angehakte Börsen erscheinen in allen Charts (Zeiteinheiten bis 4 h) als farbige Bereiche mit
+  Linien bei Eröffnung und Schluss; Feiertage sind nicht hinterlegt
+
 **Claude**
 - Chat-Panel mit Streaming, Schnell-Prompts, wählbarem Aufwand (Effort) und optionalem Screenshot
 - Jede Nachricht enthält einen `<chart_state>` mit den letzten Kerzen, aktiven Indikatoren

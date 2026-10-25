@@ -14,6 +14,7 @@ import {
   type IChartApi,
   type ISeriesApi,
   type ISeriesMarkersPluginApi,
+  type Logical,
   type MouseEventParams,
   type SeriesMarker,
   type SeriesType,
@@ -22,6 +23,7 @@ import {
 } from "lightweight-charts";
 import { getIndicator, resolveParams, type IndicatorDef, type OutputDef } from "../../shared/indicators";
 import { heikinAshi, type Bar, type Series } from "../../shared/math";
+import { getExchange, tradingDays } from "../../shared/exchanges";
 import { INTERVAL_SECONDS } from "../../shared/marketData";
 import type { OrderBlock, OrderBlockSignal } from "../../shared/orderblocks";
 import type { CandlePattern, Formation } from "../../shared/patterns";
@@ -34,6 +36,7 @@ import { DrawingsPrimitive } from "./DrawingsPrimitive";
 import { HeatmapPrimitive } from "./HeatmapPrimitive";
 import { LiquidationBubblesPrimitive } from "./LiquidationBubblesPrimitive";
 import { PatternsPrimitive } from "./PatternsPrimitive";
+import { SessionsPrimitive, type SessionBand } from "./SessionsPrimitive";
 import { VolumeProfilePrimitive } from "./VolumeProfilePrimitive";
 
 export const THEME = {
@@ -84,6 +87,9 @@ export class ChartEngine {
   private readonly axisLabels = new AxisLabelsPrimitive();
   private readonly liquidationBubbles = new LiquidationBubblesPrimitive();
   private readonly patterns = new PatternsPrimitive((t) => this.drawings.timeToX(t));
+  private readonly sessions = new SessionsPrimitive((t) => this.timeToXInterpolated(t));
+  private exchangeIds: string[] = [];
+  private sessionKey = "";
   private patternMarkers: SeriesMarker<Time>[] = [];
   private patternKey = "";
   private liquidations: LiveLiquidation[] = [];
@@ -179,6 +185,7 @@ export class ChartEngine {
     this.main?.detachPrimitive(this.axisLabels);
     this.main?.detachPrimitive(this.liquidationBubbles);
     this.main?.detachPrimitive(this.patterns);
+    this.main?.detachPrimitive(this.sessions);
     this.chart.remove();
   }
 
@@ -239,6 +246,7 @@ export class ChartEngine {
     });
 
     this.drawings.setData(s.drawings, s.bars);
+    this.refreshSessions();
     this.liquidationBubbles.setData(s.settings.liveLiquidations ? this.liquidations : [], s.bars);
     if (s.markers !== this.markers || barsChanged) {
       this.markers = s.markers;
@@ -252,6 +260,7 @@ export class ChartEngine {
       this.main.detachPrimitive(this.axisLabels);
       this.main.detachPrimitive(this.liquidationBubbles);
       this.main.detachPrimitive(this.patterns);
+      this.main.detachPrimitive(this.sessions);
       this.markersApi?.detach();
       this.chart.removeSeries(this.main);
     }
@@ -288,6 +297,7 @@ export class ChartEngine {
     this.main.attachPrimitive(this.axisLabels);
     this.main.attachPrimitive(this.liquidationBubbles);
     this.main.attachPrimitive(this.patterns);
+    this.main.attachPrimitive(this.sessions);
     this.markersApi = createSeriesMarkers(this.main, []);
   }
 
@@ -335,6 +345,56 @@ export class ChartEngine {
     });
     this.main?.applyOptions({ lastValueVisible: st.lastPriceLabel, priceLineVisible: st.lastPriceLine });
     this.onLayout();
+  }
+
+  /** Exchanges whose trading sessions are shaded behind the candles. */
+  setExchanges(ids: string[]) {
+    this.exchangeIds = ids;
+    this.refreshSessions();
+  }
+
+  /** Like drawings.timeToX, but between bars (logicalToCoordinate gives 0 for some fractional logicals). */
+  private timeToXInterpolated(time: number): number | null {
+    const logical = this.drawings.timeToLogical(time);
+    if (logical === null) return null;
+    const scale = this.chart.timeScale();
+    const lo = Math.floor(logical);
+    const xa = scale.logicalToCoordinate(lo as Logical);
+    const xb = scale.logicalToCoordinate((lo + 1) as Logical);
+    return xa === null || xb === null ? null : xa + (xb - xa) * (logical - lo);
+  }
+
+  private refreshSessions() {
+    const bars = this.bars;
+    // Daily and weekly candles already are whole sessions.
+    const intraday = this.intervalSeconds < 86400 && bars.length > 1;
+    const from = intraday ? bars[0].time : 0;
+    // A bit beyond the last candle so the next open is visible in the right margin.
+    const to = intraday ? bars[bars.length - 1].time + Math.max(86400, 40 * this.intervalSeconds) : 0;
+    const key = intraday ? `${this.exchangeIds.join(",")}|${from}|${Math.floor(to / 3600)}` : "";
+    if (key === this.sessionKey) return;
+    this.sessionKey = key;
+    const bands: SessionBand[] = [];
+    if (intraday) {
+      this.exchangeIds.forEach((id, row) => {
+        const ex = getExchange(id);
+        if (!ex) return;
+        for (const day of tradingDays(ex, from, to)) {
+          day.parts.forEach((p, i) =>
+            bands.push({
+              start: p.start,
+              end: p.end,
+              color: ex.color,
+              label: i === 0 ? ex.short : undefined,
+              row,
+              openEdge: i === 0,
+              closeEdge: i === day.parts.length - 1,
+            }),
+          );
+        }
+      });
+    }
+    this.sessions.setBands(bands);
   }
 
   /** Live liquidations to draw as bubbles (only when the setting is on). */

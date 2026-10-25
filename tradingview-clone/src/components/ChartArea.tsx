@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { indicatorLabel } from "../../shared/indicators";
 import { ChartEngine, type ComputedIndicator, type PointerEvent } from "../chart/ChartEngine";
+import { getSelectedExchanges, subscribeExchanges } from "../exchangeSelection";
 import { liquidationFeed } from "../market/liquidationFeed";
 import { DEFAULT_FIBEXT_LEVELS, DEFAULT_FIB_LEVELS, formatPrice } from "../chart/DrawingsPrimitive";
 import { placeOnSide } from "../../shared/position";
@@ -262,6 +263,8 @@ export function ChartArea({ chart, onEngine, magnet, onEditIndicator, onEditPosi
       engine.setLiquidations(feed.symbol === chart.get().symbol ? feed.items : [], chart.get().settings.liveLiquidations);
     };
     const unsubscribeLiq = liquidationFeed.subscribe(pushLiquidations);
+    engine.setExchanges(getSelectedExchanges());
+    const unsubscribeExchanges = subscribeExchanges(() => engine.setExchanges(getSelectedExchanges()));
     const ro = new ResizeObserver(() => requestAnimationFrame(refreshLayout));
     ro.observe(containerRef.current!);
     const onKey = (ev: KeyboardEvent) => {
@@ -281,6 +284,7 @@ export function ChartArea({ chart, onEngine, magnet, onEditIndicator, onEditPosi
       ro.disconnect();
       unsubscribe();
       unsubscribeLiq();
+      unsubscribeExchanges();
       onEngine(chart.slot, null);
       engine.destroy();
       engineRef.current = null;
