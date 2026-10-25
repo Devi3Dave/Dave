@@ -62,7 +62,7 @@ und zusammen mit der Fill & Sign-App auf GitHub Pages veröffentlicht.
   Der angetippte Chart ist aktiv (blauer Rahmen); Kopfzeile, Werkzeuge und Claude wirken auf ihn.
   Optional wird die Zeiteinheit in allen Charts synchron gewechselt
 - Layout (Symbol, Indikatoren, Zeichnungen, Einstellungen) wird je Chart im Browser gespeichert
-- Vorlagen (▤ Vorlagen): fertige Setups Scalping, Daytrading, Swing, Krypto-Zyklus und
+- Vorlagen (▤ Vorlagen): fertige Setups Nur Chart (ohne Indikatoren), Scalping, Daytrading, Swing, Krypto-Zyklus und
   Smart Money, Mustererkennung; eigene Vorlagen aus dem aktiven Chart speichern (Indikatoren mit Parametern/Farben,
   optional Zeiteinheit, Symbol und Zeichnungen) und ganze Arbeitsbereiche (Layout mit allen Charts)
 - Versionsnummer neben dem Logo; sie zeigt „Update“, sobald eine neuere Version online ist –
