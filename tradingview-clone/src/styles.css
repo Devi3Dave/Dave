@@ -395,6 +395,18 @@ textarea {
   white-space: nowrap;
 }
 
+.draw-hint.error {
+  background: rgba(239, 83, 80, 0.92);
+}
+
+/* Demo stop/target lines can be grabbed and moved up or down. */
+.trade-line-hover,
+.trade-line-hover canvas,
+.trade-line-dragging,
+.trade-line-dragging canvas {
+  cursor: ns-resize !important;
+}
+
 .chart-container {
   position: absolute;
   inset: 0;

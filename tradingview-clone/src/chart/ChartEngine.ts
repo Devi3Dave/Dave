@@ -79,6 +79,8 @@ export interface TradeLine {
   color: string;
   title: string;
   dashed?: boolean;
+  /** Set on lines that can be dragged up and down (stop, target); reported back by `onTradeLineDrag`. */
+  drag?: string;
 }
 
 export class ChartEngine {
@@ -114,6 +116,8 @@ export class ChartEngine {
   /** Freehand drawing (brush): pointer down → moves → up, while chart panning is off. */
   onDrag: (phase: "start" | "move" | "end", e: PointerEvent) => void = () => {};
   private dragMode = false;
+  /** Dragging a trade line to `price` ("cancel": the browser took the touch over, nothing to save). */
+  onTradeLineDrag: (phase: "move" | "end" | "cancel", dragId: string, price: number) => void = () => {};
 
   constructor(container: HTMLElement) {
     this.chart = createChart(container, {
@@ -151,8 +155,29 @@ export class ChartEngine {
       if (logical === null || paneIndex < 0) return null;
       return { x, y: y - layout[paneIndex].top, logical, paneIndex };
     };
+    // Trade lines (stop, target) are dragged with mouse or finger. The chart listens to mouse
+    // and touch events, which come after the pointer event, so those are kept away from it.
+    let lineDrag: { id: string; pointerId: number } | null = null;
+    const linePrice = (ev: globalThis.PointerEvent) => {
+      const top = this.paneLayout()[0]?.top ?? 0;
+      return this.main?.coordinateToPrice(ev.clientY - container.getBoundingClientRect().top - top) ?? null;
+    };
+    const keepFromChart = (ev: Event) => {
+      if (!lineDrag) return;
+      ev.stopPropagation();
+      if (ev.cancelable) ev.preventDefault();
+    };
+    for (const type of ["mousedown", "touchstart", "touchmove"]) container.addEventListener(type, keepFromChart, { capture: true, passive: false });
     container.addEventListener("pointerdown", (ev) => {
       down = { x: ev.clientX, y: ev.clientY };
+      const hit = this.dragMode || ev.button > 0 ? null : this.tradeLineAt(ev.clientY - container.getBoundingClientRect().top, ev.pointerType === "mouse" ? 6 : 16);
+      if (hit) {
+        lineDrag = { id: hit, pointerId: ev.pointerId };
+        down = null;
+        container.setPointerCapture(ev.pointerId);
+        container.classList.add("trade-line-dragging");
+        return;
+      }
       if (!this.dragMode) return;
       const e = toEvent(ev);
       if (!e || e.paneIndex !== 0) return;
@@ -161,11 +186,29 @@ export class ChartEngine {
       this.onDrag("start", e);
     });
     container.addEventListener("pointermove", (ev) => {
+      if (lineDrag) {
+        const price = ev.pointerId === lineDrag.pointerId ? linePrice(ev) : null;
+        if (price !== null && price > 0) this.onTradeLineDrag("move", lineDrag.id, price);
+        return;
+      }
+      if (ev.pointerType === "mouse" && !this.dragMode)
+        container.classList.toggle("trade-line-hover", this.tradeLineAt(ev.clientY - container.getBoundingClientRect().top, 6) !== null);
       if (!dragging) return;
       const e = toEvent(ev);
       if (e && e.paneIndex === 0) this.onDrag("move", e);
     });
+    const endLineDrag = (ev: globalThis.PointerEvent, phase: "end" | "cancel") => {
+      if (!lineDrag || ev.pointerId !== lineDrag.pointerId) return false;
+      const { id } = lineDrag;
+      lineDrag = null;
+      container.classList.remove("trade-line-dragging");
+      const price = linePrice(ev);
+      this.onTradeLineDrag(phase === "end" && price !== null && price > 0 ? "end" : "cancel", id, price ?? 0);
+      return true;
+    };
+    container.addEventListener("pointercancel", (ev) => endLineDrag(ev, "cancel"));
     container.addEventListener("pointerup", (ev) => {
+      if (endLineDrag(ev, "end")) return;
       if (dragging) {
         dragging = false;
         down = null;
@@ -319,10 +362,25 @@ export class ChartEngine {
 
   /** Demo-account positions: entry, stop-loss and take-profit as labelled price lines. */
   setTradeLines(lines: TradeLine[]) {
-    const key = (l: TradeLine[]) => l.map((x) => `${x.price}|${x.color}|${x.title}|${x.dashed}`).join(";");
+    const key = (l: TradeLine[]) => l.map((x) => `${x.price}|${x.color}|${x.title}|${x.dashed}|${x.drag}`).join(";");
     if (key(lines) === key(this.tradeLines)) return;
     this.tradeLines = lines;
     this.drawTradeLines();
+  }
+
+  /** The draggable trade line within `tolerance` px of `y` (from the chart's top), the closest one. */
+  private tradeLineAt(y: number, tolerance: number): string | null {
+    if (!this.main) return null;
+    const top = this.paneLayout()[0]?.top ?? 0;
+    let best: string | null = null;
+    let bestDist = tolerance;
+    for (const l of this.tradeLines) {
+      const ly = l.drag ? this.main.priceToCoordinate(l.price) : null;
+      if (ly === null || Math.abs(ly + top - y) > bestDist) continue;
+      bestDist = Math.abs(ly + top - y);
+      best = l.drag!;
+    }
+    return best;
   }
 
   private drawTradeLines() {

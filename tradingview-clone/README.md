@@ -156,6 +156,9 @@ aktiven Charts, wie bei einem Futures-Konto mit isolierter Margin; das Konto lie
 - Offene Positionen mit laufendem G/V, SL/TP nachträglich verschieben, schließen per Tipp
 - SL, TP und Liquidation lösen automatisch aus (solange die App offen ist), mit Hinweis oben im Bild
 - Einstieg, SL, TP und Liquidation als Linien im Chart; laufendes Ergebnis in der Kopfzeile
+- SL- und TP-Linie im Chart mit Finger oder Maus ziehen, um sie während des Trades zu verschieben
+  (das Label zeigt den Gewinn/Verlust beim Auslösen); fehlt SL oder TP, zieht man ihn aus der
+  Einstiegslinie heraus (nach oben/unten je nach Seite). Gespeichert wird beim Loslassen.
 - Historie mit Trefferquote und Gebühren; Trades einzeln, alle oder automatisch ins Journal (Setup „Demo“)
 - Gebühr pro Seite einstellbar (0 / 0,02 / 0,05 / 0,1 %), Konto jederzeit neu starten
 

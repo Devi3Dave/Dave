@@ -65,6 +65,11 @@ function PositionCard({ p, price }: { p: DemoPosition; price: number | undefined
     setError(null);
     setEditing(true);
   };
+  // A line dragged in the chart meanwhile: the open form shows the new levels.
+  useEffect(() => {
+    setStop(showNum(p.stop));
+    setTarget(showNum(p.target));
+  }, [p.stop, p.target]);
   const save = () => {
     const s = parseNum(stop);
     const t = parseNum(target);
@@ -320,7 +325,7 @@ export function DemoPanel() {
             </label>
             <label className="menu-check">
               <input type="checkbox" checked={settings.showLines} onChange={(e) => updateDemoSettings({ showLines: e.target.checked })} />
-              Einstieg, SL und TP als Linien im Chart
+              Einstieg, SL und TP als Linien im Chart (SL/TP zum Verschieben ziehen)
             </label>
           </div>
         )}

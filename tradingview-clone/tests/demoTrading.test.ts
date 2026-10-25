@@ -5,6 +5,7 @@ import {
   closePosition,
   createAccount,
   demoStats,
+  draggedLevels,
   equity,
   liquidationPrice,
   modifyPosition,
@@ -135,5 +136,28 @@ describe("demo trading account", () => {
     expect(parseAccount(null)).toBeNull();
     expect(parseAccount({ balance: "x" })).toBeNull();
     expect(parseAccount({ startBalance: 1, balance: 1, positions: [{ id: 3 }] })?.positions).toEqual([]);
+  });
+});
+
+describe("dragging stop and target lines", () => {
+  const acc = open(createAccount(10_000, 0, 0), { qty: 1, stop: 90, target: 120 }, 100);
+  const long = acc.positions[0];
+
+  it("moves the dragged level and keeps the other", () => {
+    expect(draggedLevels(long, "stop", 95.123456789)).toEqual({ level: "stop", stop: 95.1235, target: 120 });
+    expect(draggedLevels(long, "target", 130)).toEqual({ level: "target", stop: 90, target: 130 });
+  });
+
+  it("pulls a level out of the entry line on the side it is dragged to", () => {
+    const bare = { ...long, stop: undefined, target: undefined };
+    expect(draggedLevels(bare, "entry", 110)).toMatchObject({ level: "target", target: 110, stop: undefined });
+    expect(draggedLevels(bare, "entry", 92)).toMatchObject({ level: "stop", stop: 92, target: undefined });
+    const short = { ...bare, side: "short" as const };
+    expect(draggedLevels(short, "entry", 110)).toMatchObject({ level: "stop", stop: 110 });
+  });
+
+  it("saving refuses a stop dragged past the price", () => {
+    const { stop, target } = draggedLevels(long, "stop", 105);
+    expect(modifyPosition(acc, "p1", { stop, target }, 100)).toMatch(/Stop-Loss/);
   });
 });
