@@ -2,7 +2,7 @@ import { equity } from "../../shared/demoTrading";
 import { REPLAY_SPEEDS } from "../../shared/replay";
 import { resolveTimeZone } from "../chartSettings";
 import { useDemo } from "../demoAccount";
-import { exitReplay, pickReplayStart, setReplayPlaying, setReplaySpeed, startReplay, stepReplay, useChart, type ChartStore } from "../store";
+import { exitReplay, pickReplayStart, setReplayPlaying, setReplaySpeed, startReplay, stepBackReplay, stepReplay, useChart, type ChartStore } from "../store";
 
 const money = (v: number) => {
   const c = Math.round(v * 100) / 100 || 0;
@@ -22,7 +22,7 @@ export function ReplayBar({ chart }: { chart: ChartStore }) {
     return (
       <div className="replay-bar select">
         <span className="replay-title">⏪ Replay</span>
-        <span className="replay-hint">Startkerze im Chart antippen</span>
+        <span className="replay-hint">{replay.shown ? "Frühere Kerze antippen, dort geht es weiter" : "Startkerze im Chart antippen"}</span>
         <button onClick={() => pickReplayStart(chart, "random")} data-tip="Zufälligen Startpunkt wählen (ohne zu sehen, was danach kommt)">
           🎲 Zufällig
         </button>
@@ -47,12 +47,25 @@ export function ReplayBar({ chart }: { chart: ChartStore }) {
     : "";
   const result = book ? equity(book.account, book.prices) - book.account.startBalance : 0;
   const trades = book ? book.account.history.length + book.account.positions.length : 0;
+  const positionsOpen = !!book && book.account.positions.length > 0;
 
   return (
     <div className="replay-bar">
-      <span className="replay-title">⏪</span>
-      <button onClick={() => startReplay(chart)} data-tip={"Neuen Startpunkt wählen\nDas Replay-Konto beginnt dann von vorn"} aria-label="Neuen Startpunkt wählen">
-        ⇤
+      <span className="replay-title">Replay</span>
+      <button
+        onClick={() => startReplay(chart)}
+        data-tip={"Zurückspulen: im Chart eine frühere Kerze antippen\nDas Replay-Konto beginnt dann von vorn"}
+        aria-label="Zurückspulen zu einer früheren Kerze"
+      >
+        ⏪
+      </button>
+      <button
+        onClick={() => stepBackReplay(chart)}
+        disabled={replay.shown <= 1 || positionsOpen}
+        data-tip={positionsOpen ? "Zurück geht nur ohne offene Replay-Position" : "Eine Kerze zurück\nTastatur: Shift + ←"}
+        aria-label="Eine Kerze zurück"
+      >
+        ⏮
       </button>
       <button
         className="replay-play"

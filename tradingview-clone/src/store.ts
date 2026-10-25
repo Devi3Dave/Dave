@@ -64,9 +64,10 @@ export type Tool = "cursor" | "trendline" | "ray" | "hline" | "vline" | "zone" |
 export interface ReplayState {
   /** New for every chosen start; the replay trading account belongs to it. */
   id: string;
-  /** "select": waiting for the start candle to be tapped (the whole chart is shown). */
+  /** "select": waiting for the start candle to be tapped. */
   phase: "select" | "play";
   all: Bar[];
+  /** Candles shown; while selecting, 0 shows all (first start) and otherwise only earlier starts can be tapped (rewind). */
   shown: number;
   playing: boolean;
   /** Candles per second. */
@@ -201,7 +202,7 @@ function createChartStore(slot: number): ChartStore {
           const next: ReplayState = shown > 0 ? { ...r, all: json.bars, shown, playing: false } : { ...r, phase: "select", all: json.bars, shown: 0, playing: false };
           chart.set({ bars: next.phase === "play" ? json.bars.slice(0, shown) : json.bars, replay: next, source: json.source, symbol: json.symbol, loading: false });
         } else if (r) {
-          chart.set({ bars: json.bars, replay: { ...r, all: json.bars }, source: json.source, symbol: json.symbol, loading: false });
+          chart.set({ bars: json.bars, replay: { ...r, all: json.bars, shown: 0 }, source: json.source, symbol: json.symbol, loading: false });
         } else chart.set({ bars: json.bars, source: json.source, symbol: json.symbol, loading: false });
         if (json.source === "binance" || json.source === "binance_futures") socket = connectLive(chart, json.symbol, interval, json.source === "binance_futures", () => seq === loadSeq);
       } catch (err) {
@@ -360,13 +361,21 @@ export function clearDrawings(scope: "claude" | "all") {
 
 // ---------------- Bar replay ----------------
 
-/** Starts a replay on a chart: the next tap in the chart chooses the start candle. Only one chart replays at a time. */
+/**
+ * Starts a replay on a chart: the next tap in the chart chooses the start candle. During a replay this
+ * rewinds: the chart stays cut where it is, so only an earlier candle can be tapped. Only one chart replays at a time.
+ */
 export function startReplay(chart: ChartStore = activeChart()) {
   const s = chart.get();
   const all = s.replay ? s.replay.all : s.bars;
   if (!all.length || s.loading) return;
   for (const c of charts) if (c !== chart && c.get().replay) exitReplay(c);
-  chart.set({ replay: { id: newId("replay"), phase: "select", all, shown: 0, playing: false, speed: s.replay?.speed ?? 1 }, bars: all, tool: "cursor" });
+  const shown = s.replay?.phase === "play" ? s.replay.shown : 0;
+  chart.set({
+    replay: { id: newId("replay"), phase: "select", all, shown, playing: false, speed: s.replay?.speed ?? 1 },
+    bars: shown ? all.slice(0, shown) : all,
+    tool: "cursor",
+  });
 }
 
 /** Cuts the chart off after the candle at `time` (or a random one); later candles are hidden. */
@@ -374,8 +383,8 @@ export function pickReplayStart(chart: ChartStore, time: number | "random") {
   const r = chart.get().replay;
   if (!r || !r.all.length) return;
   const index = time === "random" ? randomStart(r.all.length) : barIndexAt(r.all, time);
-  // At least one candle stays hidden to be played.
-  const shown = Math.max(1, Math.min(index + 1, r.all.length - 1));
+  // At least one candle stays hidden to be played; when rewinding, a tap right of the cut stays at the cut.
+  const shown = Math.max(1, Math.min(index + 1, r.all.length - 1, time === "random" || !r.shown ? Infinity : r.shown));
   chart.set({ replay: { ...r, id: newId("replay"), phase: "play", shown, playing: false }, bars: r.all.slice(0, shown) });
 }
 
@@ -391,6 +400,14 @@ export function stepReplay(chart: ChartStore, count = 1): boolean {
   }
   chart.set({ replay: { ...r, shown, playing: r.playing && more }, bars: r.all.slice(0, shown) });
   return more;
+}
+
+/** Hides the last candle(s) again; at least one stays. */
+export function stepBackReplay(chart: ChartStore, count = 1) {
+  const r = chart.get().replay;
+  if (!r || r.phase !== "play" || r.shown <= 1) return;
+  const shown = Math.max(1, r.shown - count);
+  chart.set({ replay: { ...r, shown, playing: false }, bars: r.all.slice(0, shown) });
 }
 
 export function setReplayPlaying(chart: ChartStore, playing: boolean) {
@@ -471,7 +488,7 @@ function connectLive(chart: ChartStore, symbol: string, interval: Interval, futu
       if (last && last.time === bar.time) bars[bars.length - 1] = bar;
       else if (!last || bar.time > last.time) bars.push(bar);
       if (!s.replay) return { bars };
-      return s.replay.phase === "select" ? { bars, replay: { ...s.replay, all: bars } } : { replay: { ...s.replay, all: bars } };
+      return s.replay.phase === "select" && !s.replay.shown ? { bars, replay: { ...s.replay, all: bars } } : { replay: { ...s.replay, all: bars } };
     });
   };
   return ws;

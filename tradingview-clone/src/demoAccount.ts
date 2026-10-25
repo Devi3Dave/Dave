@@ -151,6 +151,9 @@ export function useDemoBook<T>(select: (b: { account: DemoAccount; prices: Recor
   return useSyncExternalStore(subscribeView, () => select(activeReplayBook() ?? state));
 }
 
+/** Open positions in the replay account of the chart `slot` (stepping back is blocked then). */
+export const replayPositionsOpen = (slot: number) => state.replay?.slot === slot && state.replay.account.positions.length > 0;
+
 export function useReplayBook(): ReplayBook | null {
   return useSyncExternalStore(subscribeView, activeReplayBook);
 }
@@ -292,6 +295,11 @@ function syncReplay(slot: number, s: ChartState) {
     return;
   }
   if (last.time === book.lastBar && book.prices[book.symbol] === last.close) return;
+  // Stepped back (only without open positions): the hidden candles count again when they come back.
+  if (last.time < book.lastBar) {
+    set({ replay: { ...book, prices: { ...book.prices, [book.symbol]: last.close }, lastBar: last.time, now: last.time * 1000 } });
+    return;
+  }
   let account = book.account;
   const closed: DemoTrade[] = [];
   for (const bar of s.bars.slice(-50)) {
