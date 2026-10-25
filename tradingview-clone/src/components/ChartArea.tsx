@@ -6,8 +6,9 @@ import { getSelectedExchanges, subscribeExchanges } from "../exchangeSelection";
 import { liquidationFeed } from "../market/liquidationFeed";
 import { DEFAULT_FIBEXT_LEVELS, DEFAULT_FIB_LEVELS, formatPrice } from "../chart/DrawingsPrimitive";
 import { placeOnSide } from "../../shared/position";
-import { addDrawing, newId, removeDrawing, removeIndicator, updateIndicator, updateSettings, useChart, type ChartStore, type Drawing, type Point } from "../store";
+import { addDrawing, newId, pickReplayStart, removeDrawing, removeIndicator, stepReplay, updateIndicator, updateSettings, useChart, type ChartStore, type Drawing, type Point } from "../store";
 import { lastPositionDefaults } from "./PositionDialog";
+import { ReplayBar } from "./ReplayBar";
 
 interface Props {
   chart: ChartStore;
@@ -139,6 +140,12 @@ export function ChartArea({ chart, onEngine, magnet, onEditIndicator, onEditPosi
 
     engine.onCrosshair = (logical, e) => {
       setHover(logical);
+      // Choosing the replay start: a line marks where the chart will be cut off.
+      if (chart.get().replay?.phase === "select") {
+        const time = e && e.paneIndex === 0 ? engine.logicalToTime(e.logical) : null;
+        engine.drawings.setPreview(time === null ? null : { id: "replay-start", author: "user", kind: "vline", time, color: "#2962ff" });
+        return;
+      }
       const pending = pendingRef.current;
       const currentTool = chart.get().tool;
       const pos = positionRef.current;
@@ -155,6 +162,14 @@ export function ChartArea({ chart, onEngine, magnet, onEditIndicator, onEditPosi
     engine.onClick = (e) => {
       const currentTool = chart.get().tool;
       if (e.paneIndex !== 0) return;
+      if (chart.get().replay?.phase === "select") {
+        const time = engine.logicalToTime(e.logical);
+        if (time !== null) {
+          engine.drawings.setPreview(null);
+          pickReplayStart(chart, time);
+        }
+        return;
+      }
       if (currentTool === "cursor") {
         // Tapping a long/short position opens its settings.
         const { width, height } = engine.paneSize();
@@ -247,13 +262,21 @@ export function ChartArea({ chart, onEngine, magnet, onEditIndicator, onEditPosi
 
     engine.update(chart.get());
     refreshLayout();
+    // Starting a replay at a candle, or leaving it, jumps the view to the newest visible candles.
+    let replayKey = "";
     const unsubscribe = chart.subscribe(() => {
-      engine.update(chart.get());
-      const t = chart.get().tool;
+      const s = chart.get();
+      engine.update(s);
+      const key = s.replay?.phase === "play" ? s.replay.id : "";
+      if (key !== replayKey) {
+        replayKey = key;
+        engine.resetView();
+      }
+      const t = s.tool;
       engine.setDragMode(t === "brush");
       if (!POINT_COUNT[t]) pendingRef.current = [];
       if (!POSITION_TOOLS.has(t)) positionRef.current = null;
-      if (!POINT_COUNT[t] && !POSITION_TOOLS.has(t) && !strokeRef.current) engine.drawings.setPreview(null);
+      if (!POINT_COUNT[t] && !POSITION_TOOLS.has(t) && !strokeRef.current && s.replay?.phase !== "select") engine.drawings.setPreview(null);
       setHint(
         POSITION_TOOLS.has(t)
           ? POSITION_HINTS[positionRef.current ? (positionRef.current.stop === null ? 1 : 2) : 0]
@@ -269,11 +292,11 @@ export function ChartArea({ chart, onEngine, magnet, onEditIndicator, onEditPosi
     // Open demo positions of this chart's symbol.
     // A stop or target line being dragged: shown at the finger, saved on release.
     let lineDraft: LineDraft | null = null;
-    const pushTradeLines = () => engine.setTradeLines(tradeLinesFor(chart.get().symbol, lineDraft));
+    const pushTradeLines = () => engine.setTradeLines(tradeLinesFor(chart.get().symbol, chart.slot, lineDraft));
     let lineErrorTimer = 0;
     engine.onTradeLineDrag = (phase, dragId, price) => {
       lineDraft = phase === "move" ? { dragId, price } : null;
-      const err = phase === "end" ? dropLevel(dragId, price) : null;
+      const err = phase === "end" ? dropLevel(dragId, price, chart.slot) : null;
       pushTradeLines();
       if (phase === "move") return;
       window.clearTimeout(lineErrorTimer);
@@ -288,6 +311,12 @@ export function ChartArea({ chart, onEngine, magnet, onEditIndicator, onEditPosi
     const ro = new ResizeObserver(() => requestAnimationFrame(refreshLayout));
     ro.observe(containerRef.current!);
     const onKey = (ev: KeyboardEvent) => {
+      // Like TradingView: Shift + → shows the next replay candle (on the chart that is replaying).
+      if (ev.key === "ArrowRight" && ev.shiftKey && chart.get().replay?.phase === "play") {
+        ev.preventDefault();
+        stepReplay(chart);
+        return;
+      }
       if (ev.key === "Escape") {
         pendingRef.current = [];
         positionRef.current = null;
@@ -313,6 +342,16 @@ export function ChartArea({ chart, onEngine, magnet, onEditIndicator, onEditPosi
       engineRef.current = null;
     };
   }, [onEngine, chart]);
+
+  // Replay playback: one candle per tick at the chosen speed.
+  const replayPlaying = useChart(chart, (s) => s.replay?.playing ?? false);
+  const replaySpeed = useChart(chart, (s) => s.replay?.speed ?? 1);
+  const replaying = useChart(chart, (s) => s.replay !== null);
+  useEffect(() => {
+    if (!replayPlaying) return;
+    const timer = window.setInterval(() => stepReplay(chart), 1000 / replaySpeed);
+    return () => window.clearInterval(timer);
+  }, [chart, replayPlaying, replaySpeed]);
 
   // Pane heights change when indicators are added; re-measure on hover too (pane drag-resizing has no event).
   useEffect(() => {
@@ -371,6 +410,7 @@ export function ChartArea({ chart, onEngine, magnet, onEditIndicator, onEditPosi
               <span className="legend-symbol">
                 {symbol} · {interval} · {source === "demo" ? "DEMO-DATEN" : source === "binance_futures" ? "BINANCE PERP" : source?.toUpperCase()}
               </span>
+              {replaying && <span className="legend-replay">REPLAY</span>}
               {bar && (
                 <span className={up ? "up" : "down"}>
                   O {formatPrice(bar.open)} H {formatPrice(bar.high)} L {formatPrice(bar.low)} C {formatPrice(bar.close)}{" "}
@@ -410,6 +450,7 @@ export function ChartArea({ chart, onEngine, magnet, onEditIndicator, onEditPosi
           </button>
         </div>
       )}
+      {replaying && <ReplayBar chart={chart} />}
       {hint && <div className="draw-hint">{hint} · Esc bricht ab</div>}
       {lineError && !hint && <div className="draw-hint error">{lineError}</div>}
       {loading && <div className="chart-overlay">Lade {symbol} …</div>}

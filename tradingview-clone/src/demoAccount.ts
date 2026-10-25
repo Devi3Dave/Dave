@@ -18,8 +18,9 @@ import {
   type Order,
 } from "../shared/demoTrading";
 import { parseBackup } from "../shared/journal";
+import { barPath } from "../shared/replay";
 import type { TradeLine } from "./chart/ChartEngine";
-import { charts, fetchMarketData } from "./store";
+import { activeChart, charts, fetchMarketData, workspace, type ChartState } from "./store";
 
 const KEY = "chartai.demo.v1";
 const JOURNAL_KEY = "chartai.journal.v1";
@@ -40,6 +41,23 @@ export interface DemoEvent {
   trade: DemoTrade;
 }
 
+/**
+ * Play-money account of a running bar replay: it trades at the replayed prices and times, apart from the
+ * demo account, and is dropped when the replay ends or gets a new start.
+ */
+export interface ReplayBook {
+  /** The replay (ReplayState.id) it belongs to. */
+  id: string;
+  slot: number;
+  symbol: string;
+  account: DemoAccount;
+  prices: Record<string, number>;
+  /** Start of the newest candle already priced in (unix seconds). */
+  lastBar: number;
+  /** Replay time in unix milliseconds, used as the time of orders. */
+  now: number;
+}
+
 interface DemoState {
   account: DemoAccount;
   settings: DemoSettings;
@@ -48,6 +66,7 @@ interface DemoState {
   /** Journal ids of demo trades that are already in the journal. */
   journaled: Set<string>;
   events: DemoEvent[];
+  replay: ReplayBook | null;
 }
 
 function readJson(key: string): unknown {
@@ -73,6 +92,7 @@ let state: DemoState = {
   prices: {},
   journaled: new Set(readJournal().map((t) => t.id)),
   events: [],
+  replay: null,
 };
 const listeners = new Set<() => void>();
 let eventSeq = 0;
@@ -102,57 +122,111 @@ export function useDemo<T>(select: (s: DemoState) => T): T {
   return useSyncExternalStore(demo.subscribe, () => select(state));
 }
 
+/** "replay" when the chart in `slot` runs a replay with its own account, else the demo account. */
+type BookKind = "live" | "replay";
+const bookOf = (slot: number): BookKind => (state.replay?.slot === slot ? "replay" : "live");
+/** Order ticket and position list act on the active chart's account. */
+const currentBook = (): BookKind => bookOf(activeChart().slot);
+
+function readBook(kind: BookKind): { account: DemoAccount; prices: Record<string, number>; now: number } {
+  return kind === "replay" && state.replay ? state.replay : { account: state.account, prices: state.prices, now: Date.now() };
+}
+
+function writeAccount(kind: BookKind, account: DemoAccount) {
+  if (kind === "replay") {
+    if (state.replay) set({ replay: { ...state.replay, account } });
+  } else set({ account });
+}
+
+/** The replay account when the active chart replays, else null. */
+export const activeReplayBook = (): ReplayBook | null => (currentBook() === "replay" ? state.replay : null);
+
+const subscribeView = (l: () => void) => {
+  const offs = [demo.subscribe(l), workspace.subscribe(l)];
+  return () => offs.forEach((off) => off());
+};
+
+/** Account and prices the demo panel shows: the replay account while the active chart replays. */
+export function useDemoBook<T>(select: (b: { account: DemoAccount; prices: Record<string, number> }) => T): T {
+  return useSyncExternalStore(subscribeView, () => select(activeReplayBook() ?? state));
+}
+
+export function useReplayBook(): ReplayBook | null {
+  return useSyncExternalStore(subscribeView, activeReplayBook);
+}
+
 const newId = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 
 function afterClose(trades: DemoTrade[], announce: boolean) {
   if (!trades.length) return;
   if (announce) set({ events: [...state.events, ...trades.map((trade) => ({ id: ++eventSeq, trade }))].slice(-5) });
-  if (state.settings.autoJournal) addToJournal(trades);
+  // Replay trades go into the journal only by hand.
+  const live = trades.filter((t) => !t.replay);
+  if (state.settings.autoJournal && live.length) addToJournal(live);
 }
 
 /** Opens a market position at the last known price of the symbol. Returns an error text or null. */
 export function placeOrder(order: Order): string | null {
-  const price = state.prices[order.symbol];
-  const next = openPosition(state.account, order, price, state.prices, Date.now(), newId());
+  const kind = currentBook();
+  const book = readBook(kind);
+  if (kind === "replay" && order.symbol !== state.replay?.symbol) return `Im Replay ist nur ${state.replay?.symbol} handelbar`;
+  const price = book.prices[order.symbol];
+  const next = openPosition(book.account, order, price, book.prices, book.now, newId());
   if (typeof next === "string") return next;
-  set({ account: next });
+  // Marked so closed replay trades are told apart from demo trades (journal, toasts).
+  writeAccount(kind, kind === "replay" ? { ...next, positions: next.positions.map((p) => (book.account.positions.includes(p) ? p : { ...p, replay: true })) } : next);
   return null;
 }
 
-export function closeDemoPosition(id: string, reason: CloseReason = "manual"): DemoTrade | null {
-  const p = state.account.positions.find((x) => x.id === id);
-  const price = p && state.prices[p.symbol];
+function closeIn(kind: BookKind, id: string, reason: CloseReason): DemoTrade | null {
+  const book = readBook(kind);
+  const p = book.account.positions.find((x) => x.id === id);
+  const price = p && book.prices[p.symbol];
   if (!p || !price) return null;
-  const r = closePosition(state.account, id, price, reason, Date.now());
+  const r = closePosition(book.account, id, price, reason, book.now);
   if (!r) return null;
-  set({ account: r.account });
+  writeAccount(kind, r.account);
   afterClose([r.trade], false);
   return r.trade;
 }
 
+export function closeDemoPosition(id: string, reason: CloseReason = "manual"): DemoTrade | null {
+  return closeIn(currentBook(), id, reason);
+}
+
 /** Closes every position that has a price; returns how many were closed. */
 export function closeAllPositions(): number {
+  const kind = currentBook();
   let n = 0;
-  for (const p of state.account.positions) if (closeDemoPosition(p.id)) n++;
+  for (const p of readBook(kind).account.positions) if (closeIn(kind, p.id, "manual")) n++;
   return n;
 }
 
-export function setLevels(id: string, levels: { stop?: number; target?: number }): string | null {
-  const p = state.account.positions.find((x) => x.id === id);
-  const price = p && state.prices[p.symbol];
+function setLevelsIn(kind: BookKind, id: string, levels: { stop?: number; target?: number }): string | null {
+  const book = readBook(kind);
+  const p = book.account.positions.find((x) => x.id === id);
+  const price = p && book.prices[p.symbol];
   if (!p || !price) return "Kein aktueller Kurs";
-  const next = modifyPosition(state.account, id, levels, price);
+  const next = modifyPosition(book.account, id, levels, price);
   if (typeof next === "string") return next;
-  set({ account: next });
+  writeAccount(kind, next);
   return null;
 }
 
+export function setLevels(id: string, levels: { stop?: number; target?: number }): string | null {
+  return setLevelsIn(currentBook(), id, levels);
+}
+
 export function resetAccount(startBalance: number) {
-  set({ account: createAccount(startBalance, Date.now(), state.account.feeRate), events: [] });
+  const kind = currentBook();
+  const book = readBook(kind);
+  writeAccount(kind, createAccount(startBalance, book.now, book.account.feeRate));
+  set({ events: [] });
 }
 
 export function setFeeRate(feeRate: number) {
-  set({ account: { ...state.account, feeRate } });
+  const kind = currentBook();
+  writeAccount(kind, { ...readBook(kind).account, feeRate });
 }
 
 export function updateDemoSettings(patch: Partial<DemoSettings>) {
@@ -189,6 +263,49 @@ export function updatePrice(symbol: string, price: number) {
   afterClose(closed, true);
 }
 
+/**
+ * Follows a replaying chart: a new start gets a fresh replay account (start balance and fees of the demo
+ * account); every revealed candle is run through from open via high/low to close, so stops and targets
+ * inside it are hit.
+ */
+function syncReplay(slot: number, s: ChartState) {
+  const r = s.replay;
+  const book = state.replay;
+  if (!r || r.phase !== "play" || s.loading || !s.bars.length) {
+    // The replay ended or waits for a new start: its account is gone.
+    if (book?.slot === slot && (!r || r.phase !== "play")) set({ replay: null });
+    return;
+  }
+  const last = s.bars[s.bars.length - 1];
+  if (!book || book.id !== r.id || book.slot !== slot) {
+    set({
+      replay: {
+        id: r.id,
+        slot,
+        symbol: s.symbol,
+        account: createAccount(state.account.startBalance, last.time * 1000, state.account.feeRate),
+        prices: { [s.symbol]: last.close },
+        lastBar: last.time,
+        now: last.time * 1000,
+      },
+    });
+    return;
+  }
+  if (last.time === book.lastBar && book.prices[book.symbol] === last.close) return;
+  let account = book.account;
+  const closed: DemoTrade[] = [];
+  for (const bar of s.bars.slice(-50)) {
+    if (bar.time <= book.lastBar) continue;
+    for (const price of barPath(bar)) {
+      const res = applyPrice(account, book.symbol, price, bar.time * 1000);
+      account = res.account;
+      closed.push(...res.closed);
+    }
+  }
+  set({ replay: { ...book, account, prices: { ...book.prices, [book.symbol]: last.close }, lastBar: Math.max(book.lastBar, last.time), now: last.time * 1000 } });
+  afterClose(closed, true);
+}
+
 const lastUpdate = new Map<string, number>();
 
 let started = false;
@@ -200,6 +317,9 @@ export function startDemoFeed() {
   for (const chart of charts) {
     const push = () => {
       const s = chart.get();
+      syncReplay(chart.slot, s);
+      // A replaying chart shows old prices; demo positions of its asset are polled meanwhile.
+      if (s.replay) return;
       // While loading, the bars still belong to the previous symbol.
       if (s.loading || s.error || !s.bars.length) return;
       lastUpdate.set(s.symbol, Date.now());
@@ -261,19 +381,21 @@ function parseDragId(dragId: string): { id: string; handle: LevelHandle } | null
 }
 
 /** Saves the level of a dragged line (stop, target, or a new one pulled from the entry line). Returns an error text or null. */
-export function dropLevel(dragId: string, price: number): string | null {
+export function dropLevel(dragId: string, price: number, slot: number): string | null {
+  const kind = bookOf(slot);
   const d = parseDragId(dragId);
-  const p = d && state.account.positions.find((x) => x.id === d.id);
+  const p = d && readBook(kind).account.positions.find((x) => x.id === d.id);
   if (!d || !p) return "Position nicht gefunden";
   const { stop, target } = draggedLevels(p, d.handle, price);
-  return setLevels(p.id, { stop, target });
+  return setLevelsIn(kind, p.id, { stop, target });
 }
 
-/** Price lines for the open demo positions of a symbol (empty when lines are switched off). */
-export function tradeLinesFor(symbol: string, draft?: LineDraft | null): TradeLine[] {
+/** Price lines for the open positions of a symbol in the chart `slot` (empty when lines are switched off). */
+export function tradeLinesFor(symbol: string, slot: number, draft?: LineDraft | null): TradeLine[] {
   if (!state.settings.showLines) return [];
   const d = draft ? parseDragId(draft.dragId) : null;
-  return state.account.positions
+  const replay = bookOf(slot) === "replay";
+  return readBook(bookOf(slot)).account.positions
     .filter((p) => p.symbol === symbol)
     .flatMap((pos) => {
       let p = pos;
@@ -287,7 +409,7 @@ export function tradeLinesFor(symbol: string, draft?: LineDraft | null): TradeLi
         {
           price: p.entry,
           color: p.side === "long" ? "#26a69a" : "#ef5350",
-          title: `Demo ${p.side === "long" ? "Long" : "Short"} ${qtyText(p.qty)}`,
+          title: `${replay ? "Replay" : "Demo"} ${p.side === "long" ? "Long" : "Short"} ${qtyText(p.qty)}`,
           // Pulls out a missing stop or target; with both set, the entry line stays put (and the chart pans there).
           drag: p.stop === undefined || p.target === undefined ? dragIdOf(p.id, "entry") : undefined,
         },

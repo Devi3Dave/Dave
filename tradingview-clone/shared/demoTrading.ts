@@ -22,6 +22,8 @@ export interface DemoPosition {
   openFee: number;
   /** Unix milliseconds. */
   openedAt: number;
+  /** Opened in a bar replay (historical prices and times), not on the demo account. */
+  replay?: boolean;
 }
 
 export interface DemoTrade extends DemoPosition {
@@ -269,8 +271,8 @@ export function toJournalTrade(t: DemoTrade): JournalTrade {
     fees: t.openFee + t.closeFee,
     // A liquidation loses the margin, which the price difference does not show exactly.
     pnl: t.reason === "liquidation" ? t.pnl : undefined,
-    setup: "Demo",
-    note: `Demo-Konto · ${REASON_LABELS[t.reason]}${t.leverage > 1 ? ` · ${t.leverage}× Hebel` : ""}`,
+    setup: t.replay ? "Replay" : "Demo",
+    note: `${t.replay ? "Replay-Training" : "Demo-Konto"} · ${REASON_LABELS[t.reason]}${t.leverage > 1 ? ` · ${t.leverage}× Hebel` : ""}`,
   };
 }
 

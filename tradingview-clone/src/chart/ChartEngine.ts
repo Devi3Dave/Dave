@@ -293,7 +293,7 @@ export class ChartEngine {
     }
     this.axisLabels.setData(s.bars, {
       // Months have no fixed length, so the countdown would be wrong there.
-      countdown: s.settings.countdown && !isCalendarInterval(s.interval),
+      countdown: s.settings.countdown && !isCalendarInterval(s.interval) && !s.replay,
       highLow: s.settings.highLowLabels,
       lastPriceLabel: s.settings.lastPriceLabel,
       intervalSeconds: this.intervalSeconds,
