@@ -19,7 +19,7 @@ import {
   type Side,
 } from "../../shared/demoTrading";
 import { formatPrice } from "../chart/DrawingsPrimitive";
-import { addToJournal, closeAllPositions, closeDemoPosition, placeOrder, resetAccount, setFeeRate, setLevels, updateDemoSettings, useDemo } from "../demoAccount";
+import { addToJournal, closeAllPositions, closeDemoPosition, placeOrder, resetAccount, setFeeRate, setLevels, updateDemoSettings, useDemo, useDemoBook, useReplayBook } from "../demoAccount";
 import { loadChart, useChartState } from "../store";
 import { AssetSearchDialog } from "./AssetPicker";
 
@@ -167,8 +167,9 @@ export function DemoPanel() {
   const symbol = useChartState((s) => s.symbol);
   const source = useChartState((s) => s.source);
   const chartLoading = useChartState((s) => s.loading);
-  const account = useDemo((s) => s.account);
-  const prices = useDemo((s) => s.prices);
+  const account = useDemoBook((b) => b.account);
+  const prices = useDemoBook((b) => b.prices);
+  const replay = useReplayBook();
   const settings = useDemo((s) => s.settings);
   const journaled = useDemo((s) => s.journaled);
 
@@ -244,12 +245,18 @@ export function DemoPanel() {
     <div className="dm">
       <section className="dm-account">
         <div className="dm-account-head">
-          <span className="dm-muted">Demo-Konto · Spielgeld</span>
+          <span className="dm-muted">{replay ? "Replay-Konto · historische Kurse" : "Demo-Konto · Spielgeld"}</span>
           <div className="spacer" />
           <button className={`pill ${settingsOpen ? "active" : ""}`} onClick={() => setSettingsOpen((o) => !o)} data-tip="Startkapital, Gebühren, Journal, Linien im Chart">
             ⚙
           </button>
         </div>
+        {replay && (
+          <div className="dm-replay-note">
+            ⏪ Dieser Chart läuft im Replay: Orders, SL und TP gelten zu den abgespielten Kursen. Das Replay-Konto wird beim Beenden verworfen, dein
+            Demo-Konto bleibt unberührt.
+          </div>
+        )}
         <div className="dm-equity">
           <strong>{money(eq)}</strong>
           <span className={tone(total)}>

@@ -2,6 +2,7 @@ import { useSyncExternalStore } from "react";
 import { binanceInterval, bucketTime, loadMarketData, loadOpenInterest, type MarketData, type OpenInterestPoint } from "../shared/marketData";
 import type { Bar } from "../shared/math";
 import type { PositionInput } from "../shared/position";
+import { barIndexAt, carryReplay, randomStart } from "../shared/replay";
 import type { CHART_TYPES, INTERVALS } from "../shared/tools";
 import { DEFAULT_SETTINGS, type ChartSettings } from "./chartSettings";
 import { STANDALONE } from "./config";
@@ -59,6 +60,19 @@ export interface IndicatorInstance {
 
 export type Tool = "cursor" | "trendline" | "ray" | "hline" | "vline" | "zone" | "fib" | "text" | "fibext" | "channel" | "measure" | "brush" | "long" | "short" | "erase";
 
+/** Bar replay of one chart: `bars` shows only the first `shown` of `all` loaded candles. */
+export interface ReplayState {
+  /** New for every chosen start; the replay trading account belongs to it. */
+  id: string;
+  /** "select": waiting for the start candle to be tapped (the whole chart is shown). */
+  phase: "select" | "play";
+  all: Bar[];
+  shown: number;
+  playing: boolean;
+  /** Candles per second. */
+  speed: number;
+}
+
 export interface ChartState {
   symbol: string;
   interval: Interval;
@@ -72,6 +86,7 @@ export interface ChartState {
   markers: ChartMarker[];
   tool: Tool;
   settings: ChartSettings;
+  replay: ReplayState | null;
 }
 
 type Listener = () => void;
@@ -130,6 +145,7 @@ function createChartStore(slot: number): ChartStore {
     markers: saved.markers ?? [],
     tool: "cursor",
     settings: { ...DEFAULT_SETTINGS, ...(saved.settings ?? first.settings) },
+    replay: null,
   };
   const listeners = new Set<Listener>();
   let persistTimer: number | undefined;
@@ -164,18 +180,29 @@ function createChartStore(slot: number): ChartStore {
       socket?.close();
       socket = null;
       const symbolChanged = symbol !== state.symbol;
+      // A new time frame keeps the replay at the same moment; another asset ends it.
+      const replay = symbolChanged ? null : state.replay;
       chart.set({
         symbol,
         interval,
         loading: true,
         error: null,
+        replay,
         // Drawings and markers are anchored to prices of one symbol.
         ...(symbolChanged ? { drawings: [], markers: [] } : {}),
       });
       try {
         const json = await fetchMarketData(symbol, interval);
         if (seq !== loadSeq) return;
-        chart.set({ bars: json.bars, source: json.source, symbol: json.symbol, loading: false });
+        const r = chart.get().replay;
+        if (r?.phase === "play") {
+          const shown = carryReplay(r.all, r.shown, json.bars);
+          // Without a finished candle before that moment, a new start has to be chosen.
+          const next: ReplayState = shown > 0 ? { ...r, all: json.bars, shown, playing: false } : { ...r, phase: "select", all: json.bars, shown: 0, playing: false };
+          chart.set({ bars: next.phase === "play" ? json.bars.slice(0, shown) : json.bars, replay: next, source: json.source, symbol: json.symbol, loading: false });
+        } else if (r) {
+          chart.set({ bars: json.bars, replay: { ...r, all: json.bars }, source: json.source, symbol: json.symbol, loading: false });
+        } else chart.set({ bars: json.bars, source: json.source, symbol: json.symbol, loading: false });
         if (json.source === "binance" || json.source === "binance_futures") socket = connectLive(chart, json.symbol, interval, json.source === "binance_futures", () => seq === loadSeq);
       } catch (err) {
         if (seq !== loadSeq) return;
@@ -331,6 +358,56 @@ export function clearDrawings(scope: "claude" | "all") {
   }));
 }
 
+// ---------------- Bar replay ----------------
+
+/** Starts a replay on a chart: the next tap in the chart chooses the start candle. Only one chart replays at a time. */
+export function startReplay(chart: ChartStore = activeChart()) {
+  const s = chart.get();
+  const all = s.replay ? s.replay.all : s.bars;
+  if (!all.length || s.loading) return;
+  for (const c of charts) if (c !== chart && c.get().replay) exitReplay(c);
+  chart.set({ replay: { id: newId("replay"), phase: "select", all, shown: 0, playing: false, speed: s.replay?.speed ?? 1 }, bars: all, tool: "cursor" });
+}
+
+/** Cuts the chart off after the candle at `time` (or a random one); later candles are hidden. */
+export function pickReplayStart(chart: ChartStore, time: number | "random") {
+  const r = chart.get().replay;
+  if (!r || !r.all.length) return;
+  const index = time === "random" ? randomStart(r.all.length) : barIndexAt(r.all, time);
+  // At least one candle stays hidden to be played.
+  const shown = Math.max(1, Math.min(index + 1, r.all.length - 1));
+  chart.set({ replay: { ...r, id: newId("replay"), phase: "play", shown, playing: false }, bars: r.all.slice(0, shown) });
+}
+
+/** Reveals the next candle(s); false when there is nothing more to show. */
+export function stepReplay(chart: ChartStore, count = 1): boolean {
+  const r = chart.get().replay;
+  if (!r || r.phase !== "play") return false;
+  const shown = Math.min(r.all.length, r.shown + count);
+  const more = shown < r.all.length;
+  if (shown === r.shown) {
+    if (r.playing) chart.set({ replay: { ...r, playing: false } });
+    return false;
+  }
+  chart.set({ replay: { ...r, shown, playing: r.playing && more }, bars: r.all.slice(0, shown) });
+  return more;
+}
+
+export function setReplayPlaying(chart: ChartStore, playing: boolean) {
+  const r = chart.get().replay;
+  if (r?.phase === "play") chart.set({ replay: { ...r, playing: playing && r.shown < r.all.length } });
+}
+
+export function setReplaySpeed(chart: ChartStore, speed: number) {
+  const r = chart.get().replay;
+  if (r) chart.set({ replay: { ...r, speed } });
+}
+
+/** Back to the live chart with all candles. */
+export function exitReplay(chart: ChartStore = activeChart()) {
+  const r = chart.get().replay;
+  if (r) chart.set({ replay: null, bars: r.all });
+}
 
 // ---------------- Market data ----------------
 
@@ -367,8 +444,10 @@ function connectLive(chart: ChartStore, symbol: string, interval: Interval, futu
     const prev = seen;
     seen = raw;
     chart.set((s) => {
+      // During a replay new candles go to the hidden part of the series.
+      const series = s.replay ? s.replay.all : s.bars;
       let bar = raw;
-      const last = s.bars[s.bars.length - 1];
+      const last = series[series.length - 1];
       if (merge) {
         const time = bucketTime(interval, raw.time);
         if (last && last.time === time) {
@@ -388,10 +467,11 @@ function connectLive(chart: ChartStore, symbol: string, interval: Interval, futu
           bar = { ...raw, time };
         }
       }
-      const bars = s.bars.slice();
+      const bars = series.slice();
       if (last && last.time === bar.time) bars[bars.length - 1] = bar;
       else if (!last || bar.time > last.time) bars.push(bar);
-      return { bars };
+      if (!s.replay) return { bars };
+      return s.replay.phase === "select" ? { bars, replay: { ...s.replay, all: bars } } : { replay: { ...s.replay, all: bars } };
     });
   };
   return ws;

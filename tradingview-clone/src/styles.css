@@ -2706,3 +2706,86 @@ select,
   font-size: 12px;
   white-space: nowrap;
 }
+
+/* ---------- bar replay ---------- */
+
+.replay-bar {
+  position: absolute;
+  bottom: 34px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+  font-size: 12px;
+  white-space: nowrap;
+  max-width: calc(100% - 16px);
+  overflow-x: auto;
+}
+
+.replay-bar button,
+.replay-bar select {
+  min-width: 32px;
+  min-height: 30px;
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.replay-bar button:disabled {
+  opacity: 0.4;
+}
+
+.replay-bar .replay-play {
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.replay-title {
+  color: var(--accent);
+  font-weight: 600;
+  padding: 0 2px;
+}
+
+.replay-hint,
+.replay-date {
+  color: var(--muted);
+  padding: 0 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.replay-pnl {
+  font-weight: 600;
+  padding: 0 4px;
+}
+
+.legend-replay {
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.dm-replay-note {
+  margin: 6px 0;
+  padding: 6px 8px;
+  border-left: 3px solid var(--accent);
+  border-radius: 4px;
+  background: rgba(41, 98, 255, 0.1);
+  font-size: 12px;
+  line-height: 1.4;
+}

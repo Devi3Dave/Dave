@@ -3,7 +3,7 @@ import { INDICATORS, getIndicator, resolveParams } from "../../shared/indicators
 import { CHART_TYPES, INTERVALS } from "../../shared/tools";
 import { formatPrice } from "../chart/DrawingsPrimitive";
 import { toggleFavorite, useFavorites } from "../favorites";
-import { LAYOUTS, addIndicator, loadChart, setLayout, store, useChartState, useWorkspace, workspace, type ChartType } from "../store";
+import { LAYOUTS, addIndicator, exitReplay, loadChart, setLayout, startReplay, store, useChartState, useWorkspace, workspace, type ChartType } from "../store";
 import { APP_VERSION, BUILD_SHA, BUILD_TIME, formatBuildTime, reloadToLatest, useUpdateCheck } from "../version";
 import { AssetMenu, AssetSearchDialog } from "./AssetPicker";
 import { DemoButton } from "./DemoToasts";
@@ -169,6 +169,7 @@ export function TopBar({ onOpenIndicators, onOpenSettings, heatmapOpen, onToggle
   const { symbol, interval, chartType } = useChartState((s) => s);
   const showPrice = useChartState((s) => s.settings.headerPrice);
   const { last, change } = useHeaderPrice();
+  const replaying = useChartState((s) => s.replay !== null);
   const [searchOpen, setSearchOpen] = useState(false);
 
   return (
@@ -211,6 +212,13 @@ export function TopBar({ onOpenIndicators, onOpenSettings, heatmapOpen, onToggle
       </select>
       <button className="pill" onClick={onOpenIndicators} data-tip={`Indikatoren hinzufügen (${INDICATORS.length} verfügbar)`}>
         ƒx Indikatoren
+      </button>
+      <button
+        className={`pill ${replaying ? "active" : ""}`}
+        onClick={() => (replaying ? exitReplay() : startReplay())}
+        data-tip={replaying ? "Replay beenden, zurück zum Live-Chart" : "Bar-Replay\nStartkerze wählen und den Chart Kerze für Kerze abspielen\nMit eigenem Replay-Konto zum Üben"}
+      >
+        ⏪ Replay
       </button>
       <FavoritesMenu />
       <TemplatesMenu />

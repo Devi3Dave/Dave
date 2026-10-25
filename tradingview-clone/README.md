@@ -162,6 +162,19 @@ aktiven Charts, wie bei einem Futures-Konto mit isolierter Margin; das Konto lie
 - Historie mit Trefferquote und Gebühren; Trades einzeln, alle oder automatisch ins Journal (Setup „Demo“)
 - Gebühr pro Seite einstellbar (0 / 0,02 / 0,05 / 0,1 %), Konto jederzeit neu starten
 
+**Bar-Replay (⏪ Replay in der Kopfzeile)**
+Wie das Bar Replay von TradingView: den Chart an einer Kerze in der Vergangenheit abschneiden und die
+folgenden Kerzen nacheinander aufdecken, um Setups ohne Blick in die Zukunft zu üben.
+- Startkerze im Chart antippen (eine Linie zeigt, wo geschnitten wird) oder 🎲 Zufällig wählen
+- ⏭ nächste Kerze (Tastatur: Shift + →), ▶/⏸ abspielen mit 0,5–10 Kerzen pro Sekunde, ⇤ neuer Startpunkt
+- Indikatoren, Zeichnungen und Claude sehen nur die bereits aufgedeckten Kerzen
+- Zeiteinheit wechseln bleibt am selben Zeitpunkt (nur abgeschlossene Kerzen werden gezeigt)
+- Trading im Replay: solange der Replay-Chart aktiv ist, handelt 💰 Demo auf einem eigenen Replay-Konto
+  zu den abgespielten Kursen. SL und TP lösen innerhalb einer Kerze aus (Weg Open → Tief/Hoch → Close),
+  das Ergebnis steht in der Replay-Leiste. Das echte Demo-Konto bleibt unberührt; Replay-Trades lassen
+  sich einzeln ins Journal übernehmen (Setup „Replay“).
+- ✕ beendet das Replay und zeigt wieder den Live-Chart
+
 **Börsenzeiten (🕐 Börsen in der Kopfzeile)**
 Öffnungs- und Schließzeiten von 16 großen Börsen (NYSE, Nasdaq, TSX, LSE, Xetra, Börse Frankfurt,
 Euronext, SIX, Tokio, Hongkong, Shanghai, Shenzhen, KRX, SGX, NSE, ASX) in der automatisch erkannten
