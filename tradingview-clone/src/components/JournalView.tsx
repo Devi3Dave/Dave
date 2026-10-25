@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { journalStats, parseBackup, sortTrades, toCsv, tradePnl, tradeR, type JournalTrade, type Side } from "../../shared/journal";
+import { JOURNAL_EVENT, refreshJournaled } from "../demoAccount";
 import { useChartState } from "../store";
 import { LineChart, useWidth } from "./CalcCharts";
 import { HelpBox, Stat } from "./CalculatorView";
@@ -243,10 +244,18 @@ export function JournalView({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(trades));
+      refreshJournaled();
     } catch {
       setError("Speichern im Browser fehlgeschlagen – bitte ein Backup exportieren");
     }
   }, [trades]);
+
+  // Demo trades taken over from the demo account while this page is open.
+  useEffect(() => {
+    const reload = () => setTrades(load());
+    window.addEventListener(JOURNAL_EVENT, reload);
+    return () => window.removeEventListener(JOURNAL_EVENT, reload);
+  }, []);
 
   // Ask the browser not to evict the journal when storage runs low.
   useEffect(() => {

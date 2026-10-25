@@ -3,6 +3,7 @@ import type { ChartEngine } from "./chart/ChartEngine";
 import { CalculatorView } from "./components/CalculatorView";
 import { ChartGrid } from "./components/ChartGrid";
 import { ChartSettingsDialog } from "./components/ChartSettingsDialog";
+import { DemoToasts } from "./components/DemoToasts";
 import { DrawingToolbar } from "./components/DrawingToolbar";
 import { ExchangesView } from "./components/ExchangesView";
 import { JournalView } from "./components/JournalView";
@@ -13,6 +14,7 @@ import { SidePanel, type SideTab } from "./components/SidePanel";
 import { TooltipLayer } from "./components/Tooltip";
 import { TopBar } from "./components/TopBar";
 import { isCryptoSymbol } from "../shared/marketData";
+import { startDemoFeed } from "./demoAccount";
 import { liquidationFeed } from "./market/liquidationFeed";
 import { MAX_CHARTS, useChartState, workspace } from "./store";
 
@@ -38,6 +40,9 @@ export default function App() {
     if (wantLiquidations) liquidationFeed.start(symbol);
     else liquidationFeed.stop();
   }, [wantLiquidations, symbol]);
+
+  // Demo positions are watched (stop, target, liquidation) whether or not their tab is open.
+  useEffect(() => startDemoFeed(), []);
 
   const onEngine = useCallback((slot: number, e: ChartEngine | null) => {
     enginesRef.current[slot] = e;
@@ -78,6 +83,17 @@ export default function App() {
           setJournalOpen(false);
           setExchangesOpen((o) => !o);
         }}
+        demoOpen={claudeOpen && sideTab === "demo"}
+        onToggleDemo={() => {
+          if (claudeOpen && sideTab === "demo" && !(heatmapOpen || calcOpen || journalOpen || exchangesOpen)) return setSideTab("claude");
+          // Trading needs the chart, so full-screen pages close.
+          setHeatmapOpen(false);
+          setCalcOpen(false);
+          setJournalOpen(false);
+          setExchangesOpen(false);
+          setClaudeOpen(true);
+          setSideTab("demo");
+        }}
         claudeOpen={claudeOpen} onToggleClaude={() => setClaudeOpen((o) => !o)} />
       <DrawingToolbar magnet={magnet} onToggleMagnet={() => setMagnet((m) => !m)} getEngine={getEngine} />
       <ChartGrid onEngine={onEngine} magnet={magnet} onEditIndicator={setEditing} onEditPosition={setEditingPosition} />
@@ -99,6 +115,10 @@ export default function App() {
       {editing && <IndicatorSettings id={editing} onClose={() => setEditing(null)} />}
       {editingPosition && <PositionDialog id={editingPosition} onClose={() => setEditingPosition(null)} />}
       {showSettings && <ChartSettingsDialog onClose={() => setShowSettings(false)} />}
+      <DemoToasts onOpen={() => {
+        setClaudeOpen(true);
+        setSideTab("demo");
+      }} />
       <TooltipLayer />
     </div>
   );

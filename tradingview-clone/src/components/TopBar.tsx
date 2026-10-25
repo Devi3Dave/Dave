@@ -6,6 +6,7 @@ import { toggleFavorite, useFavorites } from "../favorites";
 import { LAYOUTS, addIndicator, loadChart, setLayout, store, useChartState, useWorkspace, workspace, type ChartType } from "../store";
 import { APP_VERSION, BUILD_SHA, BUILD_TIME, formatBuildTime, reloadToLatest, useUpdateCheck } from "../version";
 import { AssetMenu, AssetSearchDialog } from "./AssetPicker";
+import { DemoButton } from "./DemoToasts";
 import { Menu } from "./Menu";
 import { TemplatesMenu } from "./TemplatesMenu";
 
@@ -46,6 +47,8 @@ interface Props {
   onToggleJournal: () => void;
   exchangesOpen: boolean;
   onToggleExchanges: () => void;
+  demoOpen: boolean;
+  onToggleDemo: () => void;
   claudeOpen: boolean;
   onToggleClaude: () => void;
 }
@@ -162,7 +165,7 @@ function FavoritesMenu() {
   );
 }
 
-export function TopBar({ onOpenIndicators, onOpenSettings, heatmapOpen, onToggleHeatmap, calcOpen, onToggleCalc, journalOpen, onToggleJournal, exchangesOpen, onToggleExchanges, claudeOpen, onToggleClaude }: Props) {
+export function TopBar({ onOpenIndicators, onOpenSettings, heatmapOpen, onToggleHeatmap, calcOpen, onToggleCalc, journalOpen, onToggleJournal, exchangesOpen, onToggleExchanges, demoOpen, onToggleDemo, claudeOpen, onToggleClaude }: Props) {
   const { symbol, interval, chartType } = useChartState((s) => s);
   const showPrice = useChartState((s) => s.settings.headerPrice);
   const { last, change } = useHeaderPrice();
@@ -215,6 +218,7 @@ export function TopBar({ onOpenIndicators, onOpenSettings, heatmapOpen, onToggle
       <button className="pill" onClick={onOpenSettings} aria-label="Chart-Einstellungen" data-tip={"Chart-Einstellungen\nAchsen, Kurslabel, Countdown, Zeitzone, Gitter"}>
         ⚙
       </button>
+      <DemoButton active={demoOpen} onClick={onToggleDemo} />
       <button className={`pill ${heatmapOpen ? "active" : ""}`} onClick={onToggleHeatmap} data-tip={"Liquidations-Heatmap im CoinGlass-Stil\nVollbild mit Zeiträumen von 12 h bis 1 Jahr"}>
         🔥 Heatmap
       </button>

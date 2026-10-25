@@ -12,6 +12,7 @@ import {
   createChart,
   createSeriesMarkers,
   type IChartApi,
+  type IPriceLine,
   type ISeriesApi,
   type ISeriesMarkersPluginApi,
   type Logical,
@@ -73,6 +74,13 @@ export interface PointerEvent {
 
 const ts = (t: number) => t as UTCTimestamp;
 
+export interface TradeLine {
+  price: number;
+  color: string;
+  title: string;
+  dashed?: boolean;
+}
+
 export class ChartEngine {
   readonly chart: IChartApi;
   readonly drawings = new DrawingsPrimitive();
@@ -97,6 +105,8 @@ export class ChartEngine {
   private settingsKey = "";
   private intervalSeconds = 3600;
   private interval = "1h";
+  private tradeLines: TradeLine[] = [];
+  private tradeLineApis: IPriceLine[] = [];
 
   onCrosshair: (logical: number | null, point: PointerEvent | null) => void = () => {};
   onClick: (e: PointerEvent) => void = () => {};
@@ -302,6 +312,25 @@ export class ChartEngine {
     this.main.attachPrimitive(this.patterns);
     this.main.attachPrimitive(this.sessions);
     this.markersApi = createSeriesMarkers(this.main, []);
+    // Price lines belong to the series; the new one gets them again.
+    this.tradeLineApis = [];
+    this.drawTradeLines();
+  }
+
+  /** Demo-account positions: entry, stop-loss and take-profit as labelled price lines. */
+  setTradeLines(lines: TradeLine[]) {
+    const key = (l: TradeLine[]) => l.map((x) => `${x.price}|${x.color}|${x.title}|${x.dashed}`).join(";");
+    if (key(lines) === key(this.tradeLines)) return;
+    this.tradeLines = lines;
+    this.drawTradeLines();
+  }
+
+  private drawTradeLines() {
+    if (!this.main || this.destroyed) return;
+    for (const l of this.tradeLineApis) this.main.removePriceLine(l);
+    this.tradeLineApis = this.tradeLines.map((l) =>
+      this.main!.createPriceLine({ price: l.price, color: l.color, lineWidth: 1, lineStyle: l.dashed ? LineStyle.Dashed : LineStyle.Solid, axisLabelVisible: true, title: l.title }),
+    );
   }
 
   private applySettings(st: ChartSettings) {
