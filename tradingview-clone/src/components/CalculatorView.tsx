@@ -95,7 +95,7 @@ function NumInput({ label, value, onChange, unit, min, max, step, hint }: { labe
 }
 
 /** Collapsible plain-language explanation; the header button opens or closes all of them. */
-function HelpBox({ help, allOpen, title = "So funktioniert's" }: { help: Help; allOpen: boolean; title?: string }) {
+export function HelpBox({ help, allOpen, title = "So funktioniert's" }: { help: Help; allOpen: boolean; title?: string }) {
   const [open, setOpen] = useState(allOpen);
   useEffect(() => setOpen(allOpen), [allOpen]);
   return (
@@ -120,7 +120,7 @@ function Card({ n, title, formula, help, helpOpen, children }: { n: number | str
   );
 }
 
-function Stat({ label, value, tone, big }: { label: string; value: ReactNode; tone?: "up" | "down" | "gold"; big?: boolean }) {
+export function Stat({ label, value, tone, big }: { label: string; value: ReactNode; tone?: "up" | "down" | "gold"; big?: boolean }) {
   return (
     <div className={`calc-stat ${big ? "big" : ""}`}>
       <span>{label}</span>

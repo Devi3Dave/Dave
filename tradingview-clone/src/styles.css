@@ -1894,3 +1894,208 @@ select,
 .calc-view .heatmap-head button.active {
   color: #f5c518;
 }
+
+/* ---------- trading journal ---------- */
+
+.jr-verdict {
+  max-width: 1100px;
+  margin: 0 0 12px;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  font-size: 15px;
+}
+
+.jr-verdict.up {
+  border-color: rgba(38, 166, 154, 0.5);
+  background: rgba(38, 166, 154, 0.08);
+}
+
+.jr-verdict.down {
+  border-color: rgba(239, 83, 80, 0.5);
+  background: rgba(239, 83, 80, 0.08);
+}
+
+.jr-muted {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.jr-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+@media (max-width: 1000px) {
+  .jr-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.jr-view .calc-card h3 .spacer {
+  flex: 1;
+}
+
+.jr-select {
+  max-width: 160px;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 6px;
+  font-size: 12px;
+}
+
+.jr-seg {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.jr-seg button {
+  border: 0;
+  border-radius: 0;
+  padding: 4px 10px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.jr-seg button.active {
+  background: var(--panel-2);
+  color: var(--text);
+}
+
+.jr-side {
+  display: flex;
+}
+
+.jr-side button {
+  flex: 1;
+  padding: 6px 8px;
+}
+
+.jr-side button.active.up {
+  color: var(--up);
+  background: rgba(38, 166, 154, 0.15);
+}
+
+.jr-side button.active.down {
+  color: var(--down);
+  background: rgba(239, 83, 80, 0.15);
+}
+
+.jr-wide {
+  grid-column: 1 / -1;
+}
+
+.jr-form input[type="date"] {
+  color-scheme: dark;
+  min-height: 30px;
+}
+
+.jr-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.jr-preview {
+  flex: 1;
+  min-width: 160px;
+  font-variant-numeric: tabular-nums;
+}
+
+.jr-actions button {
+  border: 1px solid var(--border);
+  padding: 7px 12px;
+}
+
+.jr-actions .jr-save {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}
+
+.jr-notice {
+  margin-top: 8px;
+  padding: 6px 8px;
+  border: 1px solid var(--up);
+  border-radius: 4px;
+  color: var(--up);
+  background: rgba(38, 166, 154, 0.08);
+  font-size: 12px;
+}
+
+.jr-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  color: var(--muted);
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+}
+
+.jr-bars,
+.jr-list {
+  margin-top: 12px;
+}
+
+.jr-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.jr-table {
+  min-width: 820px;
+}
+
+.jr-table td,
+.jr-table th {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.jr-table td:nth-child(2),
+.jr-table td:nth-child(3),
+.jr-table td:nth-child(4),
+.jr-table th:nth-child(2),
+.jr-table th:nth-child(3),
+.jr-table th:nth-child(4),
+.jr-table .jr-note,
+.jr-table th:nth-child(11) {
+  text-align: left;
+}
+
+.jr-table .jr-note {
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--muted);
+}
+
+.jr-table tr.jr-editing td {
+  background: rgba(41, 98, 255, 0.12);
+}
+
+.jr-row-actions button + button {
+  margin-left: 4px;
+}
+
+.jr-row-actions button {
+  padding: 2px 6px;
+  font-size: 13px;
+}
+
+.jr-row-actions .jr-danger {
+  color: #fff;
+  background: var(--down);
+  border-radius: 4px;
+}

@@ -56,6 +56,8 @@ interface LineChartProps {
   xDomain: [number, number];
   yDomain: [number, number];
   xFmt: (v: number) => string;
+  /** Tooltip heading for an x value (defaults to xFmt). */
+  xTipFmt?: (v: number) => string;
   yFmt: (v: number) => string;
   xTitle?: string;
   height?: number;
@@ -68,7 +70,7 @@ interface LineChartProps {
 
 const PAD = { l: 58, r: 46, t: 12, b: 34 };
 
-export function LineChart({ series, xDomain, yDomain, xFmt, yFmt, xTitle, height = 240, markers = [], hLines = [], vLines = [], integerX }: LineChartProps) {
+export function LineChart({ series, xDomain, yDomain, xFmt, xTipFmt = xFmt, yFmt, xTitle, height = 240, markers = [], hLines = [], vLines = [], integerX }: LineChartProps) {
   const [ref, width] = useWidth<HTMLDivElement>();
   const [hoverX, setHoverX] = useState<number | null>(null);
   const plotW = Math.max(10, width - PAD.l - PAD.r);
@@ -97,7 +99,7 @@ export function LineChart({ series, xDomain, yDomain, xFmt, yFmt, xTitle, height
     const left = hx + 170 > width ? hx - 170 : hx + 12;
     tooltip = (
       <div className="calc-tip" style={{ left: Math.max(0, left), top: PAD.t }}>
-        <div className="calc-tip-head">{xFmt(hoverX)}</div>
+        <div className="calc-tip-head">{xTipFmt(hoverX)}</div>
         {rows.map(({ s, p }) => (
           <div key={s.id} className="calc-tip-row">
             <span className="calc-swatch" style={{ background: s.color }} />
