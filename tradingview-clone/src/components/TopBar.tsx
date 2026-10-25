@@ -27,7 +27,14 @@ const INTERVAL_LABELS: Record<string, string> = {
   "4h": "4 Stunden",
   "1d": "1 Tag",
   "1w": "1 Woche",
+  "1M": "1 Monat",
+  "3M": "1 Quartal",
+  "1y": "1 Jahr",
+  all: "Alles (gesamte Historie in Wochenkerzen)",
 };
+
+/** Button text where the key would be ambiguous (1m minute vs. 1M month). */
+const INTERVAL_SHORT: Record<string, string> = { "1M": "1Mo", "3M": "1Q", "1y": "1J", all: "Alles" };
 
 interface Props {
   onOpenIndicators: () => void;
@@ -210,7 +217,7 @@ export function TopBar({ onOpenIndicators, onOpenSettings, heatmapOpen, onToggle
       <div className="group">
         {INTERVALS.map((iv) => (
           <button key={iv} className={iv === interval ? "active" : ""} onClick={() => loadChart(symbol, iv)} data-tip={`Zeiteinheit: ${INTERVAL_LABELS[iv]}`}>
-            {iv}
+            {INTERVAL_SHORT[iv] ?? iv}
           </button>
         ))}
       </div>

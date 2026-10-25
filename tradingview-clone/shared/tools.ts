@@ -4,7 +4,7 @@
 import { z } from "zod";
 import { INDICATOR_IDS } from "./indicators.js";
 
-export const INTERVALS = ["1m", "5m", "15m", "30m", "1h", "4h", "1d", "1w"] as const;
+export const INTERVALS = ["1m", "5m", "15m", "30m", "1h", "4h", "1d", "1w", "1M", "3M", "1y", "all"] as const;
 export const CHART_TYPES = ["candles", "bars", "heikin_ashi", "line", "area"] as const;
 
 const time = z
@@ -48,7 +48,7 @@ export const toolSchemas = {
     description: "Wechselt Symbol, Zeiteinheit oder Charttyp. Danach sind neue Kerzen geladen.",
     schema: z.object({
       symbol: z.string().optional().describe("z. B. BTCUSDT, ETHUSDT (Binance) oder AAPL, ^GDAXI, EURUSD=X (Yahoo)."),
-      interval: z.enum(INTERVALS).optional(),
+      interval: z.enum(INTERVALS).optional().describe("1M = Monat, 3M = Quartal, 1y = Jahr, all = gesamte Historie (Wochenkerzen)."),
       chart_type: z.enum(CHART_TYPES).optional(),
     }),
   },

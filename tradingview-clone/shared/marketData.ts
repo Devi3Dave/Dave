@@ -19,7 +19,39 @@ export const INTERVAL_SECONDS: Record<string, number> = {
   "12h": 43200,
   "1d": 86400,
   "1w": 604800,
+  // Calendar candles: the seconds are only an average length (demo data, axis format).
+  "1M": 2629800,
+  "3M": 7889400,
+  "1y": 31557600,
+  // Whole history: weekly candles, zoomed out to show everything.
+  all: 604800,
 };
+
+/** Months per candle for calendar intervals (month, quarter, year). */
+const CALENDAR_MONTHS: Record<string, number> = { "1M": 1, "3M": 3, "1y": 12 };
+
+export function isCalendarInterval(interval: string): boolean {
+  return interval in CALENDAR_MONTHS;
+}
+
+/** Binance candles to request: quarters and years are built from monthly candles. */
+export function binanceInterval(interval: string): string {
+  if (interval === "all") return "1w";
+  return isCalendarInterval(interval) ? "1M" : interval;
+}
+
+/** Start of the candle a timestamp belongs to (UTC calendar for month/quarter/year). */
+export function bucketTime(interval: string, time: number): number {
+  const months = CALENDAR_MONTHS[interval];
+  if (!months) {
+    const step = INTERVAL_SECONDS[interval] ?? 3600;
+    return Math.floor(time / step) * step;
+  }
+  // Half a day of slack: Yahoo stamps monthly candles of European markets at 23:00 UTC of the day before.
+  const d = new Date((time + 43200) * 1000);
+  const m = d.getUTCMonth();
+  return Date.UTC(d.getUTCFullYear(), m - (m % months), 1) / 1000;
+}
 
 const CRYPTO_QUOTES = /^[A-Z0-9]{2,}(USDT|USDC|FDUSD|BUSD|BTC|ETH|BNB|EUR|TRY)$/;
 
@@ -38,14 +70,16 @@ async function fetchJson(url: string): Promise<unknown> {
 }
 
 async function fromBinance(symbol: string, interval: string, limit: number): Promise<Bar[]> {
-  const query = `symbol=${encodeURIComponent(symbol)}&interval=${interval}&limit=${limit}`;
+  const source = binanceInterval(interval);
+  // Aggregated and full-history charts take as much history as Binance gives in one request.
+  const query = `symbol=${encodeURIComponent(symbol)}&interval=${source}&limit=${source === interval && interval !== "all" ? limit : 1000}`;
   // data-api.binance.vision is Binance's public market-data mirror; it also
   // works from regions where api.binance.com answers 451.
   let lastError: unknown;
   for (const host of ["https://api.binance.com", "https://data-api.binance.vision"]) {
     try {
       const rows = (await fetchJson(`${host}/api/v3/klines?${query}`)) as unknown[][];
-      return rows.map((r) => ({
+      const bars = rows.map((r) => ({
         time: Math.floor(Number(r[0]) / 1000),
         open: Number(r[1]),
         high: Number(r[2]),
@@ -54,6 +88,7 @@ async function fromBinance(symbol: string, interval: string, limit: number): Pro
         volume: Number(r[5]),
         buyVolume: Number(r[9]),
       }));
+      return source === interval || interval === "all" ? bars : aggregate(bars, interval).slice(-limit);
     } catch (err) {
       lastError = err;
     }
@@ -61,15 +96,19 @@ async function fromBinance(symbol: string, interval: string, limit: number): Pro
   throw lastError;
 }
 
-const YAHOO: Record<string, { interval: string; range: string; aggregate?: number }> = {
+const YAHOO: Record<string, { interval: string; range: string; aggregate?: boolean }> = {
   "1m": { interval: "1m", range: "7d" },
   "5m": { interval: "5m", range: "60d" },
   "15m": { interval: "15m", range: "60d" },
   "30m": { interval: "30m", range: "60d" },
   "1h": { interval: "60m", range: "730d" },
-  "4h": { interval: "60m", range: "730d", aggregate: 4 },
+  "4h": { interval: "60m", range: "730d", aggregate: true },
   "1d": { interval: "1d", range: "10y" },
   "1w": { interval: "1wk", range: "max" },
+  "1M": { interval: "1mo", range: "max", aggregate: true },
+  "3M": { interval: "1mo", range: "max", aggregate: true },
+  "1y": { interval: "1mo", range: "max", aggregate: true },
+  all: { interval: "1wk", range: "max" },
 };
 
 interface YahooChart {
@@ -95,20 +134,23 @@ async function fromYahoo(symbol: string, interval: string, limit: number): Promi
     if (o === null || h === null || l === null || c === null) return;
     bars.push({ time: t, open: o, high: h, low: l, close: c, volume: q.volume[i] ?? 0 });
   });
-  if (cfg.aggregate) bars = aggregate(bars, INTERVAL_SECONDS[interval]);
-  return bars.slice(-limit);
+  if (cfg.aggregate) bars = aggregate(bars, interval);
+  // The full history is never cut off.
+  return interval === "all" ? bars : bars.slice(-limit);
 }
 
-function aggregate(bars: Bar[], seconds: number): Bar[] {
+/** Merges smaller candles into candles of `interval` (fixed length or calendar). */
+export function aggregate(bars: Bar[], interval: string): Bar[] {
   const out: Bar[] = [];
   for (const b of bars) {
-    const bucket = Math.floor(b.time / seconds) * seconds;
+    const bucket = bucketTime(interval, b.time);
     const last = out[out.length - 1];
     if (last && last.time === bucket) {
       last.high = Math.max(last.high, b.high);
       last.low = Math.min(last.low, b.low);
       last.close = b.close;
       last.volume += b.volume;
+      if (last.buyVolume !== undefined && b.buyVolume !== undefined) last.buyVolume += b.buyVolume;
     } else {
       out.push({ ...b, time: bucket });
     }

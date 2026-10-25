@@ -24,7 +24,7 @@ import {
 import { getIndicator, resolveParams, type IndicatorDef, type OutputDef } from "../../shared/indicators";
 import { heikinAshi, type Bar, type Series } from "../../shared/math";
 import { getExchange, tradingDays } from "../../shared/exchanges";
-import { INTERVAL_SECONDS } from "../../shared/marketData";
+import { INTERVAL_SECONDS, isCalendarInterval } from "../../shared/marketData";
 import type { OrderBlock, OrderBlockSignal } from "../../shared/orderblocks";
 import type { CandlePattern, Formation } from "../../shared/patterns";
 import { resolveTimeZone, type ChartSettings } from "../chartSettings";
@@ -96,6 +96,7 @@ export class ChartEngine {
   private side: "left" | "right" = "right";
   private settingsKey = "";
   private intervalSeconds = 3600;
+  private interval = "1h";
 
   onCrosshair: (logical: number | null, point: PointerEvent | null) => void = () => {};
   onClick: (e: PointerEvent) => void = () => {};
@@ -201,6 +202,7 @@ export class ChartEngine {
       this.createMainSeries(s.chartType);
     }
     this.intervalSeconds = INTERVAL_SECONDS[s.interval] ?? 3600;
+    this.interval = s.interval;
 
     const symbolKey = `${s.symbol}|${s.interval}`;
     const prev = this.bars;
@@ -219,7 +221,7 @@ export class ChartEngine {
       else this.setMainData();
       if (symbolKey !== this.symbolKey && s.bars.length > 0) {
         this.symbolKey = symbolKey;
-        this.chart.timeScale().setVisibleLogicalRange({ from: s.bars.length - 160, to: s.bars.length + 8 });
+        this.showDefaultRange();
       }
     }
 
@@ -237,7 +239,8 @@ export class ChartEngine {
       this.applySettings(s.settings);
     }
     this.axisLabels.setData(s.bars, {
-      countdown: s.settings.countdown,
+      // Months have no fixed length, so the countdown would be wrong there.
+      countdown: s.settings.countdown && !isCalendarInterval(s.interval),
       highLow: s.settings.highLowLabels,
       lastPriceLabel: s.settings.lastPriceLabel,
       intervalSeconds: this.intervalSeconds,
@@ -410,9 +413,15 @@ export class ChartEngine {
 
   /** Scrolls back to the latest candles and re-fits the price scale. */
   resetView() {
-    const n = this.bars.length;
-    this.chart.timeScale().setVisibleLogicalRange({ from: n - 160, to: n + 8 });
+    this.showDefaultRange();
     this.autoScale();
+  }
+
+  /** The latest ~160 candles; "all" shows the whole history, short histories keep a readable candle width. */
+  private showDefaultRange() {
+    const n = this.bars.length;
+    const from = this.interval === "all" ? -1 : n - Math.max(40, Math.min(160, n + 2));
+    this.chart.timeScale().setVisibleLogicalRange({ from, to: n + (this.interval === "all" ? 2 : 8) });
   }
 
   priceScaleWidth(): number {

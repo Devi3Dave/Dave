@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react";
-import { loadMarketData, loadOpenInterest, type MarketData, type OpenInterestPoint } from "../shared/marketData";
+import { binanceInterval, bucketTime, loadMarketData, loadOpenInterest, type MarketData, type OpenInterestPoint } from "../shared/marketData";
 import type { Bar } from "../shared/math";
 import type { PositionInput } from "../shared/position";
 import type { CHART_TYPES, INTERVALS } from "../shared/tools";
@@ -352,15 +352,41 @@ export async function fetchMarketData(symbol: string, interval: string, limit = 
 }
 
 function connectLive(chart: ChartStore, symbol: string, interval: Interval, current: () => boolean): WebSocket {
-  const ws = new WebSocket(`wss://stream.binance.com:9443/ws/${symbol.toLowerCase()}@kline_${interval}`);
+  const stream = binanceInterval(interval);
+  // Quarter and year candles follow the monthly stream; `seen` is the last monthly kline, for volume deltas.
+  const merge = stream === "1M" && interval !== "1M";
+  let seen: Bar | null = null;
+  const ws = new WebSocket(`wss://stream.binance.com:9443/ws/${symbol.toLowerCase()}@kline_${stream}`);
   ws.onmessage = (ev) => {
     if (!current()) return;
     const k = JSON.parse(ev.data).k;
     if (!k) return;
-    const bar: Bar = { time: Math.floor(k.t / 1000), open: +k.o, high: +k.h, low: +k.l, close: +k.c, volume: +k.v, buyVolume: +k.V };
+    const raw: Bar = { time: Math.floor(k.t / 1000), open: +k.o, high: +k.h, low: +k.l, close: +k.c, volume: +k.v, buyVolume: +k.V };
+    const prev = seen;
+    seen = raw;
     chart.set((s) => {
+      let bar = raw;
+      const last = s.bars[s.bars.length - 1];
+      if (merge) {
+        const time = bucketTime(interval, raw.time);
+        if (last && last.time === time) {
+          // The first message has no reference yet, so its volume is already in the loaded candle.
+          const same = prev?.time === raw.time;
+          const dv = !prev ? 0 : same ? raw.volume - prev.volume : raw.volume;
+          const dbv = !prev ? 0 : same ? (raw.buyVolume ?? 0) - (prev.buyVolume ?? 0) : (raw.buyVolume ?? 0);
+          bar = {
+            ...last,
+            high: Math.max(last.high, raw.high),
+            low: Math.min(last.low, raw.low),
+            close: raw.close,
+            volume: last.volume + dv,
+            buyVolume: last.buyVolume === undefined ? undefined : last.buyVolume + dbv,
+          };
+        } else {
+          bar = { ...raw, time };
+        }
+      }
       const bars = s.bars.slice();
-      const last = bars[bars.length - 1];
       if (last && last.time === bar.time) bars[bars.length - 1] = bar;
       else if (!last || bar.time > last.time) bars.push(bar);
       return { bars };
