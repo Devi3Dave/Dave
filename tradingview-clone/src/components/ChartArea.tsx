@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { indicatorLabel } from "../../shared/indicators";
 import { ChartEngine, type ComputedIndicator, type PointerEvent } from "../chart/ChartEngine";
+import { demo, tradeLinesFor } from "../demoAccount";
 import { getSelectedExchanges, subscribeExchanges } from "../exchangeSelection";
 import { liquidationFeed } from "../market/liquidationFeed";
 import { DEFAULT_FIBEXT_LEVELS, DEFAULT_FIB_LEVELS, formatPrice } from "../chart/DrawingsPrimitive";
@@ -263,6 +264,11 @@ export function ChartArea({ chart, onEngine, magnet, onEditIndicator, onEditPosi
       engine.setLiquidations(feed.symbol === chart.get().symbol ? feed.items : [], chart.get().settings.liveLiquidations);
     };
     const unsubscribeLiq = liquidationFeed.subscribe(pushLiquidations);
+    // Open demo positions of this chart's symbol.
+    const pushTradeLines = () => engine.setTradeLines(tradeLinesFor(chart.get().symbol));
+    pushTradeLines();
+    const unsubscribeDemo = demo.subscribe(pushTradeLines);
+    const unsubscribeDemoChart = chart.subscribe(pushTradeLines);
     engine.setExchanges(getSelectedExchanges());
     const unsubscribeExchanges = subscribeExchanges(() => engine.setExchanges(getSelectedExchanges()));
     const ro = new ResizeObserver(() => requestAnimationFrame(refreshLayout));
@@ -285,6 +291,8 @@ export function ChartArea({ chart, onEngine, magnet, onEditIndicator, onEditPosi
       unsubscribe();
       unsubscribeLiq();
       unsubscribeExchanges();
+      unsubscribeDemo();
+      unsubscribeDemoChart();
       onEngine(chart.slot, null);
       engine.destroy();
       engineRef.current = null;

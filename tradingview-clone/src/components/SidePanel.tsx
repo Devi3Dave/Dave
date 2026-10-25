@@ -1,12 +1,14 @@
 import type { ChartEngine } from "../chart/ChartEngine";
 import { ClaudePanel } from "./ClaudePanel";
+import { DemoPanel } from "./DemoPanel";
 import { LiquidationsPanel } from "./LiquidationsPanel";
 import { OrderBookPanel } from "./OrderBookPanel";
 
-export type SideTab = "claude" | "book" | "liq";
+export type SideTab = "claude" | "demo" | "book" | "liq";
 
 const TABS: { id: SideTab; label: string; tip: string }[] = [
   { id: "claude", label: "✦ Claude", tip: "Chart-Analyse mit Claude" },
+  { id: "demo", label: "💰 Demo", tip: "Demo-Trading mit Spielgeld\nKaufen, verkaufen, Long/Short mit Hebel, SL/TP" },
   { id: "book", label: "Orderbuch", tip: "Live-Orderbuch von Binance (Spot oder Futures)" },
   { id: "liq", label: "Liquidationen", tip: "Liquidations-Heatmap und Live-Liquidationen" },
 ];
@@ -33,6 +35,11 @@ export function SidePanel({ tab, onTab, getEngine, onOpenHeatmap }: Props) {
         <div className="side-page" hidden={tab !== "claude"}>
           <ClaudePanel getEngine={getEngine} />
         </div>
+        {tab === "demo" && (
+          <div className="side-page">
+            <DemoPanel />
+          </div>
+        )}
         {tab === "book" && (
           <div className="side-page">
             <OrderBookPanel />

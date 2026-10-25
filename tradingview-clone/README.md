@@ -146,6 +146,19 @@ liest sie wieder ein, „⇩ CSV“ exportiert sie für Excel/Numbers.
 - Balken je Trade und je Monat, Filter nach Symbol oder Setup, Trades bearbeiten und löschen
 - Menge auf Knopfdruck aus dem 1 R des Rechners
 
+**Demo-Trading mit Spielgeld (💰 Demo in der Kopfzeile oder Seitenleiste)**
+Ein virtuelles Konto (Start 10.000 $, frei wählbar) zum Üben mit jedem Asset, das der Chart laden
+kann: Krypto, Aktien, Indizes, Metalle, Rohstoffe, Forex. Gehandelt wird zum aktuellen Kurs des
+aktiven Charts, wie bei einem Futures-Konto mit isolierter Margin; das Konto liegt nur im Browser.
+- Kaufen/Long oder Verkaufen/Short, Größe als Einsatz in $, als Risiko in % (über den Stop) oder als Menge
+- Hebel 1×–100×, Stop-Loss und Take-Profit (Schnellwahl 1/2/5 % bzw. Chance-Risiko 1:2 und 1:3)
+- Vorschau: Positionswert, Margin, Gebühr, Verlust bei SL, Gewinn bei TP, Liquidationspreis
+- Offene Positionen mit laufendem G/V, SL/TP nachträglich verschieben, schließen per Tipp
+- SL, TP und Liquidation lösen automatisch aus (solange die App offen ist), mit Hinweis oben im Bild
+- Einstieg, SL, TP und Liquidation als Linien im Chart; laufendes Ergebnis in der Kopfzeile
+- Historie mit Trefferquote und Gebühren; Trades einzeln, alle oder automatisch ins Journal (Setup „Demo“)
+- Gebühr pro Seite einstellbar (0 / 0,02 / 0,05 / 0,1 %), Konto jederzeit neu starten
+
 **Börsenzeiten (🕐 Börsen in der Kopfzeile)**
 Öffnungs- und Schließzeiten von 16 großen Börsen (NYSE, Nasdaq, TSX, LSE, Xetra, Börse Frankfurt,
 Euronext, SIX, Tokio, Hongkong, Shanghai, Shenzhen, KRX, SGX, NSE, ASX) in der automatisch erkannten
@@ -195,6 +208,7 @@ shared/   math.ts        Indikator-Mathematik (rein, getestet)
           tools.ts       Zod-Schemas der Claude-Tools (Quelle für API-Schema und Validierung)
           claudeTurn.ts  Ein gestreamter Claude-Turn (Server und Standalone-Build)
           marketData.ts  Binance / Yahoo / Demo-Daten
+          demoTrading.ts Demo-Konto: Positionen, Margin, SL/TP, Liquidation (rein, getestet)
           prompt.ts      Systemprompt inkl. Indikatorkatalog
 server/   index.ts       Express: /api/chat (SSE-Proxy zur Claude API), /api/klines
 src/      chart/         ChartEngine (lightweight-charts v5), Zeichen- und Band-Primitives
