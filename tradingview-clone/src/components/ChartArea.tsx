@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { indicatorLabel } from "../../shared/indicators";
 import { ChartEngine, type ComputedIndicator, type PointerEvent } from "../chart/ChartEngine";
-import { demo, tradeLinesFor } from "../demoAccount";
+import { demo, dropLevel, tradeLinesFor, type LineDraft } from "../demoAccount";
 import { getSelectedExchanges, subscribeExchanges } from "../exchangeSelection";
 import { liquidationFeed } from "../market/liquidationFeed";
 import { DEFAULT_FIBEXT_LEVELS, DEFAULT_FIB_LEVELS, formatPrice } from "../chart/DrawingsPrimitive";
@@ -103,6 +103,8 @@ export function ChartArea({ chart, onEngine, magnet, onEditIndicator, onEditPosi
   const firstClickRef = useRef<{ x: number; y: number } | null>(null);
   const positionRef = useRef<{ entry: Point; stop: number | null } | null>(null);
   const [hint, setHint] = useState<string | null>(null);
+  /** Why a dragged stop/target line was not saved; shown for a few seconds. */
+  const [lineError, setLineError] = useState<string | null>(null);
   const editPositionRef = useRef(onEditPosition);
   editPositionRef.current = onEditPosition;
   const magnetRef = useRef(magnet);
@@ -265,7 +267,19 @@ export function ChartArea({ chart, onEngine, magnet, onEditIndicator, onEditPosi
     };
     const unsubscribeLiq = liquidationFeed.subscribe(pushLiquidations);
     // Open demo positions of this chart's symbol.
-    const pushTradeLines = () => engine.setTradeLines(tradeLinesFor(chart.get().symbol));
+    // A stop or target line being dragged: shown at the finger, saved on release.
+    let lineDraft: LineDraft | null = null;
+    const pushTradeLines = () => engine.setTradeLines(tradeLinesFor(chart.get().symbol, lineDraft));
+    let lineErrorTimer = 0;
+    engine.onTradeLineDrag = (phase, dragId, price) => {
+      lineDraft = phase === "move" ? { dragId, price } : null;
+      const err = phase === "end" ? dropLevel(dragId, price) : null;
+      pushTradeLines();
+      if (phase === "move") return;
+      window.clearTimeout(lineErrorTimer);
+      setLineError(err);
+      if (err) lineErrorTimer = window.setTimeout(() => setLineError(null), 4000);
+    };
     pushTradeLines();
     const unsubscribeDemo = demo.subscribe(pushTradeLines);
     const unsubscribeDemoChart = chart.subscribe(pushTradeLines);
@@ -293,6 +307,7 @@ export function ChartArea({ chart, onEngine, magnet, onEditIndicator, onEditPosi
       unsubscribeExchanges();
       unsubscribeDemo();
       unsubscribeDemoChart();
+      window.clearTimeout(lineErrorTimer);
       onEngine(chart.slot, null);
       engine.destroy();
       engineRef.current = null;
@@ -396,6 +411,7 @@ export function ChartArea({ chart, onEngine, magnet, onEditIndicator, onEditPosi
         </div>
       )}
       {hint && <div className="draw-hint">{hint} · Esc bricht ab</div>}
+      {lineError && !hint && <div className="draw-hint error">{lineError}</div>}
       {loading && <div className="chart-overlay">Lade {symbol} …</div>}
       {error && <div className="chart-overlay error">Fehler: {error}</div>}
     </div>

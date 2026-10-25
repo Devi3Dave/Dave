@@ -168,6 +168,19 @@ export function modifyPosition(acc: DemoAccount, id: string, levels: { stop?: nu
   return { ...acc, positions: acc.positions.map((x) => (x.id === id ? { ...x, stop: levels.stop, target: levels.target } : x)) };
 }
 
+/** A line of an open position that can be dragged in the chart. */
+export type LevelHandle = "stop" | "target" | "entry";
+
+/**
+ * Stop and target after dragging a line of `p` to `price`. Stop and target lines move their level;
+ * the entry line pulls out the level on the side it is dragged to (above a long: target, below: stop).
+ */
+export function draggedLevels(p: DemoPosition, handle: LevelHandle, price: number): { level: "stop" | "target"; stop?: number; target?: number } {
+  const rounded = +price.toPrecision(6);
+  const level = handle !== "entry" ? handle : (rounded - p.entry) * dir(p.side) >= 0 ? "target" : "stop";
+  return { level, stop: p.stop, target: p.target, [level]: rounded };
+}
+
 /** Which level a price has reached: liquidation first, then stop, then target. */
 export function triggerOf(p: DemoPosition, price: number): { reason: CloseReason; exit: number } | null {
   const d = dir(p.side);

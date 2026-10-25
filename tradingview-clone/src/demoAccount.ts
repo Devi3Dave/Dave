@@ -3,15 +3,18 @@ import {
   applyPrice,
   closePosition,
   createAccount,
+  draggedLevels,
   journalId,
   liquidationPrice,
   modifyPosition,
   openPosition,
   parseAccount,
   toJournalTrade,
+  unrealizedPnl,
   type CloseReason,
   type DemoAccount,
   type DemoTrade,
+  type LevelHandle,
   type Order,
 } from "../shared/demoTrading";
 import { parseBackup } from "../shared/journal";
@@ -237,16 +240,62 @@ export function refreshJournaled() {
 }
 
 const qtyText = (q: number) => String(+q.toPrecision(4)).replace(".", ",");
+const pnlText = (v: number) => {
+  const digits = Math.abs(v) >= 100 ? 0 : 2;
+  return `${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.abs(v).toLocaleString("de-DE", { minimumFractionDigits: digits, maximumFractionDigits: digits })} $`;
+};
+
+/** A stop or target line being dragged in the chart, not saved yet. */
+export interface LineDraft {
+  dragId: string;
+  price: number;
+}
+
+const dragIdOf = (positionId: string, handle: LevelHandle) => `${positionId}:${handle}`;
+
+function parseDragId(dragId: string): { id: string; handle: LevelHandle } | null {
+  const i = dragId.lastIndexOf(":");
+  const handle = dragId.slice(i + 1);
+  if (i < 0 || (handle !== "stop" && handle !== "target" && handle !== "entry")) return null;
+  return { id: dragId.slice(0, i), handle };
+}
+
+/** Saves the level of a dragged line (stop, target, or a new one pulled from the entry line). Returns an error text or null. */
+export function dropLevel(dragId: string, price: number): string | null {
+  const d = parseDragId(dragId);
+  const p = d && state.account.positions.find((x) => x.id === d.id);
+  if (!d || !p) return "Position nicht gefunden";
+  const { stop, target } = draggedLevels(p, d.handle, price);
+  return setLevels(p.id, { stop, target });
+}
 
 /** Price lines for the open demo positions of a symbol (empty when lines are switched off). */
-export function tradeLinesFor(symbol: string): TradeLine[] {
+export function tradeLinesFor(symbol: string, draft?: LineDraft | null): TradeLine[] {
   if (!state.settings.showLines) return [];
+  const d = draft ? parseDragId(draft.dragId) : null;
   return state.account.positions
     .filter((p) => p.symbol === symbol)
-    .flatMap((p) => {
-      const lines: TradeLine[] = [{ price: p.entry, color: p.side === "long" ? "#26a69a" : "#ef5350", title: `Demo ${p.side === "long" ? "Long" : "Short"} ${qtyText(p.qty)}` }];
-      if (p.stop !== undefined) lines.push({ price: p.stop, color: "#ef5350", title: "SL", dashed: true });
-      if (p.target !== undefined) lines.push({ price: p.target, color: "#26a69a", title: "TP", dashed: true });
+    .flatMap((pos) => {
+      let p = pos;
+      let dragging: "stop" | "target" | null = null;
+      if (d && draft && d.id === p.id) {
+        const { level, stop, target } = draggedLevels(p, d.handle, draft.price);
+        p = { ...p, stop, target };
+        dragging = level;
+      }
+      const lines: TradeLine[] = [
+        {
+          price: p.entry,
+          color: p.side === "long" ? "#26a69a" : "#ef5350",
+          title: `Demo ${p.side === "long" ? "Long" : "Short"} ${qtyText(p.qty)}`,
+          // Pulls out a missing stop or target; with both set, the entry line stays put (and the chart pans there).
+          drag: p.stop === undefined || p.target === undefined ? dragIdOf(p.id, "entry") : undefined,
+        },
+      ];
+      if (p.stop !== undefined)
+        lines.push({ price: p.stop, color: "#ef5350", title: `SL ${pnlText(unrealizedPnl(p, p.stop))}`, dashed: dragging !== "stop", drag: dragIdOf(p.id, "stop") });
+      if (p.target !== undefined)
+        lines.push({ price: p.target, color: "#26a69a", title: `TP ${pnlText(unrealizedPnl(p, p.target))}`, dashed: dragging !== "target", drag: dragIdOf(p.id, "target") });
       const liq = p.leverage > 1 ? liquidationPrice(p) : null;
       if (liq !== null) lines.push({ price: liq, color: "#f5c518", title: "Liq", dashed: true });
       return lines;
