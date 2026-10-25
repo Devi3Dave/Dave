@@ -43,6 +43,14 @@ const ind = (type: string, params: Record<string, number> = {}, colors?: string[
 
 export const BUILTIN_TEMPLATES: Template[] = [
   {
+    id: "builtin-clean",
+    name: "Nur Chart",
+    kind: "chart",
+    builtin: true,
+    description: "Alle Indikatoren entfernen, nur der reine Chart",
+    chart: { indicators: [] },
+  },
+  {
     id: "builtin-scalping",
     name: "Scalping",
     kind: "chart",
