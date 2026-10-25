@@ -4,10 +4,12 @@ import {
   clock,
   dayShift,
   formatDuration,
+  holidayName,
   localTimeZone,
   marketStatus,
   nextClockChange,
   tradingDays,
+  upcomingHolidays,
   wallTime,
   zoneOffset,
   zonedToUtc,
@@ -95,12 +97,14 @@ function ExchangeRow({ ex, now, tz, checked }: { ex: Exchange; now: number; tz: 
   const day = status.day;
   const change = nextClockChange(ex, now, tz);
   const sameZone = zoneOffset(now * 1000, ex.timeZone) === zoneOffset(now * 1000, tz);
+  const holidayToday = holidayName(ex, localDate(now, ex.timeZone));
+  const nextHoliday = upcomingHolidays(ex, now).find((h) => h.date > localDate(now, ex.timeZone));
   const [statusText, statusSub] =
     status.phase === "open"
       ? ["● Offen", `schließt in ${formatDuration(status.next - now)}`]
       : status.phase === "lunch"
         ? ["◐ Mittagspause", `weiter in ${formatDuration(status.next - now)}`]
-        : ["○ Geschlossen", `öffnet in ${formatDuration(status.next - now)}`];
+        : [holidayToday ? `○ Feiertag: ${holidayToday}` : "○ Geschlossen", `öffnet in ${formatDuration(status.next - now)}`];
   const openDate = day ? localDate(day.open, tz) : "";
   const today = openDate === localDate(now, tz);
 
@@ -141,6 +145,11 @@ function ExchangeRow({ ex, now, tz, checked }: { ex: Exchange; now: number; tz: 
             {change && (
               <div className="ex-change">
                 ⏰ Zeitumstellung: ab {fmtDate(change.date)} {change.open}–{change.close}
+              </div>
+            )}
+            {nextHoliday && (
+              <div className="ex-muted">
+                🎌 Feiertag {fmtDate(nextHoliday.date)}: {nextHoliday.name} (geschlossen)
               </div>
             )}
           </>
@@ -194,7 +203,9 @@ export function ExchangesView({ onClose }: { onClose: () => void }) {
         <p className="calc-intro">
           Hake die Börsen an, deren Handelszeiten du im Chart sehen willst. Sie erscheinen dort als farbige Bereiche mit gestrichelten Linien
           bei Eröffnung und Schluss – in jedem Chart und jeder Zeiteinheit bis 4 h. Alle Zeiten werden in deine Zeitzone umgerechnet, Sommer-
-          und Winterzeit (auch wenn Börse und du an verschiedenen Tagen umstellen) sind berücksichtigt. Feiertage kennt die App nicht.
+          und Winterzeit (auch wenn Börse und du an verschiedenen Tagen umstellen) sind berücksichtigt. An Wochenenden und an den Feiertagen des
+          jeweiligen Börsenlandes (z. B. Karfreitag, Thanksgiving, Chinesisches Neujahr) ist die Börse geschlossen und erscheint nicht im Chart.
+          Kurzfristige Sonderschließungen und verkürzte Handelstage kennt die App nicht.
         </p>
 
         {daily && selected.length > 0 && (
