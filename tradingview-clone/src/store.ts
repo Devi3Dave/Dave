@@ -64,7 +64,7 @@ export interface ChartState {
   interval: Interval;
   chartType: ChartType;
   bars: Bar[];
-  source: "binance" | "yahoo" | "demo" | null;
+  source: MarketData["source"] | null;
   loading: boolean;
   error: string | null;
   indicators: IndicatorInstance[];
@@ -176,7 +176,7 @@ function createChartStore(slot: number): ChartStore {
         const json = await fetchMarketData(symbol, interval);
         if (seq !== loadSeq) return;
         chart.set({ bars: json.bars, source: json.source, symbol: json.symbol, loading: false });
-        if (json.source === "binance") socket = connectLive(chart, json.symbol, interval, () => seq === loadSeq);
+        if (json.source === "binance" || json.source === "binance_futures") socket = connectLive(chart, json.symbol, interval, json.source === "binance_futures", () => seq === loadSeq);
       } catch (err) {
         if (seq !== loadSeq) return;
         chart.set({ loading: false, error: (err as Error).message });
@@ -343,7 +343,8 @@ export async function loadChart(symbol: string, interval: Interval): Promise<voi
 }
 
 export async function fetchMarketData(symbol: string, interval: string, limit = 1000): Promise<MarketData> {
-  // Without the Node server the browser fetches directly (Binance allows it; Yahoo does not, so stocks fall back to demo data).
+  // Without the Node server the browser fetches directly (Binance allows it; Yahoo does not, so stocks
+  // use Binance perpetuals where one exists, see shared/assets.ts, and otherwise fall back to demo data).
   if (STANDALONE) return loadMarketData(symbol, interval, limit);
   const res = await fetch(`/api/klines?symbol=${encodeURIComponent(symbol)}&interval=${interval}&limit=${limit}`);
   const json = await res.json();
@@ -351,12 +352,13 @@ export async function fetchMarketData(symbol: string, interval: string, limit = 
   return json as MarketData;
 }
 
-function connectLive(chart: ChartStore, symbol: string, interval: Interval, current: () => boolean): WebSocket {
+function connectLive(chart: ChartStore, symbol: string, interval: Interval, futures: boolean, current: () => boolean): WebSocket {
   const stream = binanceInterval(interval);
   // Quarter and year candles follow the monthly stream; `seen` is the last monthly kline, for volume deltas.
   const merge = stream === "1M" && interval !== "1M";
   let seen: Bar | null = null;
-  const ws = new WebSocket(`wss://stream.binance.com:9443/ws/${symbol.toLowerCase()}@kline_${stream}`);
+  const host = futures ? "wss://fstream.binance.com" : "wss://stream.binance.com:9443";
+  const ws = new WebSocket(`${host}/ws/${symbol.toLowerCase()}@kline_${stream}`);
   ws.onmessage = (ev) => {
     if (!current()) return;
     const k = JSON.parse(ev.data).k;

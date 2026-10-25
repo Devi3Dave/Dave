@@ -133,10 +133,123 @@ textarea {
   color: var(--accent);
 }
 
-.symbol-form input {
-  width: 120px;
+.symbol-picker {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.asset-button {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  max-width: 240px;
+}
+
+.asset-button .asset-name {
+  color: var(--muted);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.asset-button .caret {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.asset-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 2px 2px 6px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
+}
+
+.asset-tabs button {
+  padding: 4px 8px;
+  border-radius: 12px;
+  background: var(--panel-2);
+  font-size: 12px;
+}
+
+.asset-tabs button.active {
+  background: var(--accent);
+  color: #fff;
+}
+
+.asset-row {
+  display: flex;
+  align-items: center;
+}
+
+.asset-item {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  text-align: left;
+  padding: 6px 8px;
+}
+
+.asset-item.active strong {
+  color: var(--accent);
+}
+
+.asset-item strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.asset-item span {
+  grid-column: 1;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.asset-item em {
+  grid-row: 1 / span 2;
+  grid-column: 2;
+  align-self: center;
+}
+
+.asset-badge {
+  font-style: normal;
+  font-size: 10px;
   font-weight: 600;
-  text-transform: uppercase;
+  padding: 1px 6px;
+  border-radius: 8px;
+  border: 1px solid currentColor;
+}
+
+.asset-badge.binance,
+.asset-badge.yahoo {
+  color: var(--up);
+}
+
+.asset-badge.binance_futures {
+  color: #f7c948;
+}
+
+.asset-badge.demo {
+  color: var(--muted);
+}
+
+.asset-search-link {
+  border-top: 1px solid var(--border);
+  margin-top: 4px;
+}
+
+.asset-dialog {
+  height: 80vh;
+}
+
+.indicator-list h3 .count {
+  font-weight: normal;
+  opacity: 0.7;
 }
 
 .group {
@@ -870,8 +983,8 @@ select,
     display: none;
   }
 
-  .symbol-form input {
-    width: 124px;
+  .asset-button .asset-name {
+    display: none;
   }
 
   .topbar {

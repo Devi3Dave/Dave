@@ -3,7 +3,7 @@ import type { Bar } from "./math.js";
 export interface MarketData {
   symbol: string;
   interval: string;
-  source: "binance" | "yahoo" | "demo";
+  source: "binance" | "binance_futures" | "yahoo" | "demo";
   bars: Bar[];
 }
 
@@ -69,16 +69,28 @@ async function fetchJson(url: string): Promise<unknown> {
   return res.json();
 }
 
-async function fromBinance(symbol: string, interval: string, limit: number): Promise<Bar[]> {
+// data-api.binance.vision is Binance's public market-data mirror; it also
+// works from regions where api.binance.com answers 451.
+const SPOT_KLINES = ["https://api.binance.com/api/v3/klines", "https://data-api.binance.vision/api/v3/klines"];
+// USDⓈ-M futures: besides crypto also TradFi perpetuals (gold, silver, oil, stocks) that trade 24/7.
+const FUTURES_KLINES = ["https://fapi.binance.com/fapi/v1/klines"];
+
+function fromBinance(symbol: string, interval: string, limit: number): Promise<Bar[]> {
+  return binanceKlines(SPOT_KLINES, symbol, interval, limit);
+}
+
+function fromBinanceFutures(symbol: string, interval: string, limit: number): Promise<Bar[]> {
+  return binanceKlines(FUTURES_KLINES, symbol, interval, limit);
+}
+
+async function binanceKlines(urls: string[], symbol: string, interval: string, limit: number): Promise<Bar[]> {
   const source = binanceInterval(interval);
   // Aggregated and full-history charts take as much history as Binance gives in one request.
   const query = `symbol=${encodeURIComponent(symbol)}&interval=${source}&limit=${source === interval && interval !== "all" ? limit : 1000}`;
-  // data-api.binance.vision is Binance's public market-data mirror; it also
-  // works from regions where api.binance.com answers 451.
   let lastError: unknown;
-  for (const host of ["https://api.binance.com", "https://data-api.binance.vision"]) {
+  for (const url of urls) {
     try {
-      const rows = (await fetchJson(`${host}/api/v3/klines?${query}`)) as unknown[][];
+      const rows = (await fetchJson(`${url}?${query}`)) as unknown[][];
       const bars = rows.map((r) => ({
         time: Math.floor(Number(r[0]) / 1000),
         open: Number(r[1]),
@@ -186,9 +198,11 @@ export function demoBars(symbol: string, interval: string, limit: number): Bar[]
 export async function loadMarketData(rawSymbol: string, interval: string, limit = 1000): Promise<MarketData> {
   const symbol = rawSymbol.trim().toUpperCase();
   if (!(interval in INTERVAL_SECONDS)) throw new Error(`Unbekannte Zeiteinheit: ${interval}`);
-  const attempts: [MarketData["source"], () => Promise<Bar[]>][] = isCryptoSymbol(symbol)
-    ? [["binance", () => fromBinance(symbol, interval, limit)], ["yahoo", () => fromYahoo(symbol, interval, limit)]]
-    : [["yahoo", () => fromYahoo(symbol, interval, limit)], ["binance", () => fromBinance(symbol, interval, limit)]];
+  const spot: [MarketData["source"], () => Promise<Bar[]>] = ["binance", () => fromBinance(symbol, interval, limit)];
+  const futures: [MarketData["source"], () => Promise<Bar[]>] = ["binance_futures", () => fromBinanceFutures(symbol, interval, limit)];
+  const yahoo: [MarketData["source"], () => Promise<Bar[]>] = ["yahoo", () => fromYahoo(symbol, interval, limit)];
+  // XAUUSDT, CLUSDT, TSLAUSDT … only exist as Binance futures, so they come after spot.
+  const attempts = isCryptoSymbol(symbol) ? [spot, futures, yahoo] : [yahoo, spot];
   for (const [source, load] of attempts) {
     try {
       const bars = await load();

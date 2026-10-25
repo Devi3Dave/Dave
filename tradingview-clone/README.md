@@ -29,8 +29,10 @@ ChartAI läuft auch ohne Server als installierbare Web-App:
    eintragen (erstellen unter platform.claude.com → API Keys).
 
 Der Schlüssel wird nur auf dem iPad gespeichert und direkt an `api.anthropic.com` gesendet.
-Unterschiede zur Server-Version: Krypto-Kurse kommen live von Binance; Aktien/Indizes über Yahoo
-sind ohne Server nicht abrufbar (Yahoo blockiert Browser-Zugriffe) und zeigen Demo-Daten.
+Unterschiede zur Server-Version: Krypto-Kurse kommen live von Binance. Yahoo ist ohne Server nicht
+abrufbar (blockiert Browser-Zugriffe); Gold, Silber, Öl und viele US-Aktien laden deshalb über die
+TradFi-Perpetuals von Binance Futures (Kennzeichen „Perp“). DAX-Werte, Indizes ohne Perpetual,
+Agrarrohstoffe und Forex zeigen auf dem iPad Demo-Daten.
 Zeichnen per Touch: Werkzeug wählen und Punkte antippen.
 
 Die Web-App wird bei jedem Push auf `master` per GitHub Actions gebaut (`npm run build:standalone`)
@@ -42,7 +44,12 @@ und zusammen mit der Fill & Sign-App auf GitHub Pages veröffentlicht.
 - Kerzen, Balken, Heikin Ashi, Linie, Fläche · Zeiteinheiten 1m – 1w, Monat (1Mo), Quartal (1Q),
   Jahr (1J) und „Alles“ (gesamte Historie in Wochenkerzen, komplett eingepasst)
 - Kursdaten: Krypto über Binance (inkl. Live-Updates per WebSocket), Aktien/Indizes/Forex über Yahoo
-  Finance (z. B. `AAPL`, `^GDAXI`, `EURUSD=X`). Ohne Internet werden Demo-Daten erzeugt.
+  Finance (z. B. `AAPL`, `^GDAXI`, `EURUSD=X`), Binance-Futures-Perpetuals wie `XAUUSDT` (Gold),
+  `CLUSDT` (Öl) oder `TSLAUSDT`. Ohne Internet werden Demo-Daten erzeugt.
+- Asset-Auswahl in der Kopfzeile: Drop-down mit gängigen Assets nach Rubriken (Krypto, Aktien,
+  Indizes & ETFs, Edelmetalle, Rohstoffe, Forex) und Favoriten; 🔍 öffnet die Suche über alle
+  Binance-Märkte, ebenfalls nach Rubriken, mit ☆ zum Speichern von Favoriten. Jede Zeile zeigt die
+  Datenquelle (Live, Perp, Yahoo oder Demo).
 - Indikator-Panels mit verschiebbaren Trennern, Legende mit Werten unter dem Fadenkreuz,
   Einstellungen (Parameter/Farben), Ein-/Ausblenden
 - Chart-Einstellungen (⚙ in der Kopfzeile): Preisskala Normal/Log/%/Index 100, Achse links/rechts,

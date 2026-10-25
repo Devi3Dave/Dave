@@ -346,7 +346,7 @@ export function ChartArea({ chart, onEngine, magnet, onEditIndicator, onEditPosi
           {i === 0 && (
             <div className="legend-row main">
               <span className="legend-symbol">
-                {symbol} · {interval} · {source === "demo" ? "DEMO-DATEN" : source?.toUpperCase()}
+                {symbol} · {interval} · {source === "demo" ? "DEMO-DATEN" : source === "binance_futures" ? "BINANCE PERP" : source?.toUpperCase()}
               </span>
               {bar && (
                 <span className={up ? "up" : "down"}>
