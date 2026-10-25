@@ -166,7 +166,8 @@ aktiven Charts, wie bei einem Futures-Konto mit isolierter Margin; das Konto lie
 Wie das Bar Replay von TradingView: den Chart an einer Kerze in der Vergangenheit abschneiden und die
 folgenden Kerzen nacheinander aufdecken, um Setups ohne Blick in die Zukunft zu üben.
 - Startkerze im Chart antippen (eine Linie zeigt, wo geschnitten wird) oder 🎲 Zufällig wählen
-- ⏭ nächste Kerze (Tastatur: Shift + →), ▶/⏸ abspielen mit 0,5–10 Kerzen pro Sekunde, ⇤ neuer Startpunkt
+- ⏭ nächste Kerze (Shift + →), ⏮ eine Kerze zurück (Shift + ←, ohne offene Replay-Position),
+  ▶/⏸ abspielen mit 0,5–10 Kerzen pro Sekunde, ⏪ zurückspulen: eine frühere Kerze antippen
 - Indikatoren, Zeichnungen und Claude sehen nur die bereits aufgedeckten Kerzen
 - Zeiteinheit wechseln bleibt am selben Zeitpunkt (nur abgeschlossene Kerzen werden gezeigt)
 - Trading im Replay: solange der Replay-Chart aktiv ist, handelt 💰 Demo auf einem eigenen Replay-Konto

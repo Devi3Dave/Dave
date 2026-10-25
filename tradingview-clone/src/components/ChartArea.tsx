@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { indicatorLabel } from "../../shared/indicators";
 import { ChartEngine, type ComputedIndicator, type PointerEvent } from "../chart/ChartEngine";
-import { demo, dropLevel, tradeLinesFor, type LineDraft } from "../demoAccount";
+import { demo, dropLevel, replayPositionsOpen, tradeLinesFor, type LineDraft } from "../demoAccount";
 import { getSelectedExchanges, subscribeExchanges } from "../exchangeSelection";
 import { liquidationFeed } from "../market/liquidationFeed";
 import { DEFAULT_FIBEXT_LEVELS, DEFAULT_FIB_LEVELS, formatPrice } from "../chart/DrawingsPrimitive";
 import { placeOnSide } from "../../shared/position";
-import { addDrawing, newId, pickReplayStart, removeDrawing, removeIndicator, stepReplay, updateIndicator, updateSettings, useChart, type ChartStore, type Drawing, type Point } from "../store";
+import { addDrawing, newId, pickReplayStart, removeDrawing, removeIndicator, stepBackReplay, stepReplay, updateIndicator, updateSettings, useChart, type ChartStore, type Drawing, type Point } from "../store";
 import { lastPositionDefaults } from "./PositionDialog";
 import { ReplayBar } from "./ReplayBar";
 
@@ -311,10 +311,11 @@ export function ChartArea({ chart, onEngine, magnet, onEditIndicator, onEditPosi
     const ro = new ResizeObserver(() => requestAnimationFrame(refreshLayout));
     ro.observe(containerRef.current!);
     const onKey = (ev: KeyboardEvent) => {
-      // Like TradingView: Shift + → shows the next replay candle (on the chart that is replaying).
-      if (ev.key === "ArrowRight" && ev.shiftKey && chart.get().replay?.phase === "play") {
+      // Like TradingView: Shift + → shows the next replay candle (on the chart that is replaying), Shift + ← goes back.
+      if ((ev.key === "ArrowRight" || ev.key === "ArrowLeft") && ev.shiftKey && chart.get().replay?.phase === "play") {
         ev.preventDefault();
-        stepReplay(chart);
+        if (ev.key === "ArrowRight") stepReplay(chart);
+        else if (!replayPositionsOpen(chart.slot)) stepBackReplay(chart);
         return;
       }
       if (ev.key === "Escape") {
