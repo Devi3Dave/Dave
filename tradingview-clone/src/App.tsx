@@ -4,6 +4,7 @@ import { CalculatorView } from "./components/CalculatorView";
 import { ChartGrid } from "./components/ChartGrid";
 import { ChartSettingsDialog } from "./components/ChartSettingsDialog";
 import { DrawingToolbar } from "./components/DrawingToolbar";
+import { ExchangesView } from "./components/ExchangesView";
 import { JournalView } from "./components/JournalView";
 import { IndicatorDialog, IndicatorSettings } from "./components/IndicatorDialog";
 import { LiqHeatmapView } from "./components/LiqHeatmapView";
@@ -27,6 +28,7 @@ export default function App() {
   const [heatmapOpen, setHeatmapOpen] = useState(false);
   const [calcOpen, setCalcOpen] = useState(false);
   const [journalOpen, setJournalOpen] = useState(false);
+  const [exchangesOpen, setExchangesOpen] = useState(false);
   const symbol = useChartState((s) => s.symbol);
   const liveLiquidations = useChartState((s) => s.settings.liveLiquidations);
 
@@ -52,19 +54,29 @@ export default function App() {
         onToggleHeatmap={() => {
           setCalcOpen(false);
           setJournalOpen(false);
+          setExchangesOpen(false);
           setHeatmapOpen((o) => !o);
         }}
         calcOpen={calcOpen}
         onToggleCalc={() => {
           setHeatmapOpen(false);
           setJournalOpen(false);
+          setExchangesOpen(false);
           setCalcOpen((o) => !o);
         }}
         journalOpen={journalOpen}
         onToggleJournal={() => {
           setHeatmapOpen(false);
           setCalcOpen(false);
+          setExchangesOpen(false);
           setJournalOpen((o) => !o);
+        }}
+        exchangesOpen={exchangesOpen}
+        onToggleExchanges={() => {
+          setHeatmapOpen(false);
+          setCalcOpen(false);
+          setJournalOpen(false);
+          setExchangesOpen((o) => !o);
         }}
         claudeOpen={claudeOpen} onToggleClaude={() => setClaudeOpen((o) => !o)} />
       <DrawingToolbar magnet={magnet} onToggleMagnet={() => setMagnet((m) => !m)} getEngine={getEngine} />
@@ -73,11 +85,13 @@ export default function App() {
       {heatmapOpen && <LiqHeatmapView onClose={() => setHeatmapOpen(false)} />}
       {calcOpen && <CalculatorView onClose={() => setCalcOpen(false)} />}
       {journalOpen && <JournalView onClose={() => setJournalOpen(false)} />}
+      {exchangesOpen && <ExchangesView onClose={() => setExchangesOpen(false)} />}
       {/* Kept mounted while hidden so the conversation survives toggling. */}
       <div className="claude-slot" hidden={!claudeOpen}>
         <SidePanel tab={sideTab} onTab={setSideTab} getEngine={getEngine} onOpenHeatmap={() => {
           setCalcOpen(false);
           setJournalOpen(false);
+          setExchangesOpen(false);
           setHeatmapOpen(true);
         }} />
       </div>
