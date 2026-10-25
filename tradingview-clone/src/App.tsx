@@ -4,6 +4,7 @@ import { CalculatorView } from "./components/CalculatorView";
 import { ChartGrid } from "./components/ChartGrid";
 import { ChartSettingsDialog } from "./components/ChartSettingsDialog";
 import { DrawingToolbar } from "./components/DrawingToolbar";
+import { JournalView } from "./components/JournalView";
 import { IndicatorDialog, IndicatorSettings } from "./components/IndicatorDialog";
 import { LiqHeatmapView } from "./components/LiqHeatmapView";
 import { PositionDialog } from "./components/PositionDialog";
@@ -25,6 +26,7 @@ export default function App() {
   const [sideTab, setSideTab] = useState<SideTab>("claude");
   const [heatmapOpen, setHeatmapOpen] = useState(false);
   const [calcOpen, setCalcOpen] = useState(false);
+  const [journalOpen, setJournalOpen] = useState(false);
   const symbol = useChartState((s) => s.symbol);
   const liveLiquidations = useChartState((s) => s.settings.liveLiquidations);
 
@@ -49,12 +51,20 @@ export default function App() {
         heatmapOpen={heatmapOpen}
         onToggleHeatmap={() => {
           setCalcOpen(false);
+          setJournalOpen(false);
           setHeatmapOpen((o) => !o);
         }}
         calcOpen={calcOpen}
         onToggleCalc={() => {
           setHeatmapOpen(false);
+          setJournalOpen(false);
           setCalcOpen((o) => !o);
+        }}
+        journalOpen={journalOpen}
+        onToggleJournal={() => {
+          setHeatmapOpen(false);
+          setCalcOpen(false);
+          setJournalOpen((o) => !o);
         }}
         claudeOpen={claudeOpen} onToggleClaude={() => setClaudeOpen((o) => !o)} />
       <DrawingToolbar magnet={magnet} onToggleMagnet={() => setMagnet((m) => !m)} getEngine={getEngine} />
@@ -62,10 +72,12 @@ export default function App() {
       {/* Drawn over the chart (same grid cell) so the chart engine stays alive for Claude. */}
       {heatmapOpen && <LiqHeatmapView onClose={() => setHeatmapOpen(false)} />}
       {calcOpen && <CalculatorView onClose={() => setCalcOpen(false)} />}
+      {journalOpen && <JournalView onClose={() => setJournalOpen(false)} />}
       {/* Kept mounted while hidden so the conversation survives toggling. */}
       <div className="claude-slot" hidden={!claudeOpen}>
         <SidePanel tab={sideTab} onTab={setSideTab} getEngine={getEngine} onOpenHeatmap={() => {
           setCalcOpen(false);
+          setJournalOpen(false);
           setHeatmapOpen(true);
         }} />
       </div>

@@ -127,6 +127,17 @@ für alle Rechner.
   (1,618 / 2,618 / 3,618) aus den Punkten A, B, C mit Grafik
 - *Hebel & Margin:* Positionswert ÷ Hebel, geschätzte Liquidation und Warnung, wenn sie vor dem Stop liegt
 
+**Trading-Journal (📒 Journal in der Kopfzeile)**
+Vollbild-Seite, um abgeschlossene Trades festzuhalten (Datum, Symbol, Long/Short, Einstieg, Stop,
+Ausstieg, Menge, Gebühren, Setup, Notiz – oder nur das Ergebnis in $). Die Trades werden im Browser
+gespeichert; „⤓ Backup“ sichert sie als Datei (iPad: „In Dateien sichern“), „⤒ Wiederherstellen“
+liest sie wieder ein, „⇩ CSV“ exportiert sie für Excel/Numbers.
+- Oben die Antwort: profitabel oder nicht, mit Gesamtergebnis in $ und R
+- Equity-Kurve (kumuliertes Ergebnis je Trade, in $ oder R) mit Break-even-Linie und Höchststand
+- Trefferquote, Profit-Faktor, Ø pro Trade, Ø Gewinn/Verlust, max. Drawdown, längste Verlustserie
+- Balken je Trade und je Monat, Filter nach Symbol oder Setup, Trades bearbeiten und löschen
+- Menge auf Knopfdruck aus dem 1 R des Rechners
+
 **Claude**
 - Chat-Panel mit Streaming, Schnell-Prompts, wählbarem Aufwand (Effort) und optionalem Screenshot
 - Jede Nachricht enthält einen `<chart_state>` mit den letzten Kerzen, aktiven Indikatoren
