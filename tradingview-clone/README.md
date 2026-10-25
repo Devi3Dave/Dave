@@ -39,7 +39,8 @@ und zusammen mit der Fill & Sign-App auf GitHub Pages veröffentlicht.
 ## Funktionen
 
 **Chart**
-- Kerzen, Balken, Heikin Ashi, Linie, Fläche · Zeiteinheiten 1m – 1w
+- Kerzen, Balken, Heikin Ashi, Linie, Fläche · Zeiteinheiten 1m – 1w, Monat (1Mo), Quartal (1Q),
+  Jahr (1J) und „Alles“ (gesamte Historie in Wochenkerzen, komplett eingepasst)
 - Kursdaten: Krypto über Binance (inkl. Live-Updates per WebSocket), Aktien/Indizes/Forex über Yahoo
   Finance (z. B. `AAPL`, `^GDAXI`, `EURUSD=X`). Ohne Internet werden Demo-Daten erzeugt.
 - Indikator-Panels mit verschiebbaren Trennern, Legende mit Werten unter dem Fadenkreuz,

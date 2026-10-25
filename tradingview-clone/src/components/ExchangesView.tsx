@@ -13,6 +13,7 @@ import {
   zonedToUtc,
   type Exchange,
 } from "../../shared/exchanges";
+import { INTERVAL_SECONDS } from "../../shared/marketData";
 import { resolveTimeZone } from "../chartSettings";
 import { setSelectedExchanges, toggleExchange, useSelectedExchanges } from "../exchangeSelection";
 import { updateSettings, useChartState } from "../store";
@@ -160,7 +161,7 @@ export function ExchangesView({ onClose }: { onClose: () => void }) {
   const chartTz = useChartState((s) => s.settings.timeZone);
   const offset = zoneOffset(now * 1000, tz);
   const openCount = EXCHANGES.filter((e) => marketStatus(e, now).phase === "open").length;
-  const daily = interval === "1d" || interval === "1w";
+  const daily = (INTERVAL_SECONDS[interval] ?? 0) >= 86400;
   const chartZoneDiffers = resolveTimeZone(chartTz) !== tz;
 
   return (
