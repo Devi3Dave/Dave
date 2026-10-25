@@ -148,7 +148,12 @@ Zeitzone des Geräts.
 - Sommer-/Winterzeit auf beiden Seiten; Hinweis, wenn sich die Zeit auf deiner Uhr demnächst
   verschiebt (z. B. NYSE 14:30 statt 15:30 in der Woche zwischen EU- und US-Umstellung)
 - Angehakte Börsen erscheinen in allen Charts (Zeiteinheiten bis 4 h) als farbige Bereiche mit
-  Linien bei Eröffnung und Schluss; Feiertage sind nicht hinterlegt
+  Linien bei Eröffnung und Schluss
+- Wochenenden und Feiertage des jeweiligen Börsenlandes: an geschlossenen Tagen kein Bereich im
+  Chart, Status „Feiertag“ und Hinweis auf den nächsten Feiertag. Berechnet für jedes Jahr (Ostern,
+  „n-ter Wochentag“, chinesischer/koreanischer Mondkalender, islamischer Kalender, Ersatztage am
+  Wochenende); nur die Hindu-Feste (NSE, Deepavali in Singapur) stehen in einer Tabelle (2025–2027).
+  China ist näherungsweise, kurzfristige Sonderschließungen und verkürzte Tage fehlen
 
 **Claude**
 - Chat-Panel mit Streaming, Schnell-Prompts, wählbarem Aufwand (Effort) und optionalem Screenshot

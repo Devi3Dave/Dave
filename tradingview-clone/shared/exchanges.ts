@@ -1,6 +1,9 @@
 // Stock exchange trading hours. Times are wall-clock times in the exchange's own
 // time zone; conversion to UTC goes through Intl, so daylight saving changes on
-// either side (exchange or viewer) come out right. Public holidays are not known.
+// either side (exchange or viewer) come out right. Weekends and each exchange's
+// holidays (see holidays.ts) are not trading days.
+
+import { holidayOn, type HolidayCalendar } from "./holidays";
 
 export interface Exchange {
   id: string;
@@ -14,26 +17,28 @@ export interface Exchange {
   close: string;
   /** Midday break (Asian exchanges). */
   lunch?: { start: string; end: string };
+  /** Which holidays close the exchange. */
+  holidays: HolidayCalendar;
   color: string;
 }
 
 export const EXCHANGES: Exchange[] = [
-  { id: "nyse", name: "New York Stock Exchange", short: "NYSE", city: "New York", country: "🇺🇸", timeZone: "America/New_York", open: "09:30", close: "16:00", color: "#2962ff" },
-  { id: "nasdaq", name: "Nasdaq Stock Market", short: "Nasdaq", city: "New York", country: "🇺🇸", timeZone: "America/New_York", open: "09:30", close: "16:00", color: "#00bcd4" },
-  { id: "tsx", name: "Toronto Stock Exchange", short: "TSX", city: "Toronto", country: "🇨🇦", timeZone: "America/Toronto", open: "09:30", close: "16:00", color: "#e91e63" },
-  { id: "lse", name: "London Stock Exchange", short: "LSE", city: "London", country: "🇬🇧", timeZone: "Europe/London", open: "08:00", close: "16:30", color: "#9c27b0" },
-  { id: "xetra", name: "Xetra (Deutsche Börse)", short: "Xetra", city: "Frankfurt", country: "🇩🇪", timeZone: "Europe/Berlin", open: "09:00", close: "17:30", color: "#f5c518" },
-  { id: "fra", name: "Börse Frankfurt (Parkett)", short: "Frankfurt", city: "Frankfurt", country: "🇩🇪", timeZone: "Europe/Berlin", open: "08:00", close: "22:00", color: "#ffb74d" },
-  { id: "euronext", name: "Euronext Paris", short: "Euronext", city: "Paris", country: "🇫🇷", timeZone: "Europe/Paris", open: "09:00", close: "17:30", color: "#7e57c2" },
-  { id: "six", name: "SIX Swiss Exchange", short: "SIX", city: "Zürich", country: "🇨🇭", timeZone: "Europe/Zurich", open: "09:00", close: "17:30", color: "#ef5350" },
-  { id: "tse", name: "Tokyo Stock Exchange", short: "Tokio", city: "Tokio", country: "🇯🇵", timeZone: "Asia/Tokyo", open: "09:00", close: "15:30", lunch: { start: "11:30", end: "12:30" }, color: "#ff7043" },
-  { id: "hkex", name: "Hong Kong Exchange", short: "HKEX", city: "Hongkong", country: "🇭🇰", timeZone: "Asia/Hong_Kong", open: "09:30", close: "16:00", lunch: { start: "12:00", end: "13:00" }, color: "#26a69a" },
-  { id: "sse", name: "Shanghai Stock Exchange", short: "Shanghai", city: "Shanghai", country: "🇨🇳", timeZone: "Asia/Shanghai", open: "09:30", close: "15:00", lunch: { start: "11:30", end: "13:00" }, color: "#d32f2f" },
-  { id: "szse", name: "Shenzhen Stock Exchange", short: "Shenzhen", city: "Shenzhen", country: "🇨🇳", timeZone: "Asia/Shanghai", open: "09:30", close: "15:00", lunch: { start: "11:30", end: "13:00" }, color: "#c2185b" },
-  { id: "krx", name: "Korea Exchange", short: "KRX", city: "Seoul", country: "🇰🇷", timeZone: "Asia/Seoul", open: "09:00", close: "15:30", color: "#5c6bc0" },
-  { id: "sgx", name: "Singapore Exchange", short: "SGX", city: "Singapur", country: "🇸🇬", timeZone: "Asia/Singapore", open: "09:00", close: "17:00", lunch: { start: "12:00", end: "13:00" }, color: "#8d6e63" },
-  { id: "nse", name: "National Stock Exchange of India", short: "NSE", city: "Mumbai", country: "🇮🇳", timeZone: "Asia/Kolkata", open: "09:15", close: "15:30", color: "#ff9800" },
-  { id: "asx", name: "Australian Securities Exchange", short: "ASX", city: "Sydney", country: "🇦🇺", timeZone: "Australia/Sydney", open: "10:00", close: "16:00", color: "#66bb6a" },
+  { id: "nyse", name: "New York Stock Exchange", short: "NYSE", city: "New York", country: "🇺🇸", timeZone: "America/New_York", open: "09:30", close: "16:00", holidays: "us", color: "#2962ff" },
+  { id: "nasdaq", name: "Nasdaq Stock Market", short: "Nasdaq", city: "New York", country: "🇺🇸", timeZone: "America/New_York", open: "09:30", close: "16:00", holidays: "us", color: "#00bcd4" },
+  { id: "tsx", name: "Toronto Stock Exchange", short: "TSX", city: "Toronto", country: "🇨🇦", timeZone: "America/Toronto", open: "09:30", close: "16:00", holidays: "ca", color: "#e91e63" },
+  { id: "lse", name: "London Stock Exchange", short: "LSE", city: "London", country: "🇬🇧", timeZone: "Europe/London", open: "08:00", close: "16:30", holidays: "uk", color: "#9c27b0" },
+  { id: "xetra", name: "Xetra (Deutsche Börse)", short: "Xetra", city: "Frankfurt", country: "🇩🇪", timeZone: "Europe/Berlin", open: "09:00", close: "17:30", holidays: "de", color: "#f5c518" },
+  { id: "fra", name: "Börse Frankfurt (Parkett)", short: "Frankfurt", city: "Frankfurt", country: "🇩🇪", timeZone: "Europe/Berlin", open: "08:00", close: "22:00", holidays: "de", color: "#ffb74d" },
+  { id: "euronext", name: "Euronext Paris", short: "Euronext", city: "Paris", country: "🇫🇷", timeZone: "Europe/Paris", open: "09:00", close: "17:30", holidays: "fr", color: "#7e57c2" },
+  { id: "six", name: "SIX Swiss Exchange", short: "SIX", city: "Zürich", country: "🇨🇭", timeZone: "Europe/Zurich", open: "09:00", close: "17:30", holidays: "ch", color: "#ef5350" },
+  { id: "tse", name: "Tokyo Stock Exchange", short: "Tokio", city: "Tokio", country: "🇯🇵", timeZone: "Asia/Tokyo", open: "09:00", close: "15:30", lunch: { start: "11:30", end: "12:30" }, holidays: "jp", color: "#ff7043" },
+  { id: "hkex", name: "Hong Kong Exchange", short: "HKEX", city: "Hongkong", country: "🇭🇰", timeZone: "Asia/Hong_Kong", open: "09:30", close: "16:00", lunch: { start: "12:00", end: "13:00" }, holidays: "hk", color: "#26a69a" },
+  { id: "sse", name: "Shanghai Stock Exchange", short: "Shanghai", city: "Shanghai", country: "🇨🇳", timeZone: "Asia/Shanghai", open: "09:30", close: "15:00", lunch: { start: "11:30", end: "13:00" }, holidays: "cn", color: "#d32f2f" },
+  { id: "szse", name: "Shenzhen Stock Exchange", short: "Shenzhen", city: "Shenzhen", country: "🇨🇳", timeZone: "Asia/Shanghai", open: "09:30", close: "15:00", lunch: { start: "11:30", end: "13:00" }, holidays: "cn", color: "#c2185b" },
+  { id: "krx", name: "Korea Exchange", short: "KRX", city: "Seoul", country: "🇰🇷", timeZone: "Asia/Seoul", open: "09:00", close: "15:30", holidays: "kr", color: "#5c6bc0" },
+  { id: "sgx", name: "Singapore Exchange", short: "SGX", city: "Singapur", country: "🇸🇬", timeZone: "Asia/Singapore", open: "09:00", close: "17:00", lunch: { start: "12:00", end: "13:00" }, holidays: "sg", color: "#8d6e63" },
+  { id: "nse", name: "National Stock Exchange of India", short: "NSE", city: "Mumbai", country: "🇮🇳", timeZone: "Asia/Kolkata", open: "09:15", close: "15:30", holidays: "in", color: "#ff9800" },
+  { id: "asx", name: "Australian Securities Exchange", short: "ASX", city: "Sydney", country: "🇦🇺", timeZone: "Australia/Sydney", open: "10:00", close: "16:00", holidays: "au", color: "#66bb6a" },
 ];
 
 export function getExchange(id: string): Exchange | undefined {
@@ -97,7 +102,12 @@ export interface TradingDay {
   parts: { start: number; end: number }[];
 }
 
-/** Regular trading days (Mon-Fri, holidays not known) that overlap [from, to] (unix seconds). */
+/** The exchange's holiday on a local date ("YYYY-MM-DD"), if any. */
+export function holidayName(ex: Exchange, date: string): string | undefined {
+  return holidayOn(ex.holidays, date);
+}
+
+/** Trading days (Mon-Fri without the exchange's holidays) that overlap [from, to] (unix seconds). */
 export function tradingDays(ex: Exchange, from: number, to: number): TradingDay[] {
   const out: TradingDay[] = [];
   const start = wallTime((from - 86400) * 1000, ex.timeZone);
@@ -110,6 +120,8 @@ export function tradingDays(ex: Exchange, from: number, to: number): TradingDay[
     const y = date.getUTCFullYear();
     const m = date.getUTCMonth() + 1;
     const d = date.getUTCDate();
+    const iso = `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+    if (holidayName(ex, iso)) continue;
     const at = (t: string) => zonedToUtc(y, m, d, ...hm(t), ex.timeZone) / 1000;
     const open = at(ex.open);
     const close = at(ex.close);
@@ -120,7 +132,7 @@ export function tradingDays(ex: Exchange, from: number, to: number): TradingDay[
           { start: at(ex.lunch.end), end: close },
         ]
       : [{ start: open, end: close }];
-    out.push({ date: `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`, open, close, parts });
+    out.push({ date: iso, open, close, parts });
   }
   return out;
 }
@@ -136,7 +148,7 @@ export interface MarketStatus {
 }
 
 export function marketStatus(ex: Exchange, now: number): MarketStatus {
-  const days = tradingDays(ex, now - 86400, now + 10 * 86400);
+  const days = tradingDays(ex, now - 86400, now + 21 * 86400);
   for (const day of days) {
     if (now >= day.close) continue;
     if (now < day.open) return { phase: "closed", next: day.open, day };
@@ -146,6 +158,26 @@ export function marketStatus(ex: Exchange, now: number): MarketStatus {
     return { phase: "lunch", next: after?.start ?? day.close, day };
   }
   return { phase: "closed", next: now, day: null };
+}
+
+export interface Holiday {
+  date: string;
+  name: string;
+}
+
+/** Weekday holidays at the exchange from its local date at `now` on, for `horizonDays` days. */
+export function upcomingHolidays(ex: Exchange, now: number, horizonDays = 30): Holiday[] {
+  const w = wallTime(now * 1000, ex.timeZone);
+  const out: Holiday[] = [];
+  for (let i = 0; i <= horizonDays; i++) {
+    const date = new Date(Date.UTC(w.y, w.m - 1, w.d + i));
+    const dow = date.getUTCDay();
+    if (dow === 0 || dow === 6) continue;
+    const iso = date.toISOString().slice(0, 10);
+    const name = holidayName(ex, iso);
+    if (name) out.push({ date: iso, name });
+  }
+  return out;
 }
 
 /** Clock time of an instant in a zone, "HH:MM". */
