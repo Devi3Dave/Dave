@@ -5,10 +5,9 @@ import { formatPrice } from "../chart/DrawingsPrimitive";
 import { toggleFavorite, useFavorites } from "../favorites";
 import { LAYOUTS, addIndicator, loadChart, setLayout, store, useChartState, useWorkspace, workspace, type ChartType } from "../store";
 import { APP_VERSION, BUILD_SHA, BUILD_TIME, formatBuildTime, reloadToLatest, useUpdateCheck } from "../version";
+import { AssetMenu, AssetSearchDialog } from "./AssetPicker";
 import { Menu } from "./Menu";
 import { TemplatesMenu } from "./TemplatesMenu";
-
-const POPULAR = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT", "AAPL", "MSFT", "NVDA", "TSLA", "^GSPC", "^GDAXI", "EURUSD=X", "GC=F"];
 
 const CHART_TYPE_LABELS: Record<ChartType, string> = {
   candles: "Kerzen",
@@ -167,13 +166,7 @@ export function TopBar({ onOpenIndicators, onOpenSettings, heatmapOpen, onToggle
   const { symbol, interval, chartType } = useChartState((s) => s);
   const showPrice = useChartState((s) => s.settings.headerPrice);
   const { last, change } = useHeaderPrice();
-  const [input, setInput] = useState(symbol);
-  useEffect(() => setInput(symbol), [symbol]);
-
-  const submit = () => {
-    const next = input.trim().toUpperCase();
-    if (next && next !== symbol) void loadChart(next, interval);
-  };
+  const [searchOpen, setSearchOpen] = useState(false);
 
   return (
     <header className="topbar">
@@ -181,28 +174,13 @@ export function TopBar({ onOpenIndicators, onOpenSettings, heatmapOpen, onToggle
         <span className="logo">◢</span> <span className="brand-name">ChartAI</span>
         <VersionBadge />
       </div>
-      <form
-        className="symbol-form"
-        onSubmit={(e) => {
-          e.preventDefault();
-          submit();
-        }}
-      >
-        <input
-          list="symbols"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onBlur={submit}
-          spellCheck={false}
-          aria-label="Symbol"
-          data-tip={"Symbol suchen, z. B. BTCUSDT, ETHUSDT\noder AAPL, ^GDAXI (Enter zum Laden)"}
-        />
-        <datalist id="symbols">
-          {POPULAR.map((s) => (
-            <option key={s} value={s} />
-          ))}
-        </datalist>
-      </form>
+      <div className="symbol-picker">
+        <AssetMenu onOpenSearch={() => setSearchOpen(true)} />
+        <button className="pill" onClick={() => setSearchOpen(true)} aria-label="Assets suchen" data-tip={"Assets suchen\nNach Rubriken, mit Favoriten"}>
+          🔍
+        </button>
+      </div>
+      {searchOpen && <AssetSearchDialog onClose={() => setSearchOpen(false)} />}
       {showPrice && last && (
         <div className="header-price" data-tip={"Aktueller Kurs\nVeränderung über 24 Stunden (bei Tages-/Wochenchart zur Vorkerze)"}>
           <strong className={change !== null && change < 0 ? "down" : "up"}>{formatPrice(last.close)}</strong>
