@@ -227,7 +227,8 @@ textarea {
 }
 
 .asset-badge.binance,
-.asset-badge.yahoo {
+.asset-badge.yahoo,
+.asset-badge.twelvedata {
   color: var(--up);
 }
 

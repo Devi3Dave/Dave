@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { assessFreshness, freshnessReport, type FreshnessInput, type Level } from "../../shared/freshness";
 import { measureClock, useClockSync } from "../market/clockSync";
+import { useFeedSettings } from "../market/exchangeFeed";
 import { crossCheckLatest, refreshAll, useChart, type ChartStore } from "../store";
+import { FeedSettingsDialog } from "./FeedSettingsDialog";
 
 const ICON: Record<Level, string> = { ok: "✓", warn: "!", bad: "✕", info: "i" };
 
@@ -43,6 +45,8 @@ export function FreshnessBadge({ chart }: { chart: ChartStore }) {
   const [checking, setChecking] = useState(false);
   const [copied, setCopied] = useState(false);
   const [checkError, setCheckError] = useState<string | null>(null);
+  const [feedOpen, setFeedOpen] = useState(false);
+  const feedKey = useFeedSettings().apiKey.length > 0;
 
   const input: FreshnessInput = {
     symbol,
@@ -125,9 +129,15 @@ export function FreshnessBadge({ chart }: { chart: ChartStore }) {
             <button className="pill" onClick={() => void copy()}>
               {copied ? "Kopiert ✓" : "Nachweis kopieren"}
             </button>
+            {result.market.kind !== "24/7" && (
+              <button className="pill" onClick={() => setFeedOpen(true)} data-tip={"Eigener Twelve-Data-Schlüssel für Börsenkurse\nvon Aktien, Indizes und Forex"}>
+                {feedKey ? "Börsenkurs-Einstellungen" : "Börsenkurs einrichten"}
+              </button>
+            )}
           </div>
         </div>
       )}
+      {feedOpen && <FeedSettingsDialog onClose={() => setFeedOpen(false)} />}
     </>
   );
 }

@@ -3,7 +3,8 @@ import type { Bar } from "./math.js";
 export interface MarketData {
   symbol: string;
   interval: string;
-  source: "binance" | "binance_futures" | "yahoo" | "demo";
+  /** twelvedata: exchange prices with the user's own key (src/market/exchangeFeed.ts). */
+  source: "binance" | "binance_futures" | "yahoo" | "twelvedata" | "demo";
   bars: Bar[];
 }
 

@@ -227,6 +227,7 @@ const SOURCE_LABEL: Record<MarketData["source"], string> = {
   binance: "Binance Spot",
   binance_futures: "Binance USDⓈ-M Perpetual",
   yahoo: "Yahoo Finance",
+  twelvedata: "Twelve Data (Börsenkurs)",
   demo: "Demo-Daten",
 };
 
@@ -237,7 +238,8 @@ export function assessFreshness(input: FreshnessInput, formatTime: (sec: number)
   const market = referenceMarket(input.symbol, source);
   const mNow = marketNow(market, now);
   const checks: Check[] = [];
-  const live = source === "binance" || source === "binance_futures";
+  const exchangeFeed = source === "twelvedata";
+  const live = source === "binance" || source === "binance_futures" || exchangeFeed;
 
   // Device clock against the server clock.
   if (clock) {
@@ -307,15 +309,17 @@ export function assessFreshness(input: FreshnessInput, formatTime: (sec: number)
     if (tick) {
       const age = trueNow - tick.eventTime;
       const latency = tick.receivedAt + (clock?.offsetMs ?? 0) - tick.eventTime;
-      // Perpetuals of stocks and commodities can go quiet outside exchange hours.
+      // Perpetuals of stocks and commodities can go quiet outside exchange hours; an exchange feed is silent while the exchange is closed.
       const quiet = source === "binance_futures" && market.kind !== "24/7";
-      const level: Level = age <= 15_000 ? "ok" : age <= 120_000 || quiet ? "warn" : "bad";
+      const level: Level = exchangeFeed && !mNow.open ? "info" : age <= 15_000 ? "ok" : age <= 120_000 || quiet ? "warn" : "bad";
       checks.push({
         id: "tick",
         label: "Letzter Live-Tick",
         level,
         detail: `${age < 1000 ? "gerade eben" : `vor ${formatSpan(age)}`} (Serverzeit ${formatTime(Math.floor(tick.eventTime / 1000))}) · Übertragung ${clock ? formatSpan(Math.max(0, latency)) : "unbekannt (Uhr nicht gemessen)"}`,
       });
+    } else if (exchangeFeed && !mNow.open) {
+      checks.push({ id: "tick", label: "Letzter Live-Tick", level: "info", detail: "Markt geschlossen: keine Live-Kurse bis zur Öffnung" });
     } else {
       const waiting = input.loadedAt !== null && input.deviceNow - input.loadedAt < 10_000;
       checks.push({ id: "tick", label: "Letzter Live-Tick", level: waiting ? "info" : "warn", detail: waiting ? "Live-Verbindung wird aufgebaut …" : "noch kein Live-Tick empfangen" });
@@ -344,7 +348,10 @@ export function assessFreshness(input: FreshnessInput, formatTime: (sec: number)
   if (market.kind === "exchange") {
     const state = mNow.open ? `geöffnet${mNow.next ? ` bis ${formatTime(mNow.next)}` : ""}` : `geschlossen${mNow.holiday ? ` (${mNow.holiday})` : ""}${mNow.next ? `, öffnet ${formatTime(mNow.next)}` : ""}`;
     const perp = source === "binance_futures" ? " · Perp-Preis ist kein Börsenkurs und kann außerhalb der Börsenzeiten abweichen" : "";
-    checks.push({ id: "market", label: `Börse ${market.label}`, level: "info", detail: `${state}${perp} · Kursabgleich mit der Börse selbst ist ohne Börsen-Feed nicht möglich` });
+    const feed = exchangeFeed
+      ? " · Börsenkurs direkt aus dem Börsen-Feed (Twelve Data); ob er in Echtzeit kommt, zeigt das Alter des Live-Ticks"
+      : " · Kursabgleich mit der Börse selbst ist ohne Börsen-Feed nicht möglich";
+    checks.push({ id: "market", label: `Börse ${market.label}`, level: "info", detail: `${state}${perp}${feed}` });
   } else if (market.kind === "24/5") {
     checks.push({ id: "market", label: market.label, level: "info", detail: mNow.open ? "Handel läuft" : `Wochenende, letzter Handel ${formatTime(mNow.lastTrade + 1)}` });
   } else {
@@ -354,7 +361,19 @@ export function assessFreshness(input: FreshnessInput, formatTime: (sec: number)
   const worst = checks.reduce<Level>((w, c) => (RANK[c.level] > RANK[w] ? c.level : w), "info");
   const level = worst === "info" ? "ok" : worst;
   const summary =
-    source === "demo" ? "Demo" : replay ? "Replay" : level === "ok" ? (live ? "Live" : "Aktuell") : level === "warn" ? "Prüfen" : "Veraltet";
+    source === "demo"
+      ? "Demo"
+      : replay
+        ? "Replay"
+        : level === "ok"
+          ? exchangeFeed && market.kind === "exchange"
+            ? "Börsenkurs"
+            : live
+              ? "Live"
+              : "Aktuell"
+          : level === "warn"
+            ? "Prüfen"
+            : "Veraltet";
   return { level, summary, trueNow, market, marketNow: mNow, checks };
 }
 

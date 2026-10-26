@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ASSETS, ASSET_CATEGORIES, categoryOfFutures, findAsset, resolveAsset, searchAssets, type AssetCategory, type DataSource, type SearchHit } from "../../shared/assets";
 import { refreshBinanceLists, symbolFor, toggleAssetFavorite, useAssets } from "../assetStore";
+import { useFeedSettings } from "../market/exchangeFeed";
 import { STANDALONE } from "../config";
 import { loadChart, useChartState } from "../store";
 import { Menu } from "./Menu";
@@ -23,6 +24,7 @@ const BADGE: Record<DataSource, { label: string; tip: string }> = {
   binance: { label: "Live", tip: "Echte Kurse live von Binance" },
   binance_futures: { label: "Perp", tip: "Echte Kurse vom Binance-Perpetual (USDT, handelt rund um die Uhr)" },
   yahoo: { label: "Yahoo", tip: "Echte Kurse von Yahoo Finance (über den Server)" },
+  twelvedata: { label: "Börse", tip: "Börsenkurs von Twelve Data (mit deinem Schlüssel)" },
   demo: { label: "Demo", tip: "In der iPad-Version ohne Datenquelle: es werden Demo-Daten angezeigt" },
 };
 
@@ -39,8 +41,9 @@ function readTab(): Tab {
 /** Data source of a picker entry; pairs outside the catalog are Binance spot or perpetuals. */
 function useSourceOf() {
   const futuresSet = useAssets((s) => s.futuresSet);
+  const feed = useFeedSettings().apiKey.length > 0;
   return (hit: SearchHit): DataSource => {
-    if (hit.asset) return resolveAsset(hit.asset, STANDALONE, futuresSet).source;
+    if (hit.asset) return resolveAsset(hit.asset, STANDALONE, futuresSet, feed).source;
     return futuresSet?.has(hit.symbol) && hit.category !== "Krypto" ? "binance_futures" : hit.symbol.endsWith("USDT") ? "binance" : STANDALONE ? "demo" : "yahoo";
   };
 }
@@ -249,6 +252,7 @@ export function AssetSearchDialog({ onClose }: { onClose: () => void }) {
           {STANDALONE
             ? "iPad-Version: Krypto live von Binance. Gold, Silber, Öl und viele US-Aktien kommen von Binance-Perpetuals (Perp). Für Assets mit „Demo“ gibt es hier keine Datenquelle."
             : "Krypto live von Binance, Aktien, Indizes, Rohstoffe und Forex über Yahoo Finance."}
+          {" Mit einem eigenen Twelve-Data-Schlüssel (Aktualitäts-Nachweis → Börsenkurs einrichten) kommen Aktien, Indizes und Forex als Börsenkurs („Börse“)."}
         </p>
       </div>
     </div>

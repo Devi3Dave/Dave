@@ -39,6 +39,15 @@ describe("resolveAsset", () => {
   it("keeps crypto on Binance spot", () => {
     expect(resolveAsset(btc, true, null)).toEqual({ symbol: "BTCUSDT", source: "binance" });
   });
+
+  it("uses the exchange feed for stocks, indices and forex once a key is set", () => {
+    expect(resolveAsset(sap, true, null, true)).toEqual({ symbol: "SAP.DE", source: "twelvedata" });
+    expect(resolveAsset(findAsset("TSLAUSDT")!, true, null, true)).toEqual({ symbol: "TSLA", source: "twelvedata" });
+    expect(resolveAsset(findAsset("EURUSD=X")!, true, null, true).source).toBe("twelvedata");
+    // Futures and crypto keep their sources.
+    expect(resolveAsset(gold, true, null, true)).toEqual({ symbol: "XAUUSDT", source: "binance_futures" });
+    expect(resolveAsset(btc, true, null, true).source).toBe("binance");
+  });
 });
 
 describe("Binance lists", () => {
