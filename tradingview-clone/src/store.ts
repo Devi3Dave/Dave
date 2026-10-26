@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from "react";
 import { binanceInterval, bucketTime, loadMarketData, loadOpenInterest, type MarketData, type OpenInterestPoint } from "../shared/marketData";
+import type { LiveTick, RestCheck } from "../shared/freshness";
 import type { Bar } from "../shared/math";
 import type { PositionInput } from "../shared/position";
 import { barIndexAt, carryReplay, randomStart } from "../shared/replay";
@@ -84,6 +85,10 @@ export interface ChartState {
   chartType: ChartType;
   bars: Bar[];
   source: MarketData["source"] | null;
+  /** Device time (ms) the candles arrived, newest live tick and last REST cross-check: the freshness proof. */
+  loadedAt: number | null;
+  liveTick: LiveTick | null;
+  restCheck: RestCheck | null;
   loading: boolean;
   error: string | null;
   indicators: IndicatorInstance[];
@@ -140,6 +145,9 @@ function createChartStore(slot: number): ChartStore {
     chartType: saved.chartType ?? first.chartType ?? "candles",
     bars: [],
     source: null,
+    loadedAt: null,
+    liveTick: null,
+    restCheck: null,
     loading: false,
     error: null,
     indicators: saved.indicators ?? [
@@ -193,12 +201,16 @@ function createChartStore(slot: number): ChartStore {
         loading: true,
         error: null,
         replay,
+        loadedAt: null,
+        liveTick: null,
+        restCheck: null,
         // Drawings and markers are anchored to prices of one symbol.
         ...(symbolChanged ? { drawings: [], markers: [] } : {}),
       });
       try {
         const json = await fetchMarketData(symbol, interval);
         if (seq !== loadSeq) return;
+        chart.set({ loadedAt: Date.now() });
         const r = chart.get().replay;
         if (r?.phase === "play") {
           const shown = carryReplay(r.all, r.shown, json.bars);
@@ -459,8 +471,11 @@ function connectLive(chart: ChartStore, symbol: string, interval: Interval, futu
   const ws = new WebSocket(`${host}/ws/${symbol.toLowerCase()}@kline_${stream}`);
   ws.onmessage = (ev) => {
     if (!current()) return;
-    const k = JSON.parse(ev.data).k;
+    const receivedAt = Date.now();
+    const msg = JSON.parse(ev.data);
+    const k = msg.k;
     if (!k) return;
+    const liveTick: LiveTick = { eventTime: Number(msg.E) || receivedAt, receivedAt };
     const raw: Bar = { time: Math.floor(k.t / 1000), open: +k.o, high: +k.h, low: +k.l, close: +k.c, volume: +k.v, buyVolume: +k.V };
     const prev = seen;
     seen = raw;
@@ -491,11 +506,25 @@ function connectLive(chart: ChartStore, symbol: string, interval: Interval, futu
       const bars = series.slice();
       if (last && last.time === bar.time) bars[bars.length - 1] = bar;
       else if (!last || bar.time > last.time) bars.push(bar);
-      if (!s.replay) return { bars };
-      return s.replay.phase === "select" && !s.replay.shown ? { bars, replay: { ...s.replay, all: bars } } : { replay: { ...s.replay, all: bars } };
+      if (!s.replay) return { bars, liveTick };
+      return s.replay.phase === "select" && !s.replay.shown ? { bars, liveTick, replay: { ...s.replay, all: bars } } : { liveTick, replay: { ...s.replay, all: bars } };
     });
   };
   return ws;
+}
+
+/** Loads the newest candles again over REST and compares them with what the chart shows. */
+export async function crossCheckLatest(chart: ChartStore): Promise<void> {
+  const { symbol, interval, source } = chart.get();
+  if (!source || source === "demo") return;
+  const json = await fetchMarketData(symbol, interval, 50);
+  const rest = json.bars[json.bars.length - 1];
+  if (!rest || chart.get().symbol !== symbol || chart.get().interval !== interval) return;
+  const s = chart.get();
+  const series = s.replay ? s.replay.all : s.bars;
+  // A candle the chart started after the REST answer was built is compared at the REST candle's time.
+  const shown = [...series].reverse().find((b) => b.time === rest.time) ?? series[series.length - 1];
+  chart.set({ restCheck: { at: Date.now(), restTime: rest.time, restClose: rest.close, chartTime: shown?.time ?? null, chartClose: shown?.close ?? null } });
 }
 
 export async function fetchOpenInterest(symbol: string, period: string, limit = 500): Promise<OpenInterestPoint[]> {

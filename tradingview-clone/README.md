@@ -66,6 +66,13 @@ und zusammen mit der Fill & Sign-App auf GitHub Pages veröffentlicht.
   Indizes & ETFs, Edelmetalle, Rohstoffe, Forex) und Favoriten; 🔍 öffnet die Suche über alle
   Binance-Märkte, ebenfalls nach Rubriken, mit ☆ zum Speichern von Favoriten. Jede Zeile zeigt die
   Datenquelle (Live, Perp, Yahoo oder Demo).
+- Aktualitäts-Nachweis: Ampel in der Legende jedes Charts (Live/Aktuell, Prüfen, Veraltet, Demo).
+  Antippen zeigt den Nachweis: Geräteuhr gegen Binance-Serverzeit (Abweichung ± Messgenauigkeit),
+  letzte Kerze gegen die Kerze, die jetzt laufen müsste (mit Börsenzeiten, Wochenenden und Feiertagen
+  der Börse des Basiswerts), Alter und Übertragungszeit des letzten Live-Ticks und eine REST-Gegenprobe
+  der letzten Kerze beim Datenserver. „Nachweis kopieren“ gibt das Protokoll mit UTC-Zeitstempeln aus.
+  Ein Kursabgleich mit der Börse selbst (Xetra, Nasdaq …) ist ohne Börsen-Feed nicht möglich; Perp-Preise
+  und Demo-Daten werden entsprechend gekennzeichnet.
 - Indikator-Panels mit verschiebbaren Trennern, Legende mit Werten unter dem Fadenkreuz,
   Einstellungen (Parameter/Farben), Ein-/Ausblenden
 - Chart-Einstellungen (⚙ in der Kopfzeile): Preisskala Normal/Log/%/Index 100, Achse links/rechts,

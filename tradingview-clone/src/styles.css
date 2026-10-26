@@ -3071,3 +3071,159 @@ select,
     }
   }
 }
+
+/* ---------- freshness proof (legend badge + panel) ---------- */
+
+.fresh-badge {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 1px 7px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+}
+
+.fresh-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.fresh-badge.ok {
+  color: var(--up);
+}
+
+.fresh-badge.ok .fresh-dot {
+  animation: fresh-pulse 2s ease-in-out infinite;
+}
+
+.fresh-badge.warn {
+  color: #f5a623;
+}
+
+.fresh-badge.bad {
+  color: var(--down);
+}
+
+@keyframes fresh-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.fresh-panel {
+  pointer-events: auto;
+  position: absolute;
+  top: 24px;
+  left: 0;
+  z-index: 20;
+  width: min(420px, calc(100vw - 32px));
+  max-height: 70vh;
+  overflow-y: auto;
+  padding: 10px 12px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+  font-size: 12px;
+  white-space: normal;
+}
+
+.fresh-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.fresh-head button {
+  padding: 0 6px;
+}
+
+.fresh-verdict {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 6px 8px;
+  margin-bottom: 8px;
+  border-radius: 4px;
+  font-weight: 600;
+  background: var(--panel-2);
+}
+
+.fresh-verdict span {
+  font-weight: 400;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.fresh-verdict.ok {
+  color: var(--up);
+}
+
+.fresh-verdict.warn {
+  color: #f5a623;
+}
+
+.fresh-verdict.bad {
+  color: var(--down);
+}
+
+.fresh-checks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.fresh-checks li {
+  display: flex;
+  gap: 8px;
+  line-height: 1.35;
+  font-variant-numeric: tabular-nums;
+}
+
+.fresh-icon {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  color: #fff;
+  background: var(--muted);
+}
+
+.fresh-checks li.ok .fresh-icon {
+  background: var(--up);
+}
+
+.fresh-checks li.warn .fresh-icon {
+  background: #f5a623;
+}
+
+.fresh-checks li.bad .fresh-icon {
+  background: var(--down);
+}
+
+.fresh-error {
+  margin-top: 8px;
+  color: var(--down);
+}
+
+.fresh-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
