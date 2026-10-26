@@ -4,6 +4,7 @@ import { SOURCE_INDICATORS, indicatorLabel } from "../../shared/indicators";
 import { ChartEngine, type ComputedIndicator, type PointerEvent } from "../chart/ChartEngine";
 import { alertLinesFor, alertStore } from "../alerts";
 import { useCompareData } from "../compare";
+import { useFootprintData } from "../footprint";
 import { compareCloseAt } from "../../shared/compare";
 import { publishSync, subscribeSync } from "../chartSync";
 import { demo, dropLevel, replayPositionsOpen, tradeLinesFor, type LineDraft } from "../demoAccount";
@@ -131,6 +132,7 @@ export function ChartArea({ chart, onEngine, magnet, onEditIndicator, onEditPosi
   const bars = useMemo(() => (brickKey ? displayBars(loaded, chartType, settings) : loaded), [loaded, brickKey]);
   const selected = useSelectedDrawing(chart.slot);
   const compareLines = useCompareData(chart);
+  const footprint = useFootprintData(chart);
   const [menu, setMenu] = useState<MenuTarget | null>(null);
   /** "Parallel verschieben/kopieren" from the menu: the drawing follows the pointer until the next tap. */
   const moveRef = useRef<{ id: string; clone: boolean; from: PointerEvent } | null>(null);
@@ -513,6 +515,9 @@ export function ChartArea({ chart, onEngine, magnet, onEditIndicator, onEditPosi
   useEffect(() => {
     engineRef.current?.setCompare(compareLines);
   }, [compareLines, chart]);
+  useEffect(() => {
+    engineRef.current?.setFootprint(footprint?.bars ?? null);
+  }, [footprint, chart]);
 
   // Replay playback: one candle per tick at the chosen speed.
   const replayPlaying = useChart(chart, (s) => s.replay?.playing ?? false);
@@ -594,6 +599,25 @@ export function ChartArea({ chart, onEngine, magnet, onEditIndicator, onEditPosi
                   {change.toFixed(2)}%
                 </span>
               )}
+            </div>
+          )}
+          {i === 0 && settings.footprint && (
+            <div className="legend-row indicator">
+              <span className="legend-name">
+                Footprint{" "}
+                {footprint
+                  ? `aus ${footprint.interval}${footprint.exact ? "" : " (Kauf/Verkauf geschätzt)"}`
+                  : source === "demo"
+                    ? "– nicht mit Demo-Daten"
+                    : isPriceDriven(chartType)
+                      ? "– nicht bei Renko/Line Break"
+                      : "lädt …"}
+              </span>
+              <span className="legend-actions">
+                <button data-tip="Footprint ausschalten" aria-label="Footprint ausschalten" onClick={() => chart.set((st) => ({ settings: { ...st.settings, footprint: false } }))}>
+                  ✕
+                </button>
+              </span>
             </div>
           )}
           {i === 0 &&

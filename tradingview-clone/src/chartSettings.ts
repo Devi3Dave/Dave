@@ -23,6 +23,8 @@ export interface ChartSettings {
   renkoAtr: number;
   /** Lines a Line Break reversal has to break (Nison: 3). */
   lineBreakLines: number;
+  /** Footprint cells (bought/sold volume per price row) over the candles. */
+  footprint: boolean;
 }
 
 export const DEFAULT_SETTINGS: ChartSettings = {
@@ -42,6 +44,7 @@ export const DEFAULT_SETTINGS: ChartSettings = {
   renkoBox: 0,
   renkoAtr: 14,
   lineBreakLines: 3,
+  footprint: false,
 };
 
 export const TIME_ZONES: { id: string; label: string }[] = [

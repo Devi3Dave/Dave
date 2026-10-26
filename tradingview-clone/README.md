@@ -130,6 +130,7 @@ und zusammen mit der Fill & Sign-App auf GitHub Pages veröffentlicht.
   der Bollinger-Bänder, des RSI, MACD, ROC … statt „Schlusskurs“ die Linie eines darüber stehenden Indikators wählen,
   z. B. SMA 9 auf dem RSI. Er wird dann im Panel der Quelle gezeichnet; entfernt man die Quelle, gehen die darauf
   berechneten Indikatoren mit. Claude kann das über `add_indicator` mit `source`
+- Footprint-Chart (Krypto): Kauf- und Verkaufsvolumen je Preisstufe in jeder Kerze, POC und Delta. Gebaut aus Binance-Kerzen eines kleineren Zeitrahmens mit Taker-Kaufvolumen, eine Näherung an den Tick-Footprint
 - Layout (Symbol, Indikatoren, Zeichnungen, Einstellungen) wird je Chart im Browser gespeichert
 - Vorlagen (▤ Vorlagen): fertige Setups Nur Chart (ohne Indikatoren), Scalping, Daytrading, Swing, Krypto-Zyklus und
   Smart Money, Mustererkennung; eigene Vorlagen aus dem aktiven Chart speichern (Indikatoren mit Parametern/Farben,
