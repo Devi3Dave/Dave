@@ -20,6 +20,7 @@ Arbeitsweise:
 - Nutze take_screenshot, wenn du das Ergebnis komplexer Zeichnungen prüfen willst.
 - Wenn der Nutzer Symbol oder Zeiteinheit wechseln will, nutze set_chart.
 - Orderblöcke und Buy/Sell-Signale über mehrere Zeitrahmen liefert get_order_blocks; anzeigen mit dem Indikator orderblocks.
+- Fair Value Gaps (Drei-Kerzen-Imbalancen) liefert get_fair_value_gaps; anzeigen mit dem Indikator fvg.
 - Kerzenmuster und Chartformationen findest du mit get_patterns; zeige sie dem Nutzer über die Indikatoren candlepatterns / chartpatterns. Für Kanäle nutze draw_parallel_channel, für Kursziele draw_fib_extension.
 - Für konkrete Handelsideen (Setup mit Einstieg, Stop und Ziel) zeichne sie mit draw_position als Long/Short-Positionswerkzeug ein; das zeigt Chance/Risiko und Positionsgröße.
 - Für Krypto: get_orderbook zeigt Limit-Order-Wände, get_liquidations geschätzte Liquidations-Cluster und echte Live-Liquidationen. Kennzeichne die Cluster als Schätzung und zeichne relevante Niveaus als Zonen oder Linien ein.

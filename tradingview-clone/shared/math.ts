@@ -639,11 +639,14 @@ export function anchoredVwap(bars: Bar[], barsBack: number): Series {
   });
 }
 
-/** Chandelier Exit: ATR trailing stop that flips with the trend. */
+/**
+ * Chandelier Exit (Chuck LeBeau, as in StockCharts ChartSchool): highest high − ATR × mult
+ * for longs, lowest low + ATR × mult for shorts; the stop flips with the trend.
+ */
 export function chandelierExit(bars: Bar[], period: number, mult: number) {
   const a = atr(bars, period);
-  const hh = highest(closes(bars), period);
-  const ll = lowest(closes(bars), period);
+  const hh = highest(bars.map((b) => b.high), period);
+  const ll = lowest(bars.map((b) => b.low), period);
   const long: Series = new Array(bars.length).fill(null);
   const short: Series = new Array(bars.length).fill(null);
   let longStop = 0;
@@ -1038,11 +1041,12 @@ export function ppo(values: Series, fast: number, slow: number, signal: number) 
   return { ppo: line, signal: sig, histogram: combine(line, sig, (a, b) => a - b) };
 }
 
+/** Klinger Oscillator as TradingView's built-in: signed volume by ta.change(hlc3) >= 0, EMA(34) − EMA(55), signal EMA(13). */
 export function klinger(bars: Bar[], fast: number, slow: number, signal: number) {
   const vf: Series = bars.map((b, i) => {
     if (i === 0) return null;
     const p = bars[i - 1];
-    const trend = b.high + b.low + b.close > p.high + p.low + p.close ? 1 : -1;
+    const trend = b.high + b.low + b.close >= p.high + p.low + p.close ? 1 : -1;
     return trend * b.volume;
   });
   const kvo = combine(ema(vf, fast), ema(vf, slow), (a, b) => a - b);

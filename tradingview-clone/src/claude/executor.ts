@@ -1,6 +1,7 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { getIndicator, indicatorLabel, resolveParams } from "../../shared/indicators";
 import type { Bar } from "../../shared/math";
+import { fairValueGaps } from "../../shared/fvg";
 import { liquidationClusters, liquidationHeatmap } from "../../shared/liquidations";
 import { isCryptoSymbol } from "../../shared/marketData";
 import { groupLevels, groupingSteps, type Level } from "../../shared/orderbook";
@@ -270,6 +271,22 @@ async function run(name: ToolName, input: unknown, engine: ChartEngine | null): 
           distance_pct: num(((z.side === "bull" ? z.top : z.bottom) - last) / last * 100),
         })),
         recent_signals: r.signals.slice(-10).map((sg) => ({ time: iso(sg.time), signal: sg.side, tf: sg.tf, price: num(sg.price) })),
+      });
+    }
+
+    case "get_fair_value_gaps": {
+      const { min_pct = 0, mitigation = "touch" } = input as ToolInput<"get_fair_value_gaps">;
+      const gaps = fairValueGaps(bars, { minPct: min_pct, mitigation, maxZones: 8, showMitigated: false });
+      const last = bars[bars.length - 1]?.close ?? 0;
+      return ok(`${gaps.length} offene Fair Value Gaps`, {
+        price: num(last),
+        fair_value_gaps: gaps.map((z) => ({
+          side: z.side === "bull" ? "bullisch" : "bärisch",
+          top: num(z.top),
+          bottom: num(z.bottom),
+          since: iso(z.from),
+          distance_pct: num(((z.side === "bull" ? z.top : z.bottom) - last) / last * 100),
+        })),
       });
     }
 

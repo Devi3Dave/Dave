@@ -65,7 +65,7 @@ export class PatternsPrimitive implements ISeriesPrimitive<Time> {
     this.requestUpdate?.();
   }
 
-  /** Order blocks as boxes from their candle to the right edge (or to where they broke). */
+  /** Order blocks and fair value gaps as boxes from their candle to the right edge (or to where they broke). */
   private drawZones(ctx: CanvasRenderingContext2D, width: number) {
     // Higher time frames first so the finer zones stay visible on top.
     const sorted = [...this.zones].sort((a, b) => b.tfSeconds - a.tfSeconds);
@@ -89,7 +89,7 @@ export class PatternsPrimitive implements ISeriesPrimitive<Time> {
       ctx.setLineDash(broken ? [3, 3] : []);
       ctx.strokeRect(x1, yTop, x2 - x1, h);
       ctx.setLineDash([]);
-      const text = `OB ${z.tf}${broken ? " ✕" : ""}`;
+      const text = `${z.label ?? `OB ${z.tf}`}${broken ? " ✕" : ""}`;
       ctx.fillStyle = withAlpha(broken ? "#787b86" : color, 0.95);
       ctx.fillText(text, Math.max(x1, 0) + 4, yTop + Math.min(8, h / 2));
     }

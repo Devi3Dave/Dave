@@ -91,12 +91,16 @@ und zusammen mit der Fill & Sign-App auf GitHub Pages veröffentlicht.
 - Versionsnummer neben dem Logo; sie zeigt „Update“, sobald eine neuere Version online ist –
   Antippen lädt sie
 
-**Indikatoren (82)**
+**Indikatoren (83)**
 - Favoriten: im Indikator-Dialog mit ☆ markieren; sie stehen dort oben und im ★-Menü der Kopfzeile
 - *Orderblöcke & Buy/Sell-Signale (MTF):* Smart-Money-Orderblöcke (letzte Gegenkerze vor einem
   Strukturbruch) auf dem Chart-Zeitrahmen und zwei wählbaren höheren Zeitrahmen (Standard 4h und 1d),
   als Zonen bis zur Invalidierung; Buy/Sell-Signal beim ersten Retest mit Reaktionskerze.
   Höhere Zeitrahmen werden aus abgeschlossenen Kerzen gebildet (kein Repainting)
+- *Fair Value Gaps (FVG):* Drei-Kerzen-Imbalancen (bullisch: Tief von Kerze 3 über Hoch von Kerze 1,
+  Kerze 2 grün; bärisch spiegelbildlich) als Zonen, bis der Kurs zurückkommt (Mitigation bei Berührung,
+  50 % oder vollständig gefüllt; Mindestgröße in %). Definition nach smart-money-concepts (`smc.fvg`)
+  bzw. „Fair Value Gap [LuxAlgo]“
 - *Muster:* Kerzenmuster (Engulfing, Hammer, Hanging Man, Inverted Hammer, Shooting Star, Morning/Evening
   Star, Harami, Piercing Line, Dark Cloud Cover, Three White Soldiers/Black Crows, optional Doji) als Marker;
   Chartformationen (Doppeltop/-boden, Schulter-Kopf-Schulter auch invers, aktuelles Dreieck) mit
@@ -230,6 +234,7 @@ Zeitzone des Geräts.
 | `draw_trendline`, `draw_horizontal_line`, `draw_vertical_line`, `draw_zone`, `draw_fibonacci`, `add_text`, `add_markers` | Zeichnen |
 | `draw_fib_extension`, `draw_auto_fibonacci`, `draw_parallel_channel` | Fib-Extension, Auto-Fib, Kanal |
 | `get_order_blocks` | Aktive Orderblöcke (mehrere Zeitrahmen) und letzte Buy/Sell-Signale |
+| `get_fair_value_gaps` | Offene Fair Value Gaps mit Ober-/Unterkante und Abstand zum Kurs |
 | `get_patterns` | Kerzenmuster und Chartformationen erkennen |
 | `draw_position` | Handelsidee als Long-/Short-Position mit Stop, Ziel und Positionsgröße |
 | `remove_drawing`, `clear_drawings` | Zeichnungen entfernen |
