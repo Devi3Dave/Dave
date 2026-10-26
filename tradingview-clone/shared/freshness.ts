@@ -6,6 +6,7 @@
 
 import { findAsset } from "./assets";
 import { getExchange, holidayName, marketStatus, tradingDays, wallTime, zoneOffset, zonedToUtc, type Exchange } from "./exchanges";
+import { venueName } from "./venues";
 import { intervalSeconds, bucketTime, isCalendarInterval, isCryptoSymbol, type MarketData } from "./marketData";
 import { parseSpread, spreadSymbols } from "./spread";
 
@@ -86,7 +87,7 @@ export function referenceMarket(symbol: string, source: MarketData["source"] | n
     return referenceMarket(first, isCryptoSymbol(first) ? "binance" : null);
   }
   const asset = findAsset(symbol);
-  if (source === "binance" || asset?.category === "Krypto" || (!asset && source === "binance_futures")) return { kind: "24/7", label: "Krypto (rund um die Uhr)" };
+  if (source === "binance" || source === "venue" || asset?.category === "Krypto" || (!asset && source === "binance_futures")) return { kind: "24/7", label: "Krypto (rund um die Uhr)" };
   const id = asset?.id ?? symbol;
   if (INDEX_EXCHANGE[id]) return exchangeRef(INDEX_EXCHANGE[id]);
   if (id.endsWith("=X") || id === "DX-Y.NYB") return { kind: "24/5", label: "Devisenmarkt (24/5)" };
@@ -236,8 +237,14 @@ const SOURCE_LABEL: Record<MarketData["source"], string> = {
   yahoo: "Yahoo Finance",
   twelvedata: "Twelve Data (Börsenkurs)",
   spread: "Spread (aus zwei Symbolen berechnet)",
+  venue: "Krypto-Börse",
   demo: "Demo-Daten",
 };
+
+/** The source in words; another crypto exchange is named from the symbol (COINBASE:BTCUSD → Coinbase). */
+function sourceLabel(source: MarketData["source"], symbol: string): string {
+  return source === "venue" ? `${venueName(symbol.split(":")[0])} (${SOURCE_LABEL.venue}, direkt)` : SOURCE_LABEL[source];
+}
 
 export function assessFreshness(input: FreshnessInput, formatTime: (sec: number) => string): Freshness {
   const { interval, source, lastBarTime, clock, tick, replay } = input;
@@ -247,7 +254,7 @@ export function assessFreshness(input: FreshnessInput, formatTime: (sec: number)
   const mNow = marketNow(market, now);
   const checks: Check[] = [];
   const exchangeFeed = source === "twelvedata";
-  const live = source === "binance" || source === "binance_futures" || exchangeFeed;
+  const live = source === "binance" || source === "binance_futures" || source === "venue" || exchangeFeed;
 
   // Device clock against the server clock.
   if (clock) {
@@ -275,7 +282,7 @@ export function assessFreshness(input: FreshnessInput, formatTime: (sec: number)
     checks.push({ id: "source", label: "Datenquelle", level: "bad", detail: "Demo-Daten (Zufallskurs): kein echter Kurs, Aktualität nicht nachweisbar" });
   } else {
     const how = live ? "REST + Live-WebSocket" : "REST, kein Live-Stream (Börsenkurse oft 15 min verzögert)";
-    checks.push({ id: "source", label: "Datenquelle", level: live ? "ok" : "info", detail: `${SOURCE_LABEL[source]} · ${how}` });
+    checks.push({ id: "source", label: "Datenquelle", level: live ? "ok" : "info", detail: `${sourceLabel(source, input.symbol)} · ${how}` });
   }
 
   // Last candle against the candle that should be forming now.
@@ -390,7 +397,7 @@ export function freshnessReport(input: FreshnessInput, result: Freshness): strin
   const iso = (ms: number) => new Date(ms).toISOString();
   const lines = [
     `ChartAI Aktualitäts-Nachweis`,
-    `Symbol: ${input.symbol} · ${input.interval} · Quelle: ${input.source ? SOURCE_LABEL[input.source] : "–"}`,
+    `Symbol: ${input.symbol} · ${input.interval} · Quelle: ${input.source ? sourceLabel(input.source, input.symbol) : "–"}`,
     `Geräteuhr: ${iso(input.deviceNow)}`,
     `Serverzeit (korrigiert): ${iso(result.trueNow)}${input.clock ? ` · Offset ${input.clock.offsetMs} ms · RTT ${input.clock.rttMs} ms · ${input.clock.source}` : " · nicht gemessen"}`,
     input.lastBarTime !== null ? `Letzte Kerze: ${iso(input.lastBarTime * 1000)}` : "Letzte Kerze: –",

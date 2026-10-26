@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { ASSETS, ASSET_CATEGORIES, categoryOfFutures, findAsset, resolveAsset, searchAssets, type AssetCategory, type DataSource, type SearchHit } from "../../shared/assets";
-import { refreshBinanceLists, symbolFor, toggleAssetFavorite, useAssets } from "../assetStore";
+import { refreshBinanceLists, setCryptoVenue, symbolFor, toggleAssetFavorite, useAssets } from "../assetStore";
 import { useFeedSettings } from "../market/exchangeFeed";
 import { STANDALONE } from "../config";
 import { loadChart, useChartState } from "../store";
 import { formatSpread, parseSpread, SPREAD_OP_LABELS } from "../../shared/spread";
+import { VENUES, venueName } from "../../shared/venues";
 import { Menu } from "./Menu";
 
 type Tab = "fav" | AssetCategory;
@@ -26,6 +27,7 @@ const BADGE: Record<DataSource, { label: string; tip: string }> = {
   binance_futures: { label: "Perp", tip: "Echte Kurse vom Binance-Perpetual (USDT, handelt rund um die Uhr)" },
   yahoo: { label: "Yahoo", tip: "Echte Kurse von Yahoo Finance (über den Server)" },
   twelvedata: { label: "Börse", tip: "Börsenkurs von Twelve Data (mit deinem Schlüssel)" },
+  venue: { label: "Börse", tip: "Echte Kurse live direkt von dieser Krypto-Börse" },
   demo: { label: "Demo", tip: "In der iPad-Version ohne Datenquelle: es werden Demo-Daten angezeigt" },
 };
 
@@ -43,7 +45,9 @@ function readTab(): Tab {
 function useSourceOf() {
   const futuresSet = useAssets((s) => s.futuresSet);
   const feed = useFeedSettings().apiKey.length > 0;
+  const venue = useAssets((s) => s.venue);
   return (hit: SearchHit): DataSource => {
+    if (hit.symbol.includes(":") || (venue !== "BINANCE" && hit.category === "Krypto" && symbolFor(hit.symbol, hit.asset, true).includes(":"))) return "venue";
     if (hit.asset) return resolveAsset(hit.asset, STANDALONE, futuresSet, feed).source;
     return futuresSet?.has(hit.symbol) && hit.category !== "Krypto" ? "binance_futures" : hit.symbol.endsWith("USDT") ? "binance" : STANDALONE ? "demo" : "yahoo";
   };
@@ -68,8 +72,8 @@ function AssetRow({ hit, onPick, onSelect }: { hit: SearchHit; onPick: () => voi
   const interval = useChartState((s) => s.interval);
   const fav = useAssets((s) => s.favorites.includes(hit.symbol));
   const source = useSourceOf()(hit);
-  const target = symbolFor(hit.symbol, hit.asset);
-  const badge = BADGE[source];
+  const target = symbolFor(hit.symbol, hit.asset, hit.category === "Krypto");
+  const badge = source === "venue" ? { label: venueName(target.split(":")[0]), tip: `Echte Kurse live direkt von ${venueName(target.split(":")[0])}` } : BADGE[source];
   return (
     <div className="asset-row">
       <button
@@ -81,7 +85,7 @@ function AssetRow({ hit, onPick, onSelect }: { hit: SearchHit; onPick: () => voi
         }}
       >
         <strong>{hit.name}</strong>
-        <span>{target === hit.symbol ? hit.symbol : `${hit.symbol} · ${target}`}</span>
+        <span>{target === hit.symbol || target.includes(":") ? target : `${hit.symbol} · ${target}`}</span>
         {/* Hints open to the left so they never cover the stars of the rows below. */}
         <em className={`asset-badge ${source}`} data-tip={badge.tip} data-tip-placement="left">
           {badge.label}
@@ -97,6 +101,27 @@ function AssetRow({ hit, onPick, onSelect }: { hit: SearchHit; onPick: () => voi
       >
         {fav ? "★" : "☆"}
       </button>
+    </div>
+  );
+}
+
+/** Exchange crypto loads from, like TradingView's exchange filter (BINANCE:BTCUSDT, COINBASE:BTCUSD …). */
+function VenueTabs() {
+  const venue = useAssets((s) => s.venue);
+  return (
+    <div className="asset-tabs venue-tabs" role="group" aria-label="Krypto-Börse">
+      <span className="venue-label">Börse</span>
+      {VENUES.map((v) => (
+        <button
+          key={v.id}
+          className={venue === v.id ? "active" : ""}
+          onClick={() => setCryptoVenue(v.id)}
+          aria-pressed={venue === v.id}
+          data-tip={v.id === "BINANCE" ? "Krypto von Binance (wie bisher)" : `Krypto direkt von ${v.name} laden, z. B. ${v.id}:BTC${v.id === "BYBIT" || v.id === "OKX" ? "USDT" : "USD"}`}
+        >
+          {v.name}
+        </button>
+      ))}
     </div>
   );
 }
@@ -144,6 +169,7 @@ export function AssetMenu({ onOpenSearch }: { onOpenSearch: () => void }) {
               </button>
             ))}
           </div>
+          {(tab === "Krypto" || tab === "fav") && <VenueTabs />}
           {tab === "fav" && hits.length === 0 && <div className="menu-empty">Noch keine Favoriten. Mit ☆ neben einem Asset speichern.</div>}
           {hits.map((h) => (
             <AssetRow key={h.symbol} hit={h} onPick={close} />
@@ -208,14 +234,14 @@ export function AssetSearchDialog({ onClose, onSelect, title = "Assets suchen" }
         <input
           autoFocus
           className="search"
-          placeholder="Name oder Symbol, z. B. Gold, Tesla, PEPE, ^GDAXI … oder Spread BTCUSDT/ETHUSDT"
+          placeholder="Name oder Symbol, z. B. Gold, Tesla, PEPE, KRAKEN:BTCEUR … oder Spread BTCUSDT/ETHUSDT"
           value={query}
           spellCheck={false}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => {
             if (e.key !== "Enter" || !q) return;
             const first = sections[0]?.[1][0];
-            select(spread ? formatSpread(spread) : first ? symbolFor(first.symbol, first.asset) : q);
+            select(spread ? formatSpread(spread) : first ? symbolFor(first.symbol, first.asset, first.category === "Krypto") : q);
             onClose();
           }}
         />
@@ -232,6 +258,7 @@ export function AssetSearchDialog({ onClose, onSelect, title = "Assets suchen" }
             </button>
           ))}
         </div>
+        {(tab === "all" || tab === "fav" || tab === "Krypto") && <VenueTabs />}
         <div className="indicator-list">
           {spread && (
             <section>
@@ -274,7 +301,8 @@ export function AssetSearchDialog({ onClose, onSelect, title = "Assets suchen" }
           {STANDALONE
             ? "iPad-Version: Krypto live von Binance. Gold, Silber, Öl und viele US-Aktien kommen von Binance-Perpetuals (Perp). Für Assets mit „Demo“ gibt es hier keine Datenquelle."
             : "Krypto live von Binance, Aktien, Indizes, Rohstoffe und Forex über Yahoo Finance."}
-          {" Spread-Charts: zwei Symbole mit / - + * verbinden, z. B. BTCUSDT/ETHUSDT oder GC=F / SI=F."}
+          {" Krypto-Börse: oben wählen, ob Krypto von Binance, Coinbase, Kraken, Bybit, OKX, Bitstamp oder Bitfinex kommt, oder direkt eintippen, z. B. COINBASE:BTCUSD oder KRAKEN:ETHEUR."}
+          {" Spread-Charts: zwei Symbole mit / - + * verbinden, z. B. BTCUSDT/ETHUSDT oder GC=F / SI=F, oder den Preisunterschied zweier Börsen: COINBASE:BTCUSD - BINANCE:BTCUSDT."}
           {" Mit einem eigenen Twelve-Data-Schlüssel (Aktualitäts-Nachweis → Börsenkurs einrichten) kommen Aktien, Indizes und Forex als Börsenkurs („Börse“)."}
         </p>
       </div>

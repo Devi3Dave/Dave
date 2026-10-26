@@ -1,11 +1,13 @@
 import type { Bar } from "./math.js";
+import { parseVenueSymbol, stripBinance, type Venue, type VenuePair } from "./venues.js";
 
 export interface MarketData {
   symbol: string;
   interval: string;
   /** twelvedata: exchange prices with the user's own key (src/market/exchangeFeed.ts). */
   /** spread: computed from two symbols (shared/spread.ts), reloaded like Yahoo. */
-  source: "binance" | "binance_futures" | "yahoo" | "twelvedata" | "spread" | "demo";
+  /** venue: another crypto exchange, the symbol names it (COINBASE:BTCUSD, shared/venues.ts). */
+  source: "binance" | "binance_futures" | "yahoo" | "twelvedata" | "spread" | "venue" | "demo";
   bars: Bar[];
 }
 
@@ -191,6 +193,45 @@ async function binanceKlines(urls: string[], symbol: string, interval: string, l
   throw lastError;
 }
 
+/** The exchange candle to merge a time frame from: its own when listed, months for quarters/years, else the largest that divides it. */
+function venueBase(venue: Venue, interval: string): string | null {
+  const codes = Object.keys(venue.intervals);
+  if (codes.includes(interval)) return interval;
+  if (isCalendarInterval(interval)) return codes.includes("1M") ? "1M" : "1d";
+  if (interval === "all") return codes.includes("1w") ? "1w" : "1d";
+  if (interval === "1w") return "1d";
+  return baseInterval(interval, codes);
+}
+
+/** Monday 1970-01-05: weeks start on Monday as at the exchanges, not on the Thursday of the epoch. */
+const MONDAY = 4 * 86400;
+
+/** Candles of another crypto exchange, paged back and merged like Binance's. */
+async function fromVenue(venue: Venue, pair: VenuePair, interval: string, limit: number, endTime?: number): Promise<Bar[]> {
+  const base = venueBase(venue, interval);
+  if (!base) throw new Error(`${venue.name} hat keine Kerzen für ${interval}`);
+  const code = venue.intervals[base];
+  const merged = base !== interval && interval !== "all";
+  const ratio = merged && !isCalendarInterval(interval) ? intervalSeconds(interval) / intervalSeconds(base) : 1;
+  const wanted = interval === "all" || isCalendarInterval(interval) ? venue.maxLimit * MAX_PAGES : limit * ratio;
+  const pages = venue.paging ? Math.min(MAX_PAGES, Math.max(1, Math.ceil(wanted / venue.maxLimit))) : 1;
+  // A watchlist quote needs two candles, not a full page.
+  const perRequest = pages > 1 ? venue.maxLimit : Math.min(venue.maxLimit, Math.ceil(wanted) + 2);
+  let bars: Bar[] = [];
+  for (let page = 0; page < pages; page++) {
+    const end = bars.length ? bars[0].time : endTime ? Math.floor(endTime) : undefined;
+    const chunk = venue.parseCandles(await fetchJson(venue.candlesUrl(pair, code, perRequest, end))).filter((b) => end === undefined || b.time < end);
+    bars = [...chunk, ...bars];
+    if (chunk.length < perRequest * 0.9) break;
+  }
+  if (!merged) return interval === "all" ? bars : bars.slice(-limit);
+  const out =
+    interval === "1w"
+      ? aggregate(bars.map((b) => ({ ...b, time: b.time - MONDAY })), "1w").map((b) => ({ ...b, time: b.time + MONDAY }))
+      : aggregate(bars, interval);
+  return out.slice(-limit);
+}
+
 const YAHOO: Record<string, { interval: string; range: string; aggregate?: boolean }> = {
   "1m": { interval: "1m", range: "7d" },
   "5m": { interval: "5m", range: "60d" },
@@ -295,10 +336,18 @@ export function demoBars(symbol: string, interval: string, limit: number): Bar[]
   return bars;
 }
 
-/** `endTime` (unix seconds) loads older candles up to that moment; only Binance supports it, other sources return the newest. */
+/** `endTime` (unix seconds) loads older candles up to that moment; only Binance and other crypto exchanges support it, other sources return the newest. */
 export async function loadMarketData(rawSymbol: string, interval: string, limit = 1000, endTime?: number): Promise<MarketData> {
-  const symbol = rawSymbol.trim().toUpperCase();
+  const symbol = stripBinance(rawSymbol.trim().toUpperCase());
   if (!isValidInterval(interval)) throw new Error(`Unbekannte Zeiteinheit: ${interval}`);
+  // Another exchange is asked on its own: a pair it does not list is an error, not Binance's or demo prices.
+  const venue = parseVenueSymbol(symbol);
+  if (venue) {
+    if (intervalSeconds(interval) < 60) throw new Error(`${venue.venue.name}: Sekunden-Kerzen gibt es nur bei Binance`);
+    const bars = await fromVenue(venue.venue, venue.pair, interval, limit, endTime);
+    if (bars.length === 0) throw new Error(`${venue.venue.name}: keine Kerzen für ${venue.pair.base}/${venue.pair.quote}`);
+    return { symbol, interval, source: "venue", bars };
+  }
   const spot: [MarketData["source"], () => Promise<Bar[]>] = ["binance", () => fromBinance(symbol, interval, limit, endTime)];
   const futures: [MarketData["source"], () => Promise<Bar[]>] = ["binance_futures", () => fromBinanceFutures(symbol, interval, limit, endTime)];
   const yahoo: [MarketData["source"], () => Promise<Bar[]>] = ["yahoo", () => fromYahoo(symbol, interval, limit)];

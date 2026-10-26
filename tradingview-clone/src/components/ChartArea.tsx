@@ -588,7 +588,7 @@ export function ChartArea({ chart, onEngine, magnet, onEditIndicator, onEditPosi
           {i === 0 && (
             <div className="legend-row main">
               <span className="legend-symbol">
-                {symbol} · {interval} · {source === "demo" ? "DEMO-DATEN" : source === "binance_futures" ? "BINANCE PERP" : source?.toUpperCase()}
+                {symbol} · {interval} · {source === "demo" ? "DEMO-DATEN" : source === "binance_futures" ? "BINANCE PERP" : source === "venue" ? "BÖRSE DIREKT" : source?.toUpperCase()}
               </span>
               <FreshnessBadge chart={chart} />
               {replaying && <span className="legend-replay">REPLAY</span>}
