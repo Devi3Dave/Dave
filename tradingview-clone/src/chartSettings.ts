@@ -18,6 +18,11 @@ export interface ChartSettings {
   grid: GridMode;
   crosshair: CrosshairSetting;
   liveLiquidations: boolean;
+  /** Renko box size in price units; 0 = ATR. */
+  renkoBox: number;
+  renkoAtr: number;
+  /** Lines a Line Break reversal has to break (Nison: 3). */
+  lineBreakLines: number;
 }
 
 export const DEFAULT_SETTINGS: ChartSettings = {
@@ -34,6 +39,9 @@ export const DEFAULT_SETTINGS: ChartSettings = {
   grid: "both",
   crosshair: "normal",
   liveLiquidations: true,
+  renkoBox: 0,
+  renkoAtr: 14,
+  lineBreakLines: 3,
 };
 
 export const TIME_ZONES: { id: string; label: string }[] = [

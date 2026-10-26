@@ -3330,3 +3330,13 @@ select,
 .al-toast {
   border-color: #ff9800;
 }
+
+.settings-number {
+  width: 110px;
+  padding: 4px 6px;
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  text-align: right;
+}

@@ -14,10 +14,15 @@ import { TemplatesMenu } from "./TemplatesMenu";
 
 const CHART_TYPE_LABELS: Record<ChartType, string> = {
   candles: "Kerzen",
+  hollow_candles: "Hohle Kerzen",
   bars: "Balken",
   heikin_ashi: "Heikin Ashi",
   line: "Linie",
+  step_line: "Stufenlinie",
   area: "Fläche",
+  baseline: "Baseline",
+  renko: "Renko",
+  line_break: "Line Break",
 };
 
 const INTERVAL_LABELS: Record<string, string> = {
