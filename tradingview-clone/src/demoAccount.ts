@@ -18,7 +18,7 @@ import {
   type Order,
 } from "../shared/demoTrading";
 import { parseBackup } from "../shared/journal";
-import { barPath } from "../shared/replay";
+import { barPath, subBarsOf } from "../shared/replay";
 import type { TradeLine } from "./chart/ChartEngine";
 import { activeChart, charts, fetchMarketData, workspace, type ChartState } from "./store";
 
@@ -295,6 +295,20 @@ function syncReplay(slot: number, s: ChartState) {
     return;
   }
   if (last.time === book.lastBar && book.prices[book.symbol] === last.close) return;
+  // Intrabar replay: the candle grew by one lower-time-frame candle, whose prices are run through.
+  const part = r.intrabar && r.sub > 0 ? subBarsOf(r.intrabar.bars, r.all, r.shown)[r.sub - 1] : undefined;
+  if (last.time === book.lastBar && part) {
+    let account = book.account;
+    const closed: DemoTrade[] = [];
+    for (const price of barPath(part)) {
+      const res = applyPrice(account, book.symbol, price, part.time * 1000);
+      account = res.account;
+      closed.push(...res.closed);
+    }
+    set({ replay: { ...book, account, prices: { ...book.prices, [book.symbol]: last.close }, now: part.time * 1000 } });
+    afterClose(closed, true);
+    return;
+  }
   // Stepped back (only without open positions): the hidden candles count again when they come back.
   if (last.time < book.lastBar) {
     set({ replay: { ...book, prices: { ...book.prices, [book.symbol]: last.close }, lastBar: last.time, now: last.time * 1000 } });

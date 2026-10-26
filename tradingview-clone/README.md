@@ -248,6 +248,10 @@ folgenden Kerzen nacheinander aufdecken, um Setups ohne Blick in die Zukunft zu 
 - Startkerze im Chart antippen (eine Linie zeigt, wo geschnitten wird) oder 🎲 Zufällig wählen
 - ⏭ nächste Kerze (Shift + →), ⏮ eine Kerze zurück (Shift + ←, ohne offene Replay-Position),
   ▶/⏸ abspielen mit 0,5–10 Kerzen pro Sekunde, ⏪ zurückspulen: eine frühere Kerze antippen
+- Intrabar-Replay (Auswahl „Kerze“ in der Replay-Leiste → z. B. 1m): jede Kerze baut sich wie bei TradingView aus
+  Kerzen einer kleineren Zeiteinheit Schritt für Schritt auf; SL/TP im Replay-Konto lösen dann je Teilkerze aus.
+  Die kleinere Zeiteinheit wird ab dem Replay-Zeitpunkt in Blöcken von Binance nachgeladen; bei anderen Quellen
+  gibt es sie nur für die jüngste Zeit, ältere Kerzen kommen dann ganz. Bei Demo-Daten nicht verfügbar
 - Indikatoren, Zeichnungen und Claude sehen nur die bereits aufgedeckten Kerzen
 - Zeiteinheit wechseln bleibt am selben Zeitpunkt (nur abgeschlossene Kerzen werden gezeigt)
 - Trading im Replay: solange der Replay-Chart aktiv ist, handelt 💰 Demo auf einem eigenen Replay-Konto

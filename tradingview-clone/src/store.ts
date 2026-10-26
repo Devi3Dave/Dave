@@ -1,12 +1,12 @@
 import { useSyncExternalStore } from "react";
-import { binanceInterval, bucketTime, loadMarketData, loadOpenInterest, type MarketData, type OpenInterestPoint } from "../shared/marketData";
+import { binanceInterval, bucketTime, intervalSeconds, loadMarketData, loadOpenInterest, type MarketData, type OpenInterestPoint } from "../shared/marketData";
 import { findAsset } from "../shared/assets";
 import { withCompare } from "../shared/compare";
 import { applyPrice, type FeedSymbol } from "../shared/exchangeFeed";
 import { marketNow, referenceMarket, type LiveTick, type RestCheck } from "../shared/freshness";
 import type { Bar } from "../shared/math";
 import type { PositionInput } from "../shared/position";
-import { barIndexAt, carryReplay, randomStart } from "../shared/replay";
+import { barIndexAt, carryReplay, nextReplayStep, randomStart, replayFrame } from "../shared/replay";
 import { loadSpreadData, parseSpread } from "../shared/spread";
 import type { CHART_TYPES, CustomInterval, INTERVALS } from "../shared/tools";
 import { DEFAULT_SETTINGS, type ChartSettings } from "./chartSettings";
@@ -81,8 +81,12 @@ export interface ReplayState {
   /** Candles shown; while selecting, 0 shows all (first start) and otherwise only earlier starts can be tapped (rewind). */
   shown: number;
   playing: boolean;
-  /** Candles per second. */
+  /** Candles (with intrabar: steps) per second. */
   speed: number;
+  /** Intrabar replay: candles of a lower time frame that build the next candle step by step. */
+  intrabar: { interval: string; bars: Bar[] } | null;
+  /** Lower-time-frame candles of the next candle already shown (0: none). */
+  sub: number;
 }
 
 export interface ChartState {
@@ -241,10 +245,10 @@ function createChartStore(slot: number): ChartStore {
     if (r?.phase === "play") {
       const shown = carryReplay(r.all, r.shown, json.bars);
       // Without a finished candle before that moment, a new start has to be chosen.
-      const next: ReplayState = shown > 0 ? { ...r, all: json.bars, shown, playing: keepPlaying && r.playing } : { ...r, phase: "select", all: json.bars, shown: 0, playing: false };
+      const next: ReplayState = shown > 0 ? { ...r, all: json.bars, shown, sub: 0, playing: keepPlaying && r.playing } : { ...r, phase: "select", all: json.bars, shown: 0, sub: 0, playing: false };
       chart.set({ ...base, bars: next.phase === "play" ? json.bars.slice(0, shown) : json.bars, replay: next });
     } else if (r) {
-      chart.set({ ...base, bars: json.bars, replay: { ...r, all: json.bars, shown: 0 } });
+      chart.set({ ...base, bars: json.bars, replay: { ...r, all: json.bars, shown: 0, sub: 0 } });
     } else chart.set({ ...base, bars: json.bars });
   };
 
@@ -279,7 +283,8 @@ function createChartStore(slot: number): ChartStore {
       const symbolChanged = symbol !== state.symbol && (!asset || asset !== findAsset(state.symbol));
       if (symbolChanged) streamRefused = false;
       // A new time frame keeps the replay at the same moment; another asset ends it.
-      const replay = symbolChanged ? null : state.replay;
+      // The lower time frame of an intrabar replay belongs to the old one and is loaded again if wanted.
+      const replay = symbolChanged ? null : state.replay && interval !== state.interval ? { ...state.replay, intrabar: null, sub: 0 } : state.replay;
       chart.set({
         symbol,
         interval,
@@ -528,7 +533,7 @@ export function startReplay(chart: ChartStore = activeChart()) {
   for (const c of charts) if (c !== chart && c.get().replay) exitReplay(c);
   const shown = s.replay?.phase === "play" ? s.replay.shown : 0;
   chart.set({
-    replay: { id: newId("replay"), phase: "select", all, shown, playing: false, speed: s.replay?.speed ?? 1 },
+    replay: { id: newId("replay"), phase: "select", all, shown, playing: false, speed: s.replay?.speed ?? 1, intrabar: s.replay?.intrabar ?? null, sub: 0 },
     bars: shown ? all.slice(0, shown) : all,
     tool: "cursor",
   });
@@ -541,29 +546,33 @@ export function pickReplayStart(chart: ChartStore, time: number | "random") {
   const index = time === "random" ? randomStart(r.all.length) : barIndexAt(r.all, time);
   // At least one candle stays hidden to be played; when rewinding, a tap right of the cut stays at the cut.
   const shown = Math.max(1, Math.min(index + 1, r.all.length - 1, time === "random" || !r.shown ? Infinity : r.shown));
-  chart.set({ replay: { ...r, id: newId("replay"), phase: "play", shown, playing: false }, bars: r.all.slice(0, shown) });
+  chart.set({ replay: { ...r, id: newId("replay"), phase: "play", shown, sub: 0, playing: false }, bars: r.all.slice(0, shown) });
+  if (r.intrabar) void ensureIntrabar(chart);
 }
 
-/** Reveals the next candle(s); false when there is nothing more to show. */
+/** Reveals the next candle(s), or with intrabar the next part(s) of the coming candle; false when there is nothing more to show. */
 export function stepReplay(chart: ChartStore, count = 1): boolean {
   const r = chart.get().replay;
   if (!r || r.phase !== "play") return false;
-  const shown = Math.min(r.all.length, r.shown + count);
-  const more = shown < r.all.length;
-  if (shown === r.shown) {
+  const sub = r.intrabar?.bars ?? null;
+  let pos = { shown: r.shown, sub: r.sub };
+  for (let i = 0; i < count; i++) pos = nextReplayStep(r.all, pos.shown, pos.sub, sub);
+  const more = pos.shown < r.all.length;
+  if (pos.shown === r.shown && pos.sub === r.sub) {
     if (r.playing) chart.set({ replay: { ...r, playing: false } });
     return false;
   }
-  chart.set({ replay: { ...r, shown, playing: r.playing && more }, bars: r.all.slice(0, shown) });
+  chart.set({ replay: { ...r, ...pos, playing: r.playing && more }, bars: replayFrame(r.all, pos.shown, pos.sub, sub) });
+  if (r.intrabar) void ensureIntrabar(chart);
   return more;
 }
 
-/** Hides the last candle(s) again; at least one stays. */
+/** Hides the last candle(s) again (a half-built candle first); at least one stays. */
 export function stepBackReplay(chart: ChartStore, count = 1) {
   const r = chart.get().replay;
-  if (!r || r.phase !== "play" || r.shown <= 1) return;
-  const shown = Math.max(1, r.shown - count);
-  chart.set({ replay: { ...r, shown, playing: false }, bars: r.all.slice(0, shown) });
+  if (!r || r.phase !== "play" || (r.shown <= 1 && !r.sub)) return;
+  const shown = r.sub ? Math.max(1, r.shown - count + 1) : Math.max(1, r.shown - count);
+  chart.set({ replay: { ...r, shown, sub: 0, playing: false }, bars: r.all.slice(0, shown) });
 }
 
 export function setReplayPlaying(chart: ChartStore, playing: boolean) {
@@ -574,6 +583,59 @@ export function setReplayPlaying(chart: ChartStore, playing: boolean) {
 export function setReplaySpeed(chart: ChartStore, speed: number) {
   const r = chart.get().replay;
   if (r) chart.set({ replay: { ...r, speed } });
+}
+
+/**
+ * Intrabar replay: builds each coming candle step by step from candles of `interval` (lower than the chart's);
+ * null steps whole candles again. The lower time frame is loaded in chunks from the replay position on
+ * (Binance; other sources only have recent candles) and candles it does not cover yet come whole.
+ */
+export function setReplayIntrabar(chart: ChartStore, interval: string | null) {
+  const r = chart.get().replay;
+  if (!r) return;
+  chart.set({
+    replay: { ...r, intrabar: interval ? { interval, bars: [] } : null, sub: 0 },
+    ...(r.phase === "play" ? { bars: r.all.slice(0, r.shown) } : {}),
+  });
+  void ensureIntrabar(chart);
+}
+
+/** Lower-time-frame candles per request (Binance's maximum). */
+const INTRABAR_CHUNK = 1000;
+/** A new chunk is loaded when fewer lower-time-frame candles than this lie ahead of the replay. */
+const INTRABAR_AHEAD = 200;
+const intrabarLoading = new Set<number>();
+/** The chunk start last requested per chart: a source without older candles is not asked again and again. */
+const intrabarTried = new Map<number, string>();
+
+/** Loads the next chunk of the intrabar replay's lower time frame when the replay gets close to its end. */
+export async function ensureIntrabar(chart: ChartStore): Promise<void> {
+  const r = chart.get().replay;
+  const from = r?.all[r.shown]?.time;
+  if (!r?.intrabar || r.phase !== "play" || from === undefined || intrabarLoading.has(chart.slot)) return;
+  const { interval, bars } = r.intrabar;
+  const step = intervalSeconds(interval);
+  const last = bars[bars.length - 1]?.time ?? -Infinity;
+  const covered = bars.length > 0 && bars[0].time <= from && last >= Math.min(from + INTRABAR_AHEAD * step, r.all[r.all.length - 1].time);
+  if (covered) return;
+  intrabarLoading.add(chart.slot);
+  try {
+    // From the replay position (or the end of what is loaded) one chunk ahead.
+    const start = bars.length && bars[0].time <= from && last >= from ? last + step : from;
+    const key = `${interval}|${start}`;
+    if (intrabarTried.get(chart.slot) === key) return;
+    intrabarTried.set(chart.slot, key);
+    const data = await fetchMarketData(chart.get().symbol, interval, INTRABAR_CHUNK, start + INTRABAR_CHUNK * step);
+    const now = chart.get().replay;
+    if (!now?.intrabar || now.intrabar.interval !== interval) return;
+    const merged = new Map(now.intrabar.bars.map((b) => [b.time, b]));
+    for (const b of data.bars) merged.set(b.time, b);
+    chart.set({ replay: { ...now, intrabar: { interval, bars: [...merged.values()].sort((a, b) => a.time - b.time) } } });
+  } catch (err) {
+    console.warn(`[replay] intrabar ${interval}: ${(err as Error).message}`);
+  } finally {
+    intrabarLoading.delete(chart.slot);
+  }
 }
 
 /** Back to the live chart with all candles. */
@@ -597,14 +659,15 @@ export async function loadChart(symbol: string, interval: Interval): Promise<voi
   );
 }
 
-export async function fetchMarketData(symbol: string, interval: string, limit = 1000): Promise<MarketData> {
+/** `endTime` (unix seconds): candles up to that moment (Binance only; the intrabar replay loads its past this way). */
+export async function fetchMarketData(symbol: string, interval: string, limit = 1000, endTime?: number): Promise<MarketData> {
   // Spread charts (BTCUSDT/ETHUSDT): both symbols are loaded as usual and combined.
   const spread = parseSpread(symbol);
-  if (spread) return loadSpreadData(spread, interval, limit, fetchMarketData);
+  if (spread) return loadSpreadData(spread, interval, limit, (s, i, l) => fetchMarketData(s, i, l, endTime));
   // Without the Node server the browser fetches directly (Binance allows it; Yahoo does not, so stocks
   // use Binance perpetuals where one exists, see shared/assets.ts, and otherwise fall back to demo data).
   // With the user's exchange-feed key, stocks, indices and forex come from the exchange; without it (or on errors) as before.
-  const feed = feedFor(symbol);
+  const feed = endTime ? null : feedFor(symbol);
   if (feed) {
     try {
       return await loadFeedData(feed.id, feed.feed, interval, limit);
@@ -612,8 +675,8 @@ export async function fetchMarketData(symbol: string, interval: string, limit = 
       console.warn(`[market] twelvedata ${symbol} ${interval}: ${(err as Error).message}`);
     }
   }
-  if (STANDALONE) return loadMarketData(symbol, interval, limit);
-  const res = await fetch(`/api/klines?symbol=${encodeURIComponent(symbol)}&interval=${interval}&limit=${limit}`);
+  if (STANDALONE) return loadMarketData(symbol, interval, limit, endTime);
+  const res = await fetch(`/api/klines?symbol=${encodeURIComponent(symbol)}&interval=${interval}&limit=${limit}${endTime ? `&endTime=${endTime}` : ""}`);
   const json = await res.json();
   if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
   return json as MarketData;

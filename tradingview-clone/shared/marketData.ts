@@ -143,18 +143,19 @@ const SPOT_KLINES = ["https://api.binance.com/api/v3/klines", "https://data-api.
 // USDⓈ-M futures: besides crypto also TradFi perpetuals (gold, silver, oil, stocks) that trade 24/7.
 const FUTURES_KLINES = ["https://fapi.binance.com/fapi/v1/klines"];
 
-function fromBinance(symbol: string, interval: string, limit: number): Promise<Bar[]> {
-  return binanceKlines(SPOT_KLINES, symbol, interval, limit);
+function fromBinance(symbol: string, interval: string, limit: number, endTime?: number): Promise<Bar[]> {
+  return binanceKlines(SPOT_KLINES, symbol, interval, limit, endTime);
 }
 
-function fromBinanceFutures(symbol: string, interval: string, limit: number): Promise<Bar[]> {
-  return binanceKlines(FUTURES_KLINES, symbol, interval, limit);
+function fromBinanceFutures(symbol: string, interval: string, limit: number, endTime?: number): Promise<Bar[]> {
+  return binanceKlines(FUTURES_KLINES, symbol, interval, limit, endTime);
 }
 
 /** Most Binance requests (1000 klines each) for one merged time frame, e.g. 30 s candles from 1 s klines. */
 const MAX_PAGES = 5;
 
-async function binanceKlines(urls: string[], symbol: string, interval: string, limit: number): Promise<Bar[]> {
+/** `endTime` (unix seconds): the candles up to that moment instead of the newest. */
+async function binanceKlines(urls: string[], symbol: string, interval: string, limit: number, endTime?: number): Promise<Bar[]> {
   const source = binanceInterval(interval);
   if (!BINANCE_NATIVE.includes(source)) throw new Error(`Binance unterstützt ${interval} nicht`);
   const merged = source !== interval && interval !== "all";
@@ -168,7 +169,7 @@ async function binanceKlines(urls: string[], symbol: string, interval: string, l
     try {
       let bars: Bar[] = [];
       for (let page = 0; page < pages; page++) {
-        const end = bars.length ? `&endTime=${bars[0].time * 1000 - 1}` : "";
+        const end = bars.length ? `&endTime=${bars[0].time * 1000 - 1}` : endTime ? `&endTime=${Math.floor(endTime) * 1000 - 1}` : "";
         const rows = (await fetchJson(`${url}?${query}${end}`)) as unknown[][];
         const chunk = rows.map((r) => ({
           time: Math.floor(Number(r[0]) / 1000),
@@ -294,11 +295,12 @@ export function demoBars(symbol: string, interval: string, limit: number): Bar[]
   return bars;
 }
 
-export async function loadMarketData(rawSymbol: string, interval: string, limit = 1000): Promise<MarketData> {
+/** `endTime` (unix seconds) loads older candles up to that moment; only Binance supports it, other sources return the newest. */
+export async function loadMarketData(rawSymbol: string, interval: string, limit = 1000, endTime?: number): Promise<MarketData> {
   const symbol = rawSymbol.trim().toUpperCase();
   if (!isValidInterval(interval)) throw new Error(`Unbekannte Zeiteinheit: ${interval}`);
-  const spot: [MarketData["source"], () => Promise<Bar[]>] = ["binance", () => fromBinance(symbol, interval, limit)];
-  const futures: [MarketData["source"], () => Promise<Bar[]>] = ["binance_futures", () => fromBinanceFutures(symbol, interval, limit)];
+  const spot: [MarketData["source"], () => Promise<Bar[]>] = ["binance", () => fromBinance(symbol, interval, limit, endTime)];
+  const futures: [MarketData["source"], () => Promise<Bar[]>] = ["binance_futures", () => fromBinanceFutures(symbol, interval, limit, endTime)];
   const yahoo: [MarketData["source"], () => Promise<Bar[]>] = ["yahoo", () => fromYahoo(symbol, interval, limit)];
   // XAUUSDT, CLUSDT, TSLAUSDT … only exist as Binance futures, so they come after spot.
   // Second candles exist only as Binance spot klines.
