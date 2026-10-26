@@ -207,12 +207,19 @@ function VersionBadge() {
   );
 }
 
+const SYNC_OPTIONS: { key: "syncSymbol" | "syncInterval" | "syncCrosshair" | "syncTime"; label: string; tip: string }[] = [
+  { key: "syncSymbol", label: "Symbol", tip: "Ein neues Asset im aktiven Chart öffnet es in allen Charts" },
+  { key: "syncInterval", label: "Zeiteinheit", tip: "Eine neue Zeiteinheit gilt für alle Charts" },
+  { key: "syncCrosshair", label: "Fadenkreuz", tip: "Das Fadenkreuz steht in allen Charts auf demselben Zeitpunkt" },
+  { key: "syncTime", label: "Zeitbereich", tip: "Scrollen und Zoomen im aktiven Chart zeigt in allen Charts denselben Zeitraum" },
+];
+
 function LayoutMenu() {
   const layout = useWorkspace((w) => w.layout);
-  const sync = useWorkspace((w) => w.syncInterval);
+  const w = useWorkspace((x) => x);
   const current = LAYOUTS.find((l) => l.id === layout) ?? LAYOUTS[0];
   return (
-    <Menu label={current.icon} className="layout-button" ariaLabel="Chart-Layout" tip={"Chart-Layout\nMehrere Charts gleichzeitig (bis zu 4)\nDer angetippte Chart ist aktiv"}>
+    <Menu label={current.icon} className="layout-button" ariaLabel="Chart-Layout" tip={"Chart-Layout\nMehrere Charts gleichzeitig (bis zu 8)\nDer angetippte Chart ist aktiv"}>
       {(close) => (
         <>
           <div className="menu-title">Layout</div>
@@ -229,10 +236,13 @@ function LayoutMenu() {
               {l.label}
             </button>
           ))}
-          <label className="menu-check">
-            <input type="checkbox" checked={sync} onChange={(e) => workspace.set({ syncInterval: e.target.checked })} />
-            Zeiteinheit in allen Charts synchron
-          </label>
+          <div className="menu-title">In allen Charts synchron</div>
+          {SYNC_OPTIONS.map((o) => (
+            <label key={o.key} className="menu-check" data-tip={o.tip}>
+              <input type="checkbox" checked={w[o.key]} onChange={(e) => workspace.set({ [o.key]: e.target.checked })} />
+              {o.label}
+            </label>
+          ))}
         </>
       )}
     </Menu>

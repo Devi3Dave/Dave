@@ -418,6 +418,46 @@ textarea {
   grid-template-rows: 1fr 1fr;
 }
 
+.charts.layout-3h {
+  grid-template-columns: 1fr 1fr 1fr;
+}
+
+.charts.layout-6 {
+  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+}
+
+.charts.layout-8 {
+  grid-template-columns: 1fr 1fr 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+}
+
+/* Narrow cells: the legend wraps inside its chart instead of running into the neighbour. */
+.charts.layout-3h .chart-cell,
+.charts.layout-6 .chart-cell,
+.charts.layout-8 .chart-cell {
+  overflow: hidden;
+}
+
+.charts.layout-3h .legend-row.main > span,
+.charts.layout-6 .legend-row.main > span,
+.charts.layout-8 .legend-row.main > span {
+  white-space: normal;
+}
+
+/* Upright iPad: six and eight charts stack two wide. */
+@media (max-width: 900px) {
+  .charts.layout-6 {
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: repeat(3, 1fr);
+  }
+
+  .charts.layout-8 {
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: repeat(4, 1fr);
+  }
+}
+
 .chart-cell {
   position: relative;
   min-width: 0;
