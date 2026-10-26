@@ -98,6 +98,18 @@ export const BUILTIN_TEMPLATES: Template[] = [
     description: "Kerzenmuster, Chartformationen, Volumen",
     chart: { indicators: [ind("volume"), ind("candlepatterns"), ind("chartpatterns")] },
   },
+  {
+    // Quellen: Craig Percoco, "My Trading Strategy is Boring But Made Me $18,565 (Step By Step)"
+    // (youtube.com/watch?v=c5ATdFHneJo) – 15m-FVGs vor dem New-York-Open markieren, Einstieg nach
+    // Change of Character + FVG auf 1m; RSI-Überkauft/Überverkauft aus seinem Einsteiger-Tutorial
+    // "How to Start Day Trading as a Beginner". Seine bezahlten Layout-Einstellungen sind nicht öffentlich.
+    id: "builtin-percoco",
+    name: "Craig Percoco",
+    kind: "chart",
+    builtin: true,
+    description: "15m · Fair Value Gaps, RSI 14 (70/30) – Einstieg auf 1m wechseln",
+    chart: { interval: "15m", chartType: "candles", indicators: [ind("fvg"), ind("rsi", { length: 14 })] },
+  },
 ];
 
 const KEY = "chartai.templates.v1";
