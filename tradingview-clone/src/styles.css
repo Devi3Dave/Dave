@@ -247,6 +247,15 @@ textarea {
 
 .asset-dialog {
   height: 80vh;
+  height: 80dvh;
+}
+
+/* Short screens (iPad landscape with keyboard, phone): the hint scrolls on its own so the list keeps its room. */
+@media (max-height: 700px) {
+  .asset-dialog > .hint {
+    max-height: 4.5em;
+    overflow-y: auto;
+  }
 }
 
 .indicator-list h3 .count {
@@ -1041,6 +1050,14 @@ textarea {
   flex-direction: column;
   padding: 12px;
   gap: 8px;
+  /* Dialogs without their own list scroll as a whole instead of spilling over. */
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* Title, search and buttons keep their size, only the list in between shrinks. */
+.modal > :not(.indicator-list, .settings-body) {
+  flex-shrink: 0;
 }
 
 .modal.small {
@@ -1063,7 +1080,12 @@ textarea {
 }
 
 .indicator-list {
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  /* Room for Safari's overlay scrollbar, which would otherwise cover the stars on the right. */
+  padding-right: 10px;
 }
 
 .indicator-list h3 {
@@ -1084,6 +1106,7 @@ textarea {
 }
 
 .fav-star {
+  flex-shrink: 0;
   font-size: 16px;
   color: var(--muted);
   padding: 6px 8px;
@@ -1096,6 +1119,7 @@ textarea {
 .indicator-item {
   display: grid;
   grid-template-columns: 1fr auto;
+  column-gap: 10px;
   width: 100%;
   text-align: left;
   padding: 6px 8px;
@@ -1376,12 +1400,6 @@ select,
   max-height: calc(100dvh - 32px);
 }
 
-/* Head and buttons stay put, only the content in between scrolls. */
-.settings-modal .modal-head,
-.settings-modal .modal-actions {
-  flex-shrink: 0;
-}
-
 .settings-body {
   flex: 1 1 auto;
   min-height: 0;
@@ -1391,7 +1409,7 @@ select,
   display: flex;
   flex-direction: column;
   gap: 14px;
-  padding-right: 4px;
+  padding-right: 10px;
   /* Shadows at the top/bottom edge show that there is more to scroll
      (Safari hides the scrollbar until you scroll). */
   background:
@@ -1850,8 +1868,10 @@ select,
   z-index: 40;
   width: 300px;
   max-height: 70vh;
+  max-height: 70dvh;
   overflow-y: auto;
-  padding: 6px;
+  overscroll-behavior: contain;
+  padding: 6px 10px 6px 6px;
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 6px;
