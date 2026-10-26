@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { INDICATORS, getIndicator, resolveParams, type IndicatorCategory, type IndicatorDef } from "../../shared/indicators";
+import { INDICATORS, SOURCE_INDICATORS, getIndicator, indicatorLabel, resolveParams, type IndicatorCategory, type IndicatorDef } from "../../shared/indicators";
 import { toggleFavorite, useFavorites } from "../favorites";
 import { addIndicator, updateIndicator, useChartState } from "../store";
 
@@ -73,9 +73,20 @@ export function IndicatorDialog({ onClose }: { onClose: () => void }) {
 
 export function IndicatorSettings({ id, onClose }: { id: string; onClose: () => void }) {
   const inst = useChartState((s) => s.indicators.find((i) => i.id === id));
+  const all = useChartState((s) => s.indicators);
   const def = inst ? getIndicator(inst.type) : undefined;
   if (!inst || !def) return null;
   const params = resolveParams(def, inst.params);
+  // Lines of the indicators above this one can be its input (TradingView's "Source").
+  const sources = SOURCE_INDICATORS.has(def.id)
+    ? all.slice(0, all.indexOf(inst)).flatMap((other) => {
+        const d = getIndicator(other.type);
+        if (!d) return [];
+        const name = indicatorLabel(d, resolveParams(d, other.params));
+        const lines = d.outputs.filter((o) => !o.helper && !o.sparse);
+        return lines.map((o) => ({ value: `${other.id}:${o.key}`, label: lines.length > 1 ? `${name} · ${o.label}` : name }));
+      })
+    : [];
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -87,6 +98,25 @@ export function IndicatorSettings({ id, onClose }: { id: string; onClose: () => 
           </button>
         </div>
         <div className="settings-grid">
+          {sources.length > 0 && (
+            <label>
+              Quelle
+              <select
+                value={inst.source ? `${inst.source.id}:${inst.source.output}` : ""}
+                onChange={(e) => {
+                  const [sid, output] = e.target.value.split(":");
+                  updateIndicator(id, { source: e.target.value ? { id: sid, output } : undefined });
+                }}
+              >
+                <option value="">Schlusskurs</option>
+                {sources.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           {def.params.map((p) => (
             <label key={p.key}>
               {p.label}

@@ -8,6 +8,7 @@ import type { Bar } from "../shared/math";
 import type { PositionInput } from "../shared/position";
 import { barIndexAt, carryReplay, nextReplayStep, randomStart, replayFrame } from "../shared/replay";
 import { loadSpreadData, parseSpread } from "../shared/spread";
+import type { IndicatorSourceRef } from "../shared/indicators";
 import type { CHART_TYPES, CustomInterval, INTERVALS } from "../shared/tools";
 import { DEFAULT_SETTINGS, type ChartSettings } from "./chartSettings";
 import { STANDALONE } from "./config";
@@ -67,6 +68,8 @@ export interface IndicatorInstance {
   colors?: string[];
   hidden?: boolean;
   author: Author;
+  /** Computed on another indicator's line instead of the close (TradingView's "Source"). */
+  source?: IndicatorSourceRef;
 }
 
 export type Tool = "cursor" | "trendline" | "ray" | "hline" | "vline" | "zone" | "fib" | "text" | "fibext" | "channel" | "measure" | "brush" | "long" | "short" | "erase";
@@ -475,8 +478,8 @@ export function updateSettings(patch: Partial<ChartSettings>) {
   store.set((s) => ({ settings: { ...s.settings, ...patch } }));
 }
 
-export function addIndicator(type: string, params: Record<string, number>, author: Author, colors?: string[]): IndicatorInstance {
-  const inst: IndicatorInstance = { id: newId(type), type, params, author, colors };
+export function addIndicator(type: string, params: Record<string, number>, author: Author, colors?: string[], source?: IndicatorSourceRef): IndicatorInstance {
+  const inst: IndicatorInstance = { id: newId(type), type, params, author, colors, ...(source ? { source } : {}) };
   store.set((s) => ({ indicators: [...s.indicators, inst] }));
   return inst;
 }
@@ -485,8 +488,14 @@ export function updateIndicator(id: string, patch: Partial<IndicatorInstance>) {
   store.set((s) => ({ indicators: s.indicators.map((i) => (i.id === id ? { ...i, ...patch } : i)) }));
 }
 
+/** Removes an indicator together with the indicators computed on its lines. */
 export function removeIndicator(id: string) {
-  store.set((s) => ({ indicators: id === "all" ? [] : s.indicators.filter((i) => i.id !== id) }));
+  store.set((s) => {
+    if (id === "all") return { indicators: [] };
+    const gone = new Set([id]);
+    for (const i of s.indicators) if (i.source && gone.has(i.source.id)) gone.add(i.id);
+    return { indicators: s.indicators.filter((i) => !gone.has(i.id)) };
+  });
 }
 
 export function addDrawing(d: Drawing) {

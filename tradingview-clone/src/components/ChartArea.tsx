@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { displayBars, isPriceDriven } from "../../shared/chartTypes";
-import { indicatorLabel } from "../../shared/indicators";
+import { SOURCE_INDICATORS, indicatorLabel } from "../../shared/indicators";
 import { ChartEngine, type ComputedIndicator, type PointerEvent } from "../chart/ChartEngine";
 import { alertLinesFor, alertStore } from "../alerts";
 import { useCompareData } from "../compare";
@@ -546,6 +546,10 @@ export function ChartArea({ chart, onEngine, magnet, onEditIndicator, onEditPosi
         <div className="legend-row indicator" key={c.instance.id}>
           <span className={`legend-name ${c.instance.hidden ? "muted" : ""}`}>
             {indicatorLabel(c.def, c.params)}
+            {c.instance.source && (() => {
+              const src = computed.find((x) => x.instance.id === c.instance.source!.id);
+              return src && SOURCE_INDICATORS.has(c.def.id) ? <span className="legend-source"> auf {indicatorLabel(src.def, src.params)}</span> : null;
+            })()}
             {c.instance.author === "claude" && <span className="by-claude" data-tip="Von Claude hinzugefügt">✦</span>}
           </span>
           {!c.instance.hidden &&

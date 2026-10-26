@@ -1,4 +1,4 @@
-import { getIndicator, indicatorLabel, resolveParams } from "../../shared/indicators";
+import { computeInstances, indicatorLabel } from "../../shared/indicators";
 import type { Bar } from "../../shared/math";
 import type { ChartEngine } from "../chart/ChartEngine";
 import { positionStats } from "../../shared/position";
@@ -85,11 +85,7 @@ export function buildChartState(s: ChartState, engine: ChartEngine | null, recen
 
   lines.push("\nAktive Indikatoren:");
   if (s.indicators.length === 0) lines.push("- keine");
-  for (const inst of s.indicators) {
-    const def = getIndicator(inst.type);
-    if (!def) continue;
-    const params = resolveParams(def, inst.params);
-    const out = def.compute(bars, params);
+  for (const { instance: inst, def, params, outputs: out, sourced } of computeInstances(s.indicators, bars)) {
     const values = def.outputs
       .filter((o) => !o.helper)
       .map((o) => {
@@ -97,7 +93,8 @@ export function buildChartState(s: ChartState, engine: ChartEngine | null, recen
         return `${o.key}=${num(arr[arr.length - 1])} (vorher ${num(arr[arr.length - 2])})`;
       })
       .join(", ");
-    lines.push(`- id=${inst.id} ${indicatorLabel(def, params)} [${inst.author === "claude" ? "von dir" : "vom Nutzer"}${inst.hidden ? ", ausgeblendet" : ""}]: ${values}`);
+    const on = sourced && inst.source ? ` auf ${inst.source.id}.${inst.source.output}` : "";
+    lines.push(`- id=${inst.id} ${indicatorLabel(def, params)}${on} [${inst.author === "claude" ? "von dir" : "vom Nutzer"}${inst.hidden ? ", ausgeblendet" : ""}]: ${values}`);
   }
 
   lines.push("\nZeichnungen:");

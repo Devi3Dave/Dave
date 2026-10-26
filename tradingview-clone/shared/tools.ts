@@ -44,6 +44,12 @@ export const toolSchemas = {
       indicator,
       params: params.optional(),
       colors: z.array(color).optional().describe("Optionale Farben je Ausgabelinie in der Reihenfolge der Ausgaben."),
+      source: z
+        .object({ id: z.string().describe("Instanz-ID des Quell-Indikators im Chart."), output: z.string().describe("Ausgabe-Key, z. B. value, macd, signal.") })
+        .optional()
+        .describe(
+          "Indikator auf Indikator (wie TradingViews „Quelle“): berechnet z. B. einen SMA oder Bollinger-Bänder auf der RSI-Linie statt auf dem Schlusskurs; wird im Panel der Quelle gezeichnet. Nur für Indikatoren mit einer Kurs-Eingabe (Durchschnitte, BB, RSI, MACD, ROC …).",
+        ),
     }),
   },
   remove_indicator: {
