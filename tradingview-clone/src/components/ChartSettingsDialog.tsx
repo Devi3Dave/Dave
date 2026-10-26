@@ -114,6 +114,11 @@ export function ChartSettingsDialog({ onClose }: { onClose: () => void }) {
           <section>
             <h3>Krypto</h3>
             <Toggle settingKey="liveLiquidations" label="Live-Liquidationen im Chart" tip="Echte Liquidationen von Binance Futures als Blasen (rot = Longs, grün = Shorts)" />
+            <Toggle
+              settingKey="footprint"
+              label="Footprint (Kauf/Verkauf je Preis)"
+              tip={"Jede Kerze in Preiszeilen: links verkauftes, rechts gekauftes Volumen, POC orange, Delta darunter\nAus Binance-Kerzen einer kleineren Zeiteinheit (Taker-Kaufvolumen); hineinzoomen für Zahlen"}
+            />
           </section>
 
           <section>

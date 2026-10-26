@@ -26,6 +26,7 @@ import {
 } from "lightweight-charts";
 import { displayBars, hollowStyle, isPriceDriven } from "../../shared/chartTypes";
 import { alignCompare } from "../../shared/compare";
+import { buildFootprints, footprintRowSize } from "../../shared/footprint";
 import { SOURCE_INDICATORS, computeIndicator, getIndicator, resolveParams, type IndicatorDef, type OutputDef } from "../../shared/indicators";
 import { heikinAshi, type Bar, type Series } from "../../shared/math";
 import { barIndexAt } from "../../shared/replay";
@@ -41,6 +42,7 @@ import type { LiveLiquidation } from "../market/liquidationFeed";
 import { AxisLabelsPrimitive } from "./AxisLabelsPrimitive";
 import { BandFillPrimitive, type BandPoint } from "./BandFillPrimitive";
 import { DrawingsPrimitive } from "./DrawingsPrimitive";
+import { FootprintPrimitive } from "./FootprintPrimitive";
 import { HeatmapPrimitive } from "./HeatmapPrimitive";
 import { LiquidationBubblesPrimitive } from "./LiquidationBubblesPrimitive";
 import { PatternsPrimitive } from "./PatternsPrimitive";
@@ -108,6 +110,7 @@ export class ChartEngine {
   private readonly liquidationBubbles = new LiquidationBubblesPrimitive();
   private readonly patterns = new PatternsPrimitive((t) => this.timeToXInterpolated(t));
   private readonly sessions = new SessionsPrimitive((t) => this.timeToXInterpolated(t));
+  private readonly footprint = new FootprintPrimitive();
   private exchangeIds: string[] = [];
   private sessionKey = "";
   private patternMarkers: SeriesMarker<Time>[] = [];
@@ -119,6 +122,8 @@ export class ChartEngine {
   private interval = "1h";
   private tradeLines: TradeLine[] = [];
   private tradeLineApis: IPriceLine[] = [];
+  private footprintSub: Bar[] | null = null;
+  private footprintKey = "";
   private compareInput: { symbol: string; color: string; bars: Bar[] }[] = [];
   private compareSeries = new Map<string, { series: ISeriesApi<"Line">; side: string }>();
   private compareKey = "";
@@ -434,6 +439,24 @@ export class ChartEngine {
       this.applyMarkers();
     }
     this.syncCompare();
+    this.syncFootprint();
+  }
+
+  /** Lower-time-frame candles for the footprint (null: off). */
+  setFootprint(sub: Bar[] | null) {
+    this.footprintSub = sub;
+    this.syncFootprint();
+  }
+
+  private syncFootprint() {
+    const sub = this.chartType && isPriceDriven(this.chartType) ? null : this.footprintSub;
+    const bars = this.bars;
+    const last = bars[bars.length - 1];
+    const key = sub ? `${sub.length}|${sub[sub.length - 1]?.time}|${bars.length}|${last?.time}|${last?.close}` : "";
+    if (key === this.footprintKey) return;
+    this.footprintKey = key;
+    // Rows are sized from the candles (about 12 per typical candle), like TradingView's automatic row size.
+    this.footprint.setData(sub ? buildFootprints(bars, sub, footprintRowSize(bars)) : [], bars);
   }
 
   /** Symbols drawn over the chart for comparison; the price scale shows percent while there are any. */
@@ -476,6 +499,7 @@ export class ChartEngine {
       this.main.detachPrimitive(this.liquidationBubbles);
       this.main.detachPrimitive(this.patterns);
       this.main.detachPrimitive(this.sessions);
+      this.main.detachPrimitive(this.footprint);
       this.markersApi?.detach();
       this.chart.removeSeries(this.main);
     }
@@ -529,6 +553,7 @@ export class ChartEngine {
     this.main.attachPrimitive(this.liquidationBubbles);
     this.main.attachPrimitive(this.patterns);
     this.main.attachPrimitive(this.sessions);
+    this.main.attachPrimitive(this.footprint);
     this.markersApi = createSeriesMarkers(this.main, []);
     // Price lines belong to the series; the new one gets them again.
     this.tradeLineApis = [];
