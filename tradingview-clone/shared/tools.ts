@@ -192,6 +192,28 @@ export const toolSchemas = {
       "Liefert die geschätzten Liquidations-Cluster (Heatmap-Modell aus Volumen und 10×–100× Hebel) über und unter dem Kurs sowie die echten Live-Liquidationen von Binance Futures seit App-Start.",
     schema: z.object({}),
   },
+  create_alert: {
+    description:
+      "Legt einen Alarm für das aktuelle Symbol und die Zeiteinheit an (wie TradingView): Kurs oder eine Indikatorlinie gegen einen Wert bzw. einen Kanal. Der Nutzer bekommt Hinweis und Ton, solange die App offen ist.",
+    schema: z.object({
+      condition: z.enum(["crossing", "crossing_up", "crossing_down", "greater", "less", "entering", "exiting"]).describe("entering/exiting brauchen value und value2 (Kanal)."),
+      value: z.number().describe("Preis bzw. Indikatorwert; beim Kanal eine Kante."),
+      value2: z.number().optional().describe("Zweite Kanalkante für entering/exiting."),
+      indicator: indicator.optional().describe("Statt des Kurses eine Indikatorlinie überwachen."),
+      params: params.optional(),
+      output: z.string().optional().describe("Ausgabe des Indikators (z. B. 'rsi'), Standard: erste Linie."),
+      frequency: z.enum(["once", "per_bar", "per_bar_close"]).optional().describe("Standard: once"),
+      message: z.string().optional(),
+    }),
+  },
+  list_alerts: {
+    description: "Listet alle Alarme (aktiv und pausiert) und die zuletzt ausgelösten.",
+    schema: z.object({}),
+  },
+  delete_alert: {
+    description: "Löscht einen Alarm per ID.",
+    schema: z.object({ id: z.string() }),
+  },
   take_screenshot: {
     description: "Macht ein Bild des aktuellen Charts inkl. Indikatoren und Zeichnungen, um das Ergebnis visuell zu prüfen.",
     schema: z.object({}),

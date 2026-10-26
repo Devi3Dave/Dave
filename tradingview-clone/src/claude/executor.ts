@@ -1,4 +1,5 @@
 import type Anthropic from "@anthropic-ai/sdk";
+import { describeAlert, isChannelCondition } from "../../shared/alerts";
 import { getIndicator, indicatorLabel, resolveParams } from "../../shared/indicators";
 import type { Bar } from "../../shared/math";
 import { fairValueGaps } from "../../shared/fvg";
@@ -9,6 +10,7 @@ import { orderBlocks } from "../../shared/orderblocks";
 import { autoFibonacci, detectCandlePatterns, detectFormations } from "../../shared/patterns";
 import { isValidPosition, positionStats } from "../../shared/position";
 import { toolSchemas, type ToolInput, type ToolName } from "../../shared/tools";
+import { alertStore, createAlert, deleteAlert } from "../alerts";
 import type { ChartEngine } from "../chart/ChartEngine";
 import { DEFAULT_FIBEXT_LEVELS, DEFAULT_FIB_LEVELS } from "../chart/DrawingsPrimitive";
 import { lastPositionDefaults } from "../components/PositionDialog";
@@ -436,6 +438,46 @@ async function run(name: ToolName, input: unknown, engine: ChartEngine | null): 
         live_totals: { long_5m: num(t5.long), short_5m: num(t5.short), long_1h: num(t60.long), short_1h: num(t60.short) },
         recent: feed.items.slice(-15).map((l) => ({ time: iso(l.time), side: l.side, price: num(l.price), notional: num(l.notional) })),
       });
+    }
+
+    case "create_alert": {
+      const i = input as ToolInput<"create_alert">;
+      const channel = isChannelCondition(i.condition);
+      if (channel && i.value2 === undefined) return fail("entering/exiting brauchen value2 (zweite Kanalkante)");
+      let source: Parameters<typeof createAlert>[0]["source"] = { kind: "price" };
+      if (i.indicator) {
+        const def = getIndicator(i.indicator)!;
+        const p = resolveParams(def, i.params);
+        const out = def.outputs.find((o) => o.key === (i.output ?? def.outputs.find((x) => !x.helper && !x.sparse)?.key));
+        if (!out) return fail(`${def.name} hat keine Ausgabe ${i.output}; verfügbar: ${def.outputs.map((o) => o.key).join(", ")}`);
+        const label = indicatorLabel(def, p) + (def.outputs.length > 1 ? ` · ${out.label}` : "");
+        source = { kind: "indicator", type: def.id, params: p, output: out.key, label };
+      }
+      const a = createAlert({
+        symbol: s.symbol,
+        interval: s.interval,
+        source,
+        condition: i.condition,
+        target: channel ? { kind: "channel", top: Math.max(i.value, i.value2!), bottom: Math.min(i.value, i.value2!) } : { kind: "value", value: i.value },
+        frequency: i.frequency ?? "once",
+        message: i.message ?? "",
+      });
+      return ok(`Alarm: ${describeAlert(a)}`, { id: a.id, alert: describeAlert(a), interval: a.interval, frequency: a.frequency });
+    }
+
+    case "list_alerts": {
+      const { alerts, log } = alertStore.get();
+      return ok(`${alerts.length} Alarme`, {
+        alerts: alerts.map((a) => ({ id: a.id, alert: describeAlert(a), interval: a.interval, frequency: a.frequency, active: a.active, message: a.message || undefined })),
+        recently_fired: log.slice(-10).map((e) => ({ time: iso(Math.floor(e.at / 1000)), alert: e.text, value: num(e.value) })),
+      });
+    }
+
+    case "delete_alert": {
+      const { id } = input as ToolInput<"delete_alert">;
+      if (!alertStore.get().alerts.some((a) => a.id === id)) return fail(`Kein Alarm mit id=${id}`);
+      deleteAlert(id);
+      return ok("Alarm gelöscht", "ok");
     }
 
     case "take_screenshot": {

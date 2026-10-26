@@ -13,6 +13,7 @@ import {
   showAllDrawings,
   undoDrawings,
 } from "../drawingEdit";
+import { createAlert, openAlertsPanel, targetOf } from "../alerts";
 import { drawingName } from "../drawingOps";
 import { useChart, type ChartStore, type Drawing, type LineStyleName } from "../store";
 
@@ -172,6 +173,27 @@ export function DrawingMenu({ chart, target, onClose, onMove, onEditPosition }: 
       )}
 
       <div className="ctx-sep" />
+      {targetOf(d) && (
+        <Item
+          icon="🔔"
+          onClick={act(() => {
+            const s = chart.get();
+            createAlert({
+              symbol: s.symbol,
+              interval: s.interval,
+              source: { kind: "price" },
+              condition: d.kind === "zone" ? "entering" : "crossing",
+              target: targetOf(d)!,
+              frequency: "once",
+              message: d.label ?? "",
+              drawing: { slot: chart.slot, id: d.id },
+            });
+            openAlertsPanel();
+          })}
+        >
+          Alarm hinzufügen
+        </Item>
+      )}
       {d.kind === "position" && (
         <Item icon="⚙" onClick={act(() => onEditPosition(d.id))}>
           Einstellungen …

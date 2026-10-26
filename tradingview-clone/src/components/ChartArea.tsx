@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { indicatorLabel } from "../../shared/indicators";
 import { ChartEngine, type ComputedIndicator, type PointerEvent } from "../chart/ChartEngine";
+import { alertLinesFor, alertStore } from "../alerts";
 import { demo, dropLevel, replayPositionsOpen, tradeLinesFor, type LineDraft } from "../demoAccount";
 import { getSelectedExchanges, subscribeExchanges } from "../exchangeSelection";
 import { liquidationFeed } from "../market/liquidationFeed";
@@ -404,7 +405,8 @@ export function ChartArea({ chart, onEngine, magnet, onEditIndicator, onEditPosi
     // Open demo positions of this chart's symbol.
     // A stop or target line being dragged: shown at the finger, saved on release.
     let lineDraft: LineDraft | null = null;
-    const pushTradeLines = () => engine.setTradeLines(tradeLinesFor(chart.get().symbol, chart.slot, lineDraft));
+    // Alert levels of this symbol join them as dashed lines.
+    const pushTradeLines = () => engine.setTradeLines([...tradeLinesFor(chart.get().symbol, chart.slot, lineDraft), ...(chart.get().replay ? [] : alertLinesFor(chart.get().symbol))]);
     let lineErrorTimer = 0;
     engine.onTradeLineDrag = (phase, dragId, price) => {
       lineDraft = phase === "move" ? { dragId, price } : null;
@@ -418,6 +420,7 @@ export function ChartArea({ chart, onEngine, magnet, onEditIndicator, onEditPosi
     pushTradeLines();
     const unsubscribeDemo = demo.subscribe(pushTradeLines);
     const unsubscribeDemoChart = chart.subscribe(pushTradeLines);
+    const unsubscribeAlerts = alertStore.subscribe(pushTradeLines);
     engine.setExchanges(getSelectedExchanges());
     const unsubscribeExchanges = subscribeExchanges(() => engine.setExchanges(getSelectedExchanges()));
     const ro = new ResizeObserver(() => requestAnimationFrame(refreshLayout));
@@ -474,6 +477,7 @@ export function ChartArea({ chart, onEngine, magnet, onEditIndicator, onEditPosi
       unsubscribeExchanges();
       unsubscribeDemo();
       unsubscribeDemoChart();
+      unsubscribeAlerts();
       window.clearTimeout(lineErrorTimer);
       onEngine(chart.slot, null);
       engine.destroy();

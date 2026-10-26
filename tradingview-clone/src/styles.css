@@ -3242,3 +3242,91 @@ select,
     transform: rotate(360deg);
   }
 }
+
+/* ---------- alerts ---------- */
+
+.al-count {
+  margin-left: 4px;
+  padding: 0 5px;
+  border-radius: 8px;
+  background: #ff9800;
+  color: #000;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.al-row {
+  display: flex;
+  gap: 6px;
+}
+
+.al-row select {
+  flex: 1;
+  min-width: 0;
+  padding: 6px;
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+.al-submit {
+  width: 100%;
+  margin-top: 8px;
+  padding: 8px;
+}
+
+.al-submit:disabled {
+  opacity: 0.5;
+}
+
+.al-notice {
+  margin-top: 6px;
+}
+
+.al-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+}
+
+.al-item.off {
+  opacity: 0.55;
+}
+
+.al-item-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.al-log {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.al h3 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.al-clear {
+  margin-left: auto;
+  font-size: 11px;
+}
+
+.al-toasts {
+  top: auto;
+  bottom: 48px;
+}
+
+.al-toast {
+  border-color: #ff9800;
+}
