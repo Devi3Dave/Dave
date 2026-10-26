@@ -6,7 +6,8 @@
 
 import { findAsset } from "./assets";
 import { getExchange, holidayName, marketStatus, tradingDays, wallTime, zoneOffset, zonedToUtc, type Exchange } from "./exchanges";
-import { intervalSeconds, bucketTime, isCalendarInterval, type MarketData } from "./marketData";
+import { intervalSeconds, bucketTime, isCalendarInterval, isCryptoSymbol, type MarketData } from "./marketData";
+import { parseSpread, spreadSymbols } from "./spread";
 
 export type Level = "ok" | "warn" | "bad" | "info";
 
@@ -78,6 +79,12 @@ function exchangeRef(id: string): MarketRef {
 
 /** Where the underlying of a symbol trades: around the clock, 24/5, or on an exchange with its own hours. */
 export function referenceMarket(symbol: string, source: MarketData["source"] | null): MarketRef {
+  // A spread trades when its first symbol trades.
+  const spread = parseSpread(symbol);
+  if (spread) {
+    const first = spreadSymbols(spread)[0];
+    return referenceMarket(first, isCryptoSymbol(first) ? "binance" : null);
+  }
   const asset = findAsset(symbol);
   if (source === "binance" || asset?.category === "Krypto" || (!asset && source === "binance_futures")) return { kind: "24/7", label: "Krypto (rund um die Uhr)" };
   const id = asset?.id ?? symbol;
@@ -228,6 +235,7 @@ const SOURCE_LABEL: Record<MarketData["source"], string> = {
   binance_futures: "Binance USDⓈ-M Perpetual",
   yahoo: "Yahoo Finance",
   twelvedata: "Twelve Data (Börsenkurs)",
+  spread: "Spread (aus zwei Symbolen berechnet)",
   demo: "Demo-Daten",
 };
 

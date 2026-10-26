@@ -111,6 +111,11 @@ und zusammen mit der Fill & Sign-App auf GitHub Pages veröffentlicht.
   CSV“ (oder ⚙ Chart-Einstellungen). Die Tabelle enthält Zeit (UTC und Unix), OHLC, Volumen und jede sichtbare
   Indikatorlinie, so wie der Chart sie zeigt (Renko-Steine, im Replay bis zur aktuellen Kerze); Semikolon und
   Dezimalkomma für Excel/Numbers, auf dem iPad über „In Dateien sichern“
+- Symbole vergleichen wie bei TradingView (⊕ neben der Suche): bis zu 5 weitere Kurse als Linien über dem Chart,
+  die Preisachse zeigt dann Prozent ab der ersten sichtbaren Kerze; ✕ in der Legende entfernt einen Vergleich
+- Spread-Charts: in der Suche zwei Symbole mit / - + * verbinden, z. B. `BTCUSDT/ETHUSDT` (Verhältnis),
+  `BTCUSDT - ETHUSDT` oder `GC=F / SI=F`. Open, High, Low und Close werden Kerze für Kerze verrechnet; der Chart
+  lädt alle 60 s neu (kein eigener Live-Stream)
 - Layout (Symbol, Indikatoren, Zeichnungen, Einstellungen) wird je Chart im Browser gespeichert
 - Vorlagen (▤ Vorlagen): fertige Setups Nur Chart (ohne Indikatoren), Scalping, Daytrading, Swing, Krypto-Zyklus und
   Smart Money, Mustererkennung; eigene Vorlagen aus dem aktiven Chart speichern (Indikatoren mit Parametern/Farben,

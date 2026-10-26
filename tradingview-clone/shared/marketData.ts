@@ -4,7 +4,8 @@ export interface MarketData {
   symbol: string;
   interval: string;
   /** twelvedata: exchange prices with the user's own key (src/market/exchangeFeed.ts). */
-  source: "binance" | "binance_futures" | "yahoo" | "twelvedata" | "demo";
+  /** spread: computed from two symbols (shared/spread.ts), reloaded like Yahoo. */
+  source: "binance" | "binance_futures" | "yahoo" | "twelvedata" | "spread" | "demo";
   bars: Bar[];
 }
 

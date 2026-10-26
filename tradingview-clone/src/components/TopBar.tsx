@@ -4,12 +4,13 @@ import { intervalSeconds, isValidInterval, normalizeInterval } from "../../share
 import { CHART_TYPES, INTERVALS, MAIN_INTERVALS } from "../../shared/tools";
 import { formatPrice } from "../chart/DrawingsPrimitive";
 import { toggleFavorite, useFavorites } from "../favorites";
-import { LAYOUTS, addIndicator, exitReplay, loadChart, setLayout, startReplay, store, useChartState, useWorkspace, workspace, type ChartType, type Interval } from "../store";
+import { LAYOUTS, addCompare, addIndicator, exitReplay, loadChart, setLayout, startReplay, store, useChartState, useWorkspace, workspace, type ChartType, type Interval } from "../store";
 import { APP_VERSION, BUILD_SHA, BUILD_TIME, formatBuildTime, reloadToLatest, useUpdateCheck } from "../version";
 import { AssetMenu, AssetSearchDialog } from "./AssetPicker";
 import { useAlerts } from "../alerts";
 import { DemoButton } from "./DemoToasts";
 import { RefreshButton } from "./FreshnessBadge";
+import { MAX_COMPARE } from "../../shared/compare";
 import { Menu } from "./Menu";
 import { TemplatesMenu } from "./TemplatesMenu";
 
@@ -305,6 +306,8 @@ export function TopBar({ onOpenIndicators, onOpenSettings, heatmapOpen, onToggle
   const { last, change } = useHeaderPrice();
   const replaying = useChartState((s) => s.replay !== null);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [compareOpen, setCompareOpen] = useState(false);
+  const compareCount = useChartState((s) => s.compare.length);
 
   return (
     <header className="topbar">
@@ -317,9 +320,19 @@ export function TopBar({ onOpenIndicators, onOpenSettings, heatmapOpen, onToggle
         <button className="pill" onClick={() => setSearchOpen(true)} aria-label="Assets suchen" data-tip={"Assets suchen\nNach Rubriken, mit Favoriten"}>
           🔍
         </button>
+        <button
+          className={`pill ${compareCount ? "active" : ""}`}
+          onClick={() => setCompareOpen(true)}
+          disabled={compareCount >= MAX_COMPARE}
+          aria-label="Symbol vergleichen"
+          data-tip={`Symbol vergleichen\nWeitere Kurse als Linie über den Chart legen, Preisachse in Prozent (bis ${MAX_COMPARE})`}
+        >
+          ⊕{compareCount > 0 && <span className="al-count">{compareCount}</span>}
+        </button>
         <RefreshButton />
       </div>
       {searchOpen && <AssetSearchDialog onClose={() => setSearchOpen(false)} />}
+      {compareOpen && <AssetSearchDialog title="Symbol vergleichen" onSelect={(symbol) => addCompare(symbol)} onClose={() => setCompareOpen(false)} />}
       {showPrice && last && (
         <div className="header-price" data-tip={"Aktueller Kurs\nVeränderung über 24 Stunden (bei Tages-/Wochenchart zur Vorkerze)"}>
           <strong className={change !== null && change < 0 ? "down" : "up"}>{formatPrice(last.close)}</strong>

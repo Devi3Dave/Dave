@@ -25,6 +25,7 @@ import {
   type UTCTimestamp,
 } from "lightweight-charts";
 import { displayBars, hollowStyle, isPriceDriven } from "../../shared/chartTypes";
+import { alignCompare } from "../../shared/compare";
 import { getIndicator, resolveParams, type IndicatorDef, type OutputDef } from "../../shared/indicators";
 import { heikinAshi, type Bar, type Series } from "../../shared/math";
 import { barIndexAt } from "../../shared/replay";
@@ -118,6 +119,10 @@ export class ChartEngine {
   private interval = "1h";
   private tradeLines: TradeLine[] = [];
   private tradeLineApis: IPriceLine[] = [];
+  private compareInput: { symbol: string; color: string; bars: Bar[] }[] = [];
+  private compareSeries = new Map<string, { series: ISeriesApi<"Line">; side: string }>();
+  private compareKey = "";
+  private scaleSettings: ChartSettings | null = null;
 
   onCrosshair: (logical: number | null, point: PointerEvent | null) => void = () => {};
   onClick: (e: PointerEvent) => void = () => {};
@@ -427,6 +432,40 @@ export class ChartEngine {
       this.markers = s.markers;
       this.applyMarkers();
     }
+    this.syncCompare();
+  }
+
+  /** Symbols drawn over the chart for comparison; the price scale shows percent while there are any. */
+  setCompare(lines: { symbol: string; color: string; bars: Bar[] }[]) {
+    this.compareInput = lines;
+    this.syncCompare();
+  }
+
+  private syncCompare() {
+    // Renko and Line Break have a made-up time axis, other symbols cannot be placed on it.
+    const lines = this.chartType && isPriceDriven(this.chartType) ? [] : this.compareInput;
+    const bars = this.bars;
+    const last = (b: Bar[]) => b[b.length - 1];
+    const key = [this.side, bars[0]?.time, last(bars)?.time, ...lines.map((l) => `${l.symbol}:${l.color}:${l.bars.length}:${last(l.bars)?.time}:${last(l.bars)?.close}`)].join("|");
+    if (key === this.compareKey) return;
+    this.compareKey = key;
+    const hadLines = this.compareSeries.size > 0;
+    for (const [symbol, c] of this.compareSeries) {
+      if (c.side === this.side && lines.some((l) => l.symbol === symbol)) continue;
+      this.chart.removeSeries(c.series);
+      this.compareSeries.delete(symbol);
+    }
+    for (const l of lines) {
+      let c = this.compareSeries.get(l.symbol);
+      if (!c) {
+        const series = this.chart.addSeries(LineSeries, { color: l.color, lineWidth: 2, priceScaleId: this.side, title: l.symbol, priceLineVisible: false, lastValueVisible: true, crosshairMarkerVisible: false }, 0);
+        c = { series, side: this.side };
+        this.compareSeries.set(l.symbol, c);
+      }
+      c.series.applyOptions({ color: l.color });
+      c.series.setData(alignCompare(bars, l.bars).map((p) => ({ time: p.time as UTCTimestamp, value: p.value })));
+    }
+    if (hadLines !== this.compareSeries.size > 0) this.applyScaleMode();
   }
 
   private createMainSeries(type: ChartType) {
@@ -563,13 +602,21 @@ export class ChartEngine {
       },
       localization: { locale: "de-DE", timeFormatter: (t: Time) => crosshairFmt.format(toDate(t)) },
     });
-    // Scale mode and inversion only for the price pane; indicator panes stay linear.
-    this.chart.priceScale(this.side, 0).applyOptions({
-      mode: { normal: PriceScaleMode.Normal, log: PriceScaleMode.Logarithmic, percent: PriceScaleMode.Percentage, indexed: PriceScaleMode.IndexedTo100 }[st.scaleMode],
-      invertScale: st.invertScale,
-    });
+    this.scaleSettings = st;
+    this.applyScaleMode();
     this.main?.applyOptions({ lastValueVisible: st.lastPriceLabel, priceLineVisible: st.lastPriceLine });
     this.onLayout();
+  }
+
+  /** Scale mode and inversion only for the price pane; indicator panes stay linear. Compared symbols need percent (or indexed). */
+  private applyScaleMode() {
+    const st = this.scaleSettings;
+    if (!st) return;
+    const mode = this.compareSeries.size > 0 && (st.scaleMode === "normal" || st.scaleMode === "log") ? "percent" : st.scaleMode;
+    this.chart.priceScale(this.side, 0).applyOptions({
+      mode: { normal: PriceScaleMode.Normal, log: PriceScaleMode.Logarithmic, percent: PriceScaleMode.Percentage, indexed: PriceScaleMode.IndexedTo100 }[mode],
+      invertScale: st.invertScale,
+    });
   }
 
   /** Exchanges whose trading sessions are shaded behind the candles. */

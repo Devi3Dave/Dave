@@ -4,6 +4,7 @@ import { getIndicator, indicatorLabel, resolveParams } from "../../shared/indica
 import type { Bar } from "../../shared/math";
 import { fairValueGaps } from "../../shared/fvg";
 import { liquidationClusters, liquidationHeatmap } from "../../shared/liquidations";
+import { withCompare } from "../../shared/compare";
 import { isCryptoSymbol } from "../../shared/marketData";
 import { groupLevels, groupingSteps, type Level } from "../../shared/orderbook";
 import { orderBlocks } from "../../shared/orderblocks";
@@ -138,8 +139,9 @@ async function run(name: ToolName, input: unknown, engine: ChartEngine | null): 
     }
 
     case "set_chart": {
-      const { symbol, interval, chart_type } = input as ToolInput<"set_chart">;
+      const { symbol, interval, chart_type, compare } = input as ToolInput<"set_chart">;
       if (chart_type) store.set({ chartType: chart_type });
+      if (compare) store.set((st) => ({ compare: compare.reduce((list, c) => withCompare(list, c, symbol?.toUpperCase() ?? st.symbol), [] as string[]) }));
       if (symbol || interval) await loadChart(symbol?.toUpperCase() ?? s.symbol, (interval as Interval | undefined) ?? s.interval);
       const after = store.get();
       if (after.error) return fail(`Laden fehlgeschlagen: ${after.error}`);
@@ -148,6 +150,7 @@ async function run(name: ToolName, input: unknown, engine: ChartEngine | null): 
         symbol: after.symbol,
         interval: after.interval,
         chart_type: after.chartType,
+        compare: after.compare,
         source: after.source,
         bars: after.bars.length,
         last: last ? { time: iso(last.time), close: last.close } : null,
