@@ -16,6 +16,7 @@ export type Series = (number | null)[];
 
 const nulls = (n: number): Series => new Array<number | null>(n).fill(null);
 
+/** Simple moving average. Verified against TA-Lib SMA. */
 export function sma(values: Series, period: number): Series {
   const out = nulls(values.length);
   let sum = 0;
@@ -38,7 +39,7 @@ export function sma(values: Series, period: number): Series {
   return out;
 }
 
-// EMA seeded with the SMA of the first `period` defined values (TradingView behaviour).
+// EMA seeded with the SMA of the first `period` defined values (TradingView ta.ema, TA-Lib EMA; verified against TA-Lib).
 export function ema(values: Series, period: number, alpha = 2 / (period + 1)): Series {
   const out = nulls(values.length);
   let prev: number | null = null;
@@ -62,9 +63,10 @@ export function ema(values: Series, period: number, alpha = 2 / (period + 1)): S
   return out;
 }
 
-// Wilder's smoothing (RMA), used by RSI, ATR, ADX.
+// Wilder's smoothing (RMA, alpha = 1/n, SMA seed as TradingView ta.rma), used by RSI, ATR, ADX.
 export const rma = (values: Series, period: number): Series => ema(values, period, 1 / period);
 
+/** Linearly weighted moving average (weights n..1). Verified against TA-Lib WMA. */
 export function wma(values: Series, period: number): Series {
   const out = nulls(values.length);
   const denom = (period * (period + 1)) / 2;
@@ -84,13 +86,18 @@ export function wma(values: Series, period: number): Series {
   return out;
 }
 
+/**
+ * Hull Moving Average (Alan Hull, 2005): WMA(2·WMA(n/2) − WMA(n), √n), both lengths
+ * truncated to integers as in Hull's MetaStock code and pandas-ta `hma`.
+ */
 export function hma(values: Series, period: number): Series {
   const half = wma(values, Math.max(1, Math.floor(period / 2)));
   const full = wma(values, period);
   const diff = half.map((h, i) => (h === null || full[i] === null ? null : 2 * h - (full[i] as number)));
-  return wma(diff, Math.max(1, Math.round(Math.sqrt(period))));
+  return wma(diff, Math.max(1, Math.floor(Math.sqrt(period))));
 }
 
+/** Population standard deviation (divide by n), as Bollinger and TradingView ta.stdev. Verified against TA-Lib STDDEV. */
 export function stdev(values: Series, period: number): Series {
   const mean = sma(values, period);
   return values.map((_, i) => {
@@ -102,6 +109,7 @@ export function stdev(values: Series, period: number): Series {
   });
 }
 
+/** Highest value of the last `period` values (TradingView ta.highest). */
 export function highest(values: Series, period: number): Series {
   return values.map((_, i) => {
     if (i < period - 1) return null;
@@ -111,6 +119,7 @@ export function highest(values: Series, period: number): Series {
   });
 }
 
+/** Lowest value of the last `period` values (TradingView ta.lowest). */
 export function lowest(values: Series, period: number): Series {
   return values.map((_, i) => {
     if (i < period - 1) return null;
@@ -126,6 +135,7 @@ const sub = (a: Series, b: Series): Series =>
 export const closes = (bars: Bar[]): Series => bars.map((b) => b.close);
 export const hlc3 = (bars: Bar[]): Series => bars.map((b) => (b.high + b.low + b.close) / 3);
 
+/** True Range (Wilder 1978); the first bar has no previous close and uses high − low (TradingView ta.tr(true)). */
 export function trueRange(bars: Bar[]): Series {
   return bars.map((b, i) =>
     i === 0
@@ -136,13 +146,14 @@ export function trueRange(bars: Bar[]): Series {
 
 export const atr = (bars: Bar[], period: number): Series => rma(trueRange(bars), period);
 
+/** Volume-weighted moving average: SMA(close·volume) / SMA(volume) (TradingView ta.vwma). */
 export function vwma(bars: Bar[], period: number): Series {
   const pv = sma(bars.map((b) => b.close * b.volume), period);
   const v = sma(bars.map((b) => b.volume), period);
   return pv.map((x, i) => (x === null || !v[i] ? null : x / (v[i] as number)));
 }
 
-// Session VWAP, reset at every UTC day boundary.
+// Session VWAP of hlc3 (TradingView ta.vwap), reset at every UTC day boundary (crypto session).
 export function vwap(bars: Bar[]): Series {
   let day = -1;
   let pv = 0;
@@ -161,6 +172,7 @@ export function vwap(bars: Bar[]): Series {
   });
 }
 
+/** Bollinger Bands (John Bollinger): SMA ± mult · population stdev. Verified against TA-Lib BBANDS. */
 export function bollinger(values: Series, period: number, mult: number) {
   const basis = sma(values, period);
   const dev = stdev(values, period);
@@ -171,6 +183,7 @@ export function bollinger(values: Series, period: number, mult: number) {
   };
 }
 
+/** Keltner Channels in the Linda Raschke form used by StockCharts and TradingView: EMA(20) ± 2 · ATR(10). */
 export function keltner(bars: Bar[], period: number, mult: number, atrPeriod: number) {
   const basis = ema(closes(bars), period);
   const a = atr(bars, atrPeriod);
@@ -181,6 +194,7 @@ export function keltner(bars: Bar[], period: number, mult: number, atrPeriod: nu
   };
 }
 
+/** Donchian Channels (Richard Donchian): highest high / lowest low of n bars and their midpoint. */
 export function donchian(bars: Bar[], period: number) {
   const upper = highest(bars.map((b) => b.high), period);
   const lower = lowest(bars.map((b) => b.low), period);
@@ -191,6 +205,7 @@ export function donchian(bars: Bar[], period: number) {
   };
 }
 
+/** RSI (Wilder 1978) with Wilder smoothing (RMA). Verified against TA-Lib RSI. */
 export function rsi(values: Series, period: number): Series {
   const gains: Series = values.map((v, i) => (i === 0 || v === null ? null : Math.max(v - (values[i - 1] as number), 0)));
   const losses: Series = values.map((v, i) => (i === 0 || v === null ? null : Math.max((values[i - 1] as number) - v, 0)));
@@ -204,12 +219,14 @@ export function rsi(values: Series, period: number): Series {
   });
 }
 
+/** MACD (Gerald Appel): EMA(fast) − EMA(slow), signal EMA of the MACD line. Verified against TA-Lib MACD. */
 export function macd(values: Series, fast: number, slow: number, signal: number) {
   const line = sub(ema(values, fast), ema(values, slow));
   const sig = ema(line, signal);
   return { macd: line, signal: sig, histogram: sub(line, sig) };
 }
 
+/** Slow Stochastic (George Lane; StockCharts default 14/3/3): SMA-smoothed %K and %D. Verified against TA-Lib STOCH. */
 export function stochastic(bars: Bar[], kPeriod: number, kSmooth: number, dPeriod: number) {
   const hh = highest(bars.map((b) => b.high), kPeriod);
   const ll = lowest(bars.map((b) => b.low), kPeriod);
@@ -223,6 +240,7 @@ export function stochastic(bars: Bar[], kPeriod: number, kSmooth: number, dPerio
   return { k, d: sma(k, dPeriod) };
 }
 
+/** Stochastic RSI (Chande & Kroll 1994) as TradingView: SMA(k) of stoch(RSI), %D = SMA(%K). */
 export function stochRsi(values: Series, rsiPeriod: number, stochPeriod: number, kSmooth: number, dSmooth: number) {
   const r = rsi(values, rsiPeriod);
   const hh = highest(r, stochPeriod);
@@ -237,6 +255,7 @@ export function stochRsi(values: Series, rsiPeriod: number, stochPeriod: number,
   return { k, d: sma(k, dSmooth) };
 }
 
+/** Directional Movement System (Wilder 1978): +DI, −DI, ADX with Wilder smoothing. Verified against TA-Lib ADX/PLUS_DI/MINUS_DI. */
 export function adx(bars: Bar[], period: number) {
   const plusDM: Series = bars.map((b, i) => {
     if (i === 0) return null;
@@ -263,6 +282,7 @@ export function adx(bars: Bar[], period: number) {
   return { adx: rma(dx, period), plusDI, minusDI };
 }
 
+/** Commodity Channel Index (Donald Lambert 1980) on hlc3 with the 0.015 constant. Verified against TA-Lib CCI. */
 export function cci(bars: Bar[], period: number): Series {
   const tp = hlc3(bars);
   const mean = sma(tp, period);
@@ -276,6 +296,7 @@ export function cci(bars: Bar[], period: number): Series {
   });
 }
 
+/** Williams %R (Larry Williams). Verified against TA-Lib WILLR. */
 export function williamsR(bars: Bar[], period: number): Series {
   const hh = highest(bars.map((b) => b.high), period);
   const ll = lowest(bars.map((b) => b.low), period);
@@ -287,6 +308,7 @@ export function williamsR(bars: Bar[], period: number): Series {
   });
 }
 
+/** Money Flow Index (Gene Quong & Avrum Soudack) on hlc3. Verified against TA-Lib MFI. */
 export function mfi(bars: Bar[], period: number): Series {
   const tp = hlc3(bars) as number[];
   return bars.map((_, i) => {
@@ -302,6 +324,7 @@ export function mfi(bars: Bar[], period: number): Series {
   });
 }
 
+/** On Balance Volume (Joe Granville 1963). Verified against TA-Lib OBV. */
 export function obv(bars: Bar[]): Series {
   let acc = 0;
   return bars.map((b, i) => {
@@ -313,6 +336,7 @@ export function obv(bars: Bar[]): Series {
   });
 }
 
+/** Chaikin Money Flow (Marc Chaikin): sum(MF volume, n) / sum(volume, n) (StockCharts). */
 export function cmf(bars: Bar[], period: number): Series {
   const mfv = bars.map((b) => (b.high === b.low ? 0 : ((b.close - b.low - (b.high - b.close)) / (b.high - b.low)) * b.volume));
   const a = sma(mfv, period);
@@ -320,6 +344,7 @@ export function cmf(bars: Bar[], period: number): Series {
   return a.map((x, i) => (x === null || !v[i] ? null : x / (v[i] as number)));
 }
 
+/** Rate of change in percent. Verified against TA-Lib ROC. */
 export function roc(values: Series, period: number): Series {
   return values.map((v, i) => {
     const prev = values[i - period];
@@ -327,6 +352,7 @@ export function roc(values: Series, period: number): Series {
   });
 }
 
+/** Momentum: close − close n bars ago. Verified against TA-Lib MOM. */
 export function momentum(values: Series, period: number): Series {
   return values.map((v, i) => {
     const prev = values[i - period];
@@ -334,11 +360,13 @@ export function momentum(values: Series, period: number): Series {
   });
 }
 
+/** Awesome Oscillator (Bill Williams): SMA(5) − SMA(34) of the median price hl2. */
 export function awesomeOscillator(bars: Bar[], fast = 5, slow = 34): Series {
   const median = bars.map((b) => (b.high + b.low) / 2);
   return sub(sma(median, fast), sma(median, slow));
 }
 
+/** TRIX (Jack Hutson 1983): 1-bar rate of change of a triple EMA, verified against TA-Lib TRIX; scaled ×10000 (TA-Lib ×100) like TradingView. */
 export function trix(values: Series, period: number): Series {
   const e3 = ema(ema(ema(values, period), period), period);
   return e3.map((v, i) => {
@@ -347,6 +375,7 @@ export function trix(values: Series, period: number): Series {
   });
 }
 
+/** Ichimoku Kinko Hyo (Goichi Hosoda), standard 9/26/52; the registry shifts the spans like TradingView (displacement − 1). */
 export function ichimoku(bars: Bar[], conv: number, base: number, spanB: number) {
   const mid = (p: number) => {
     const h = highest(bars.map((b) => b.high), p);
@@ -366,44 +395,64 @@ export function ichimoku(bars: Bar[], conv: number, base: number, spanB: number)
   };
 }
 
+/**
+ * Parabolic SAR (J. Welles Wilder, "New Concepts in Technical Trading Systems", 1978),
+ * ported 1:1 from TA-Lib ta_SAR.c / ta_SAREXT.c: initial direction from the first
+ * bar's −DM, a touch of the SAR reverses, and the SAR is kept outside the current
+ * and previous bar's range (also on the reversal bar).
+ */
 export function parabolicSar(bars: Bar[], start: number, increment: number, maximum: number): Series {
   const out = nulls(bars.length);
   if (bars.length < 2) return out;
-  let up = bars[1].close >= bars[0].close;
+  const upMove = bars[1].high - bars[0].high;
+  const downMove = bars[0].low - bars[1].low;
+  let isLong = !(downMove > upMove && downMove > 0);
   let af = start;
-  let ep = up ? bars[0].high : bars[0].low;
-  let sar = up ? bars[0].low : bars[0].high;
+  let ep = isLong ? bars[1].high : bars[1].low;
+  let sar = isLong ? bars[0].low : bars[0].high;
+  let newHigh = bars[1].high;
+  let newLow = bars[1].low;
   for (let i = 1; i < bars.length; i++) {
-    const b = bars[i];
-    sar = sar + af * (ep - sar);
-    if (up) {
-      sar = Math.min(sar, bars[i - 1].low, bars[Math.max(0, i - 2)].low);
-      if (b.low < sar) {
-        up = false;
-        sar = ep;
-        ep = b.low;
+    const prevHigh = newHigh;
+    const prevLow = newLow;
+    newHigh = bars[i].high;
+    newLow = bars[i].low;
+    if (isLong) {
+      if (newLow <= sar) {
+        isLong = false;
+        sar = Math.max(ep, prevHigh, newHigh);
+        out[i] = sar;
         af = start;
-      } else if (b.high > ep) {
-        ep = b.high;
-        af = Math.min(af + increment, maximum);
+        ep = newLow;
+        sar = Math.max(sar + af * (ep - sar), prevHigh, newHigh);
+      } else {
+        out[i] = sar;
+        if (newHigh > ep) {
+          ep = newHigh;
+          af = Math.min(af + increment, maximum);
+        }
+        sar = Math.min(sar + af * (ep - sar), prevLow, newLow);
       }
+    } else if (newHigh >= sar) {
+      isLong = true;
+      sar = Math.min(ep, prevLow, newLow);
+      out[i] = sar;
+      af = start;
+      ep = newHigh;
+      sar = Math.min(sar + af * (ep - sar), prevLow, newLow);
     } else {
-      sar = Math.max(sar, bars[i - 1].high, bars[Math.max(0, i - 2)].high);
-      if (b.high > sar) {
-        up = true;
-        sar = ep;
-        ep = b.high;
-        af = start;
-      } else if (b.low < ep) {
-        ep = b.low;
+      out[i] = sar;
+      if (newLow < ep) {
+        ep = newLow;
         af = Math.min(af + increment, maximum);
       }
+      sar = Math.max(sar + af * (ep - sar), prevHigh, newHigh);
     }
-    out[i] = sar;
   }
   return out;
 }
 
+/** Supertrend (Olivier Seban) with the band ratchet of TradingView ta.supertrend: hl2 ± factor · ATR (RMA). */
 export function supertrend(bars: Bar[], period: number, mult: number) {
   const a = atr(bars, period);
   const up = nulls(bars.length);
@@ -437,6 +486,7 @@ export function supertrend(bars: Bar[], period: number, mult: number) {
   return { up, down };
 }
 
+/** Moving average envelope: SMA ± percent. */
 export function envelope(values: Series, period: number, percent: number) {
   const basis = sma(values, period);
   return {
@@ -446,7 +496,7 @@ export function envelope(values: Series, period: number, percent: number) {
   };
 }
 
-// Classic floor-trader pivots computed from the previous UTC day (or previous
+// Classic floor-trader pivots (TradingView "Pivot Points Standard", type Traditional) computed from the previous UTC day (or previous
 // bar block when bars are daily or larger: previous week).
 export function pivotPoints(bars: Bar[]) {
   const keys = ["p", "r1", "r2", "r3", "s1", "s2", "s3"] as const;
@@ -486,6 +536,7 @@ export function pivotPoints(bars: Bar[]) {
   return out;
 }
 
+/** Heikin-Ashi candles (Dan Valcu, "Using the Heikin-Ashi Technique", TASC 2004). */
 export function heikinAshi(bars: Bar[]): Bar[] {
   const out: Bar[] = [];
   for (let i = 0; i < bars.length; i++) {
@@ -506,11 +557,13 @@ const combine = (a: Series, b: Series, f: (x: number, y: number) => number): Ser
 
 export const hl2 = (bars: Bar[]): Series => bars.map((b) => (b.high + b.low) / 2);
 
+/** Double EMA (Patrick Mulloy, TASC 1994): 2·EMA − EMA(EMA). Verified against TA-Lib DEMA. */
 export function dema(values: Series, period: number): Series {
   const e1 = ema(values, period);
   return combine(e1, ema(e1, period), (a, b) => 2 * a - b);
 }
 
+/** Triple EMA (Patrick Mulloy, TASC 1994): 3·EMA − 3·EMA² + EMA³. Verified against TA-Lib TEMA. */
 export function tema(values: Series, period: number): Series {
   const e1 = ema(values, period);
   const e2 = ema(e1, period);
@@ -518,7 +571,7 @@ export function tema(values: Series, period: number): Series {
   return e1.map((v, i) => (v === null || e2[i] === null || e3[i] === null ? null : 3 * v - 3 * (e2[i] as number) + (e3[i] as number)));
 }
 
-/** Kaufman Adaptive Moving Average. */
+/** Kaufman Adaptive Moving Average (Perry Kaufman, "Smarter Trading" 1995), ER over n, SC 2/30. Verified against TA-Lib KAMA. */
 export function kama(values: Series, period: number, fast = 2, slow = 30): Series {
   const out = new Array<number | null>(values.length).fill(null);
   const fastSc = 2 / (fast + 1);
@@ -539,7 +592,7 @@ export function kama(values: Series, period: number, fast = 2, slow = 30): Serie
   return out;
 }
 
-/** Arnaud Legoux Moving Average. */
+/** Arnaud Legoux Moving Average (Legoux & Kouzis-Loukas 2009): Gaussian weights centred at offset·(n−1), width n/sigma, as TradingView ta.alma. */
 export function alma(values: Series, period: number, offset = 0.85, sigma = 6): Series {
   const m = offset * (period - 1);
   const s = period / sigma;
@@ -575,7 +628,7 @@ function linFit(values: Series, end: number, period: number) {
   return { slope, intercept, last: intercept + slope * (period - 1) };
 }
 
-/** Linear regression curve (LSMA): endpoint of the regression line over each window. */
+/** Linear regression curve (LSMA): endpoint of the regression line over each window. Verified against TA-Lib LINEARREG. */
 export function linreg(values: Series, period: number): Series {
   return values.map((_, i) => {
     if (i < period - 1) return null;
@@ -584,11 +637,20 @@ export function linreg(values: Series, period: number): Series {
   });
 }
 
+/**
+ * McGinley Dynamic (John R. McGinley, 1990): MD = MD[1] + (P − MD[1]) / (N · (P / MD[1])^4).
+ * Seeded with the SMA of the first N closes, like TradingView's built-in (which seeds with ta.ema).
+ */
 export function mcginley(values: Series, period: number): Series {
+  const seed = sma(values, period);
   let prev: number | null = null;
-  return values.map((v) => {
+  return values.map((v, i) => {
     if (v === null) return null;
-    prev = prev === null ? v : prev + (v - prev) / (period * (v / prev) ** 4);
+    if (prev === null) {
+      prev = seed[i];
+      return prev;
+    }
+    prev = prev + (v - prev) / (period * (v / prev) ** 4);
     return prev;
   });
 }
@@ -597,7 +659,7 @@ export function mcginley(values: Series, period: number): Series {
 // Bands, stops and price structure
 // ---------------------------------------------------------------------------
 
-/** Session VWAP (UTC day) with volume-weighted standard deviation bands. */
+/** Session VWAP (UTC day) with volume-weighted standard deviation bands, as TradingView "VWAP" band mode Standard Deviation. */
 export function vwapBands(bars: Bar[], mult1: number, mult2: number) {
   let day = -1;
   let pv = 0;
@@ -675,13 +737,13 @@ export function chandelierExit(bars: Bar[], period: number, mult: number) {
   return { long, short };
 }
 
-/** Bill Williams Alligator (smoothed MAs of hl2; offsets applied by the registry). */
+/** Bill Williams Alligator ("Trading Chaos" 1995): SMMA 13/8/5 of hl2, shifted 8/5/3 bars by the registry. */
 export function alligator(bars: Bar[], jaw: number, teeth: number, lips: number) {
   const m = hl2(bars);
   return { jaw: rma(m, jaw), teeth: rma(m, teeth), lips: rma(m, lips) };
 }
 
-/** Bill Williams fractals: a high (low) with `n` lower highs (higher lows) on each side. */
+/** Bill Williams fractals ("Trading Chaos" 1995): a high (low) with `n` lower highs (higher lows) on each side. */
 export function fractals(bars: Bar[], n: number) {
   const up: Series = new Array(bars.length).fill(null);
   const down: Series = new Array(bars.length).fill(null);
@@ -743,7 +805,7 @@ export function zigzag(bars: Bar[], pct: number): Series {
   return out;
 }
 
-/** Linear regression channel over the last `period` bars (null before). */
+/** Linear regression channel over the last `period` bars (least squares ± dev · stdev of residuals; null before). */
 export function linRegChannel(values: Series, period: number, dev: number) {
   const n = values.length;
   const basis: Series = new Array(n).fill(null);
@@ -808,7 +870,7 @@ export const emaLast = (xs: number[], period: number): number | null => {
 // Momentum / oscillators popular with crypto traders
 // ---------------------------------------------------------------------------
 
-/** WaveTrend oscillator (LazyBear). */
+/** WaveTrend oscillator (LazyBear, "WaveTrend Oscillator [WT]" on TradingView): wt1 = EMA(21) of CI, wt2 = SMA(4) of wt1. */
 export function waveTrend(bars: Bar[], channel: number, average: number) {
   const ap = hlc3(bars);
   const esa = ema(ap, channel);
@@ -819,7 +881,10 @@ export function waveTrend(bars: Bar[], channel: number, average: number) {
   return { wt1, wt2, diff: combine(wt1, wt2, (a, b) => a - b) };
 }
 
-/** Squeeze Momentum (LazyBear): momentum histogram plus squeeze state (1 = on, 0 = off). */
+/**
+ * Squeeze Momentum (LazyBear SQZMOM_LB): momentum histogram = linreg of close minus the Donchian/SMA mean,
+ * plus squeeze state (1 = on, 0 = off) with John Carter's TTM Squeeze condition: BB(20, 2) inside KC(20, 1.5).
+ */
 export function squeezeMomentum(bars: Bar[], length: number, bbMult: number, kcMult: number) {
   const c = closes(bars);
   const bb = bollinger(c, length, bbMult);
@@ -841,6 +906,7 @@ export function squeezeMomentum(bars: Bar[], length: number, bbMult: number, kcM
   return { momentum: linreg(src, length), squeeze };
 }
 
+/** Ultimate Oscillator (Larry Williams 1985), weights 4/2/1. Verified against TA-Lib ULTOSC. */
 export function ultimateOscillator(bars: Bar[], p1: number, p2: number, p3: number): Series {
   const bp: number[] = [];
   const tr: number[] = [];
@@ -861,7 +927,7 @@ export function ultimateOscillator(bars: Bar[], p1: number, p2: number, p3: numb
   return bars.map((_, i) => (i < p3 ? null : (100 * (4 * avg(i, p1) + 2 * avg(i, p2) + avg(i, p3))) / 7));
 }
 
-/** KDJ (popular on Asian exchanges): stochastic with 1/m smoothing and J = 3K - 2D. */
+/** KDJ (standard Chinese definition): RSV(9), K and D with 1/3 smoothing starting at 50, J = 3K − 2D. */
 export function kdj(bars: Bar[], period: number, m1: number, m2: number) {
   const hh = highest(bars.map((b) => b.high), period);
   const ll = lowest(bars.map((b) => b.low), period);
@@ -887,6 +953,7 @@ export function kdj(bars: Bar[], period: number, m1: number, m2: number) {
   return { k, d, j };
 }
 
+/** Aroon (Tushar Chande 1995). Verified against TA-Lib AROON. */
 export function aroon(bars: Bar[], period: number) {
   const up: Series = [];
   const down: Series = [];
@@ -908,6 +975,7 @@ export function aroon(bars: Bar[], period: number) {
   return { up, down };
 }
 
+/** Vortex Indicator (Etienne Botes & Douglas Siepman, TASC 2010). */
 export function vortex(bars: Bar[], period: number) {
   const plus: Series = [];
   const minus: Series = [];
@@ -932,7 +1000,7 @@ export function vortex(bars: Bar[], period: number) {
   return { plus, minus };
 }
 
-/** Accumulation/Distribution line. */
+/** Accumulation/Distribution line (Marc Chaikin). Verified against TA-Lib AD. */
 export function adl(bars: Bar[]): Series {
   let acc = 0;
   return bars.map((b) => {
@@ -941,15 +1009,18 @@ export function adl(bars: Bar[]): Series {
   });
 }
 
+/** Chaikin Oscillator (Marc Chaikin): EMA(3) − EMA(10) of the A/D line; EMA seeded with an SMA like TradingView (TA-Lib ADOSC agrees once seeded). */
 export function chaikinOscillator(bars: Bar[], fast: number, slow: number): Series {
   const a = adl(bars);
   return combine(ema(a, fast), ema(a, slow), (x, y) => x - y);
 }
 
+/** Force Index (Alexander Elder): EMA(13) of (close − previous close) · volume. */
 export function forceIndex(bars: Bar[], period: number): Series {
   return ema(bars.map((b, i) => (i === 0 ? null : (b.close - bars[i - 1].close) * b.volume)), period);
 }
 
+/** Fisher Transform (John Ehlers, TASC 2002) on hl2, trigger = previous value; as TradingView and pandas-ta `fisher`. */
 export function fisherTransform(bars: Bar[], period: number) {
   const m = hl2(bars);
   const hh = highest(m, period);
@@ -964,14 +1035,16 @@ export function fisherTransform(bars: Bar[], period: number) {
     }
     const range = (hh[i] as number) - (ll[i] as number);
     value = 0.66 * (range === 0 ? 0 : (v - (ll[i] as number)) / range - 0.5) + 0.67 * value;
-    value = Math.max(-0.999, Math.min(0.999, value));
+    // Ehlers' clamp: anything beyond ±0.99 is set to ±0.999.
+    if (value > 0.99) value = 0.999;
+    else if (value < -0.99) value = -0.999;
     prevFish = 0.5 * Math.log((1 + value) / (1 - value)) + 0.5 * prevFish;
     fisher.push(prevFish);
   });
   return { fisher, trigger: fisher.map((_, i) => (i === 0 ? null : fisher[i - 1])) };
 }
 
-/** Connors RSI: average of RSI, RSI of the up/down streak and percent rank of ROC(1). */
+/** Connors RSI (Connors Research, "An Introduction to ConnorsRSI" 2012): mean of RSI(3), RSI(2) of the up/down streak and the percent rank of ROC(1) over 100 bars. */
 export function connorsRsi(values: Series, rsiLen: number, streakLen: number, rankLen: number): Series {
   const streak: Series = [];
   let s = 0;
@@ -995,7 +1068,7 @@ export function connorsRsi(values: Series, rsiLen: number, streakLen: number, ra
   });
 }
 
-/** Schaff Trend Cycle: double stochastic of the MACD line. */
+/** Schaff Trend Cycle (Doug Schaff, 1999): MACD(23, 50), stochastic over 10 bars smoothed with factor 0.5, applied twice. */
 export function schaffTrendCycle(values: Series, cycle: number, fast: number, slow: number): Series {
   const m = combine(ema(values, fast), ema(values, slow), (a, b) => a - b);
   const stochSmooth = (src: Series): Series => {
@@ -1013,11 +1086,12 @@ export function schaffTrendCycle(values: Series, cycle: number, fast: number, sl
   return stochSmooth(stochSmooth(m));
 }
 
+/** Coppock Curve (Edwin Coppock 1962): WMA(10) of ROC(14) + ROC(11). */
 export function coppock(values: Series, wmaLen: number, longRoc: number, shortRoc: number): Series {
   return wma(combine(roc(values, longRoc), roc(values, shortRoc), (a, b) => a + b), wmaLen);
 }
 
-/** Know Sure Thing (Pring) with the standard 10/15/20/30 settings. */
+/** Know Sure Thing (Martin Pring, StockCharts): ROC 10/15/20/30 smoothed by SMA 10/10/10/15, weights 1–4, signal SMA(9). */
 export function kst(values: Series, signalLen: number) {
   const part = (r: number, s: number, w: number) => sma(roc(values, r), s).map((v) => (v === null ? null : v * w));
   const parts = [part(10, 10, 1), part(15, 10, 2), part(20, 10, 3), part(30, 15, 4)];
@@ -1025,7 +1099,7 @@ export function kst(values: Series, signalLen: number) {
   return { kst: line, signal: sma(line, signalLen) };
 }
 
-/** Detrended Price Oscillator (centered, so the last period/2+1 bars are undefined). */
+/** Detrended Price Oscillator (StockCharts): close shifted n/2+1 bars back minus SMA(n), centred, so the last n/2+1 bars are undefined. */
 export function dpo(values: Series, period: number): Series {
   const avg = sma(values, period);
   const shift = Math.floor(period / 2) + 1;
@@ -1035,6 +1109,7 @@ export function dpo(values: Series, period: number): Series {
   });
 }
 
+/** Percentage Price Oscillator: 100 · (EMA(fast) − EMA(slow)) / EMA(slow). Verified against TA-Lib PPO (EMA). */
 export function ppo(values: Series, fast: number, slow: number, signal: number) {
   const line = combine(ema(values, fast), ema(values, slow), (a, b) => (b === 0 ? 0 : (100 * (a - b)) / b));
   const sig = ema(line, signal);
@@ -1053,6 +1128,7 @@ export function klinger(bars: Bar[], fast: number, slow: number, signal: number)
   return { kvo, signal: ema(kvo, signal) };
 }
 
+/** Ease of Movement (Richard Arms): SMA of Δhl2 · (high − low) · 10000 / volume, as TradingView. */
 export function easeOfMovement(bars: Bar[], period: number): Series {
   return sma(
     bars.map((b, i) => {
@@ -1064,11 +1140,13 @@ export function easeOfMovement(bars: Bar[], period: number): Series {
   );
 }
 
+/** Volume Oscillator: 100 · (EMA(5) − EMA(10)) / EMA(10) of volume, as TradingView. */
 export function volumeOscillator(bars: Bar[], fast: number, slow: number): Series {
   const v = bars.map((b) => b.volume);
   return combine(ema(v, fast), ema(v, slow), (a, b) => (b === 0 ? 0 : (100 * (a - b)) / b));
 }
 
+/** Price Volume Trend: cumulative percent change · volume (StockCharts). */
 export function pvt(bars: Bar[]): Series {
   let acc = 0;
   return bars.map((b, i) => {
@@ -1077,11 +1155,13 @@ export function pvt(bars: Bar[]): Series {
   });
 }
 
+/** Relative volume: volume / SMA(volume, n). */
 export function relativeVolume(bars: Bar[], period: number): Series {
   const avg = sma(bars.map((b) => b.volume), period);
   return bars.map((b, i) => (avg[i] ? b.volume / (avg[i] as number) : null));
 }
 
+/** Bollinger %B (John Bollinger): (close − lower) / (upper − lower). */
 export function percentB(values: Series, period: number, mult: number): Series {
   const bb = bollinger(values, period, mult);
   return values.map((v, i) => {
@@ -1091,7 +1171,7 @@ export function percentB(values: Series, period: number, mult: number): Series {
   });
 }
 
-/** Annualised historical volatility in percent (crypto trades 365 days a year). */
+/** Historical volatility: population stdev of log returns, annualised by √(bars per year) in percent (crypto trades 365 days a year). */
 export function historicalVolatility(bars: Bar[], period: number): Series {
   const logRet: Series = bars.map((b, i) => (i === 0 || bars[i - 1].close <= 0 ? null : Math.log(b.close / bars[i - 1].close)));
   const sd = stdev(logRet, period);
@@ -1100,6 +1180,7 @@ export function historicalVolatility(bars: Bar[], period: number): Series {
   return sd.map((v) => (v === null ? null : v * Math.sqrt(perYear) * 100));
 }
 
+/** Choppiness Index (E. W. Dreiss): 100 · log10(ΣTR / (HH − LL)) / log10(n). */
 export function choppiness(bars: Bar[], period: number): Series {
   const tr = trueRange(bars) as number[];
   return bars.map((_, i) => {
