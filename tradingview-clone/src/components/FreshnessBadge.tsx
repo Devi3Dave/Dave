@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { assessFreshness, freshnessReport, type FreshnessInput, type Level } from "../../shared/freshness";
 import { measureClock, useClockSync } from "../market/clockSync";
-import { crossCheckLatest, useChart, type ChartStore } from "../store";
+import { crossCheckLatest, refreshAll, useChart, type ChartStore } from "../store";
 
 const ICON: Record<Level, string> = { ok: "✓", warn: "!", bad: "✕", info: "i" };
 
@@ -59,10 +59,11 @@ export function FreshnessBadge({ chart }: { chart: ChartStore }) {
   };
   const result = useMemo(() => assessFreshness(input, formatTime), [now, symbol, interval, source, loading, lastBarTime, clock, tick, loadedAt, rest, replay]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const runCheck = async () => {
+  const runCheck = async (reload = false) => {
     setChecking(true);
     setCheckError(null);
     try {
+      if (reload) await chart.refresh();
       await Promise.all([measureClock(), crossCheckLatest(chart)]);
     } catch (err) {
       setCheckError((err as Error).message);
@@ -118,8 +119,8 @@ export function FreshnessBadge({ chart }: { chart: ChartStore }) {
           </ul>
           {checkError && <div className="fresh-error">Abgleich fehlgeschlagen: {checkError}</div>}
           <div className="fresh-actions">
-            <button className="pill" onClick={() => void runCheck()} disabled={checking || source === "demo"}>
-              {checking ? "Prüfe …" : "Jetzt prüfen"}
+            <button className="pill" onClick={() => void runCheck(true)} disabled={checking} data-tip={"Kerzen neu laden, Live-Verbindung neu aufbauen\nund Uhr sowie Server erneut abgleichen"}>
+              {checking ? "Aktualisiere …" : "⟳ Aktualisieren"}
             </button>
             <button className="pill" onClick={() => void copy()}>
               {copied ? "Kopiert ✓" : "Nachweis kopieren"}
@@ -128,5 +129,29 @@ export function FreshnessBadge({ chart }: { chart: ChartStore }) {
         </div>
       )}
     </>
+  );
+}
+
+/** Top-bar button: reloads all charts, reconnects their live streams and measures the clock again. */
+export function RefreshButton() {
+  const [busy, setBusy] = useState(false);
+  const run = async () => {
+    setBusy(true);
+    try {
+      await refreshAll();
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <button
+      className={`pill refresh-btn ${busy ? "busy" : ""}`}
+      onClick={() => void run()}
+      disabled={busy}
+      aria-label="Kurse aktualisieren"
+      data-tip={"Kurse aktualisieren\nLädt alle Charts neu, verbindet den Live-Stream neu\nund gleicht die Uhr mit dem Server ab.\nAutomatisch: beim Zurückkehren zur App, wenn das Netz\nwieder da ist und wenn der Live-Stream 1 min stillsteht"}
+    >
+      <span className="refresh-icon">⟳</span>
+    </button>
   );
 }

@@ -73,6 +73,10 @@ und zusammen mit der Fill & Sign-App auf GitHub Pages veröffentlicht.
   der letzten Kerze beim Datenserver. „Nachweis kopieren“ gibt das Protokoll mit UTC-Zeitstempeln aus.
   Ein Kursabgleich mit der Börse selbst (Xetra, Nasdaq …) ist ohne Börsen-Feed nicht möglich; Perp-Preise
   und Demo-Daten werden entsprechend gekennzeichnet.
+- Aktualisieren (⟳ neben der Suche): lädt alle Charts neu, verbindet den Live-Stream neu und gleicht die
+  Uhr ab. Automatisch passiert das, wenn die Live-Verbindung abreißt (Neuverbinden nach 2 s, 4 s … bis 30 s),
+  beim Zurückkehren zur App, wenn das Netz wieder da ist und wenn der Live-Stream 1 min stillsteht.
+  Quellen ohne Live-Stream (Yahoo) werden jede Minute neu geladen.
 - Indikator-Panels mit verschiebbaren Trennern, Legende mit Werten unter dem Fadenkreuz,
   Einstellungen (Parameter/Farben), Ein-/Ausblenden
 - Chart-Einstellungen (⚙ in der Kopfzeile): Preisskala Normal/Log/%/Index 100, Achse links/rechts,
