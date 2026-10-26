@@ -27,8 +27,9 @@ app.get("/api/klines", async (req, res) => {
   const symbol = String(req.query.symbol ?? "BTCUSDT");
   const interval = String(req.query.interval ?? "1h");
   const limit = Math.min(1000, Math.max(50, Number(req.query.limit ?? 1000)));
+  const endTime = req.query.endTime ? Number(req.query.endTime) : undefined;
   try {
-    res.json(await loadMarketData(symbol, interval, limit));
+    res.json(await loadMarketData(symbol, interval, limit, endTime && Number.isFinite(endTime) ? endTime : undefined));
   } catch (err) {
     res.status(400).json({ error: (err as Error).message });
   }
