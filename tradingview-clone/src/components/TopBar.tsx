@@ -12,6 +12,7 @@ import { DemoButton } from "./DemoToasts";
 import { RefreshButton } from "./FreshnessBadge";
 import { MAX_COMPARE } from "../../shared/compare";
 import { Menu } from "./Menu";
+import { shortcutLabel, useShortcutOverrides, useShortcuts } from "../shortcuts";
 import { TemplatesMenu } from "./TemplatesMenu";
 
 const CHART_TYPE_LABELS: Record<ChartType, string> = {
@@ -146,6 +147,7 @@ function IntervalPanel({ close }: { close: () => void }) {
 interface Props {
   onOpenIndicators: () => void;
   onOpenSettings: () => void;
+  onOpenShortcuts: () => void;
   heatmapOpen: boolean;
   onToggleHeatmap: () => void;
   calcOpen: boolean;
@@ -299,7 +301,7 @@ function IntervalMenu({ className, label }: { className: string; label?: string 
   );
 }
 
-export function TopBar({ onOpenIndicators, onOpenSettings, heatmapOpen, onToggleHeatmap, calcOpen, onToggleCalc, journalOpen, onToggleJournal, exchangesOpen, onToggleExchanges, demoOpen, onToggleDemo, alertsOpen, onToggleAlerts, claudeOpen, onToggleClaude }: Props) {
+export function TopBar({ onOpenIndicators, onOpenSettings, onOpenShortcuts, heatmapOpen, onToggleHeatmap, calcOpen, onToggleCalc, journalOpen, onToggleJournal, exchangesOpen, onToggleExchanges, demoOpen, onToggleDemo, alertsOpen, onToggleAlerts, claudeOpen, onToggleClaude }: Props) {
   const activeAlerts = useAlerts((s) => s.alerts.filter((a) => a.active).length);
   const { symbol, interval, chartType } = useChartState((s) => s);
   const showPrice = useChartState((s) => s.settings.headerPrice);
@@ -308,6 +310,15 @@ export function TopBar({ onOpenIndicators, onOpenSettings, heatmapOpen, onToggle
   const [searchOpen, setSearchOpen] = useState(false);
   const [compareOpen, setCompareOpen] = useState(false);
   const compareCount = useChartState((s) => s.compare.length);
+  useShortcuts({
+    "dialog.search": () => setSearchOpen(true),
+    "dialog.compare": () => (compareCount < MAX_COMPARE ? setCompareOpen(true) : false),
+  });
+  const keys = (id: string) => {
+    const k = shortcutLabel(id);
+    return k ? ` (${k})` : "";
+  };
+  useShortcutOverrides();
 
   return (
     <header className="topbar">
@@ -317,7 +328,7 @@ export function TopBar({ onOpenIndicators, onOpenSettings, heatmapOpen, onToggle
       </div>
       <div className="symbol-picker">
         <AssetMenu onOpenSearch={() => setSearchOpen(true)} />
-        <button className="pill" onClick={() => setSearchOpen(true)} aria-label="Assets suchen" data-tip={"Assets suchen\nNach Rubriken, mit Favoriten"}>
+        <button className="pill" onClick={() => setSearchOpen(true)} aria-label="Assets suchen" data-tip={`Assets suchen${keys("dialog.search")}\nNach Rubriken, mit Favoriten`}>
           🔍
         </button>
         <button
@@ -365,7 +376,7 @@ export function TopBar({ onOpenIndicators, onOpenSettings, heatmapOpen, onToggle
           </option>
         ))}
       </select>
-      <button className="pill" onClick={onOpenIndicators} aria-label="Indikatoren" data-tip={`Indikatoren hinzufügen (${INDICATORS.length} verfügbar)`}>
+      <button className="pill" onClick={onOpenIndicators} aria-label="Indikatoren" data-tip={`Indikatoren hinzufügen${keys("dialog.indicators")}\n${INDICATORS.length} verfügbar`}>
         <span className="pill-icon">ƒx</span>
         <span className="pill-label"> Indikatoren</span>
       </button>
@@ -381,11 +392,14 @@ export function TopBar({ onOpenIndicators, onOpenSettings, heatmapOpen, onToggle
       <FavoritesMenu />
       <TemplatesMenu />
       <LayoutMenu />
+      <button className="pill" onClick={onOpenShortcuts} aria-label="Tastenkürzel" data-tip={`Tastenkürzel${keys("dialog.shortcuts")}\nAlle Kürzel nachschlagen, ändern und neu belegen`}>
+        ⌨
+      </button>
       <button className="pill" onClick={onOpenSettings} aria-label="Chart-Einstellungen" data-tip={"Chart-Einstellungen\nAchsen, Kurslabel, Countdown, Zeitzone, Gitter"}>
         ⚙
       </button>
       <DemoButton active={demoOpen} onClick={onToggleDemo} />
-      <button className={`pill ${alertsOpen ? "active" : ""}`} onClick={onToggleAlerts} aria-label="Alarme" data-tip={"Alarme (Alt + A)\nPreis, Indikator, Linie oder Zone – mit Ton und Hinweis"}>
+      <button className={`pill ${alertsOpen ? "active" : ""}`} onClick={onToggleAlerts} aria-label="Alarme" data-tip={`Alarme${keys("panel.alerts")}\nPreis, Indikator, Linie oder Zone – mit Ton und Hinweis`}>
         <span className="pill-icon">🔔</span>
         <span className="pill-label"> Alarme</span>
         {activeAlerts > 0 && <span className="al-count">{activeAlerts}</span>}

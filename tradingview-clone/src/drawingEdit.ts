@@ -33,6 +33,8 @@ export function useSelectedDrawing(slot: number): string | null {
 // ---------------- Undo (per chart) ----------------
 
 const history = new Map<number, Drawing[][]>();
+/** States undone with ⌘Z, for redo; a new edit clears them. */
+const future = new Map<number, Drawing[][]>();
 let restoring = false;
 
 /** Remembers each earlier state of the chart's drawings, so ⌘Z can go back. A new symbol starts over. */
@@ -40,12 +42,14 @@ export function trackHistory(chart: ChartStore): () => void {
   let prev = chart.get().drawings;
   let symbol = chart.get().symbol;
   history.set(chart.slot, []);
+  future.set(chart.slot, []);
   return chart.subscribe(() => {
     const s = chart.get();
     if (s.symbol !== symbol) {
       symbol = s.symbol;
       prev = s.drawings;
       history.set(chart.slot, []);
+      future.set(chart.slot, []);
       return;
     }
     if (s.drawings === prev) return;
@@ -54,6 +58,7 @@ export function trackHistory(chart: ChartStore): () => void {
       h.push(prev);
       if (h.length > 50) h.shift();
       history.set(chart.slot, h);
+      future.set(chart.slot, []);
     }
     prev = s.drawings;
   });
@@ -66,10 +71,30 @@ export function canUndo(chart: ChartStore): boolean {
 export function undoDrawings(chart: ChartStore): boolean {
   const last = history.get(chart.slot)?.pop();
   if (!last) return false;
-  restoring = true;
-  chart.set({ drawings: last });
-  restoring = false;
+  future.set(chart.slot, [...(future.get(chart.slot) ?? []), chart.get().drawings]);
+  restore(chart, last);
   return true;
+}
+
+export function redoDrawings(chart: ChartStore): boolean {
+  const next = future.get(chart.slot)?.pop();
+  if (!next) return false;
+  history.get(chart.slot)?.push(chart.get().drawings);
+  restore(chart, next);
+  return true;
+}
+
+function restore(chart: ChartStore, drawings: Drawing[]) {
+  restoring = true;
+  chart.set({ drawings });
+  restoring = false;
+}
+
+/** Hides every drawing, or shows them all again when all are hidden (TradingView: Ctrl + Alt + H). */
+export function toggleAllDrawingsHidden(chart: ChartStore) {
+  const list = chart.get().drawings;
+  if (list.length && list.every((d) => d.hidden)) return showAllDrawings(chart);
+  setDrawings(chart, (l) => l.map((d) => (d.hidden ? d : { ...d, hidden: true })));
 }
 
 // ---------------- Edits ----------------
@@ -126,5 +151,3 @@ export function pasteDrawing(chart: ChartStore) {
   selectDrawing(chart.slot, copy.id);
 }
 
-/** ⌘ on Apple devices (also iPad with keyboard), Ctrl elsewhere. */
-export const MOD_KEY = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent) ? "⌘" : "Strg+";

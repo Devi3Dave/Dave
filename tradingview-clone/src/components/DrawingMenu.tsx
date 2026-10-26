@@ -1,7 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import type { PointerEvent as ChartPointer } from "../chart/ChartEngine";
 import {
-  MOD_KEY,
   arrange,
   canUndo,
   cloneInPlace,
@@ -14,6 +13,7 @@ import {
   undoDrawings,
 } from "../drawingEdit";
 import { createAlert, openAlertsPanel, targetOf } from "../alerts";
+import { shortcutLabel } from "../shortcuts";
 import { exportChart } from "../chartExport";
 import { drawingName } from "../drawingOps";
 import { useChart, type ChartStore, type Drawing, type LineStyleName } from "../store";
@@ -232,14 +232,14 @@ export function DrawingMenu({ chart, target, onClose, onMove, onEditPosition }: 
           Parallel kopieren
         </Item>
       )}
-      <Item icon="⧉" keys={`${MOD_KEY}D`} onClick={act(() => cloneInPlace(chart, d.id))}>
+      <Item icon="⧉" keys={shortcutLabel("drawing.clone")} onClick={act(() => cloneInPlace(chart, d.id))}>
         Klonen
       </Item>
-      <Item icon="⎘" keys={`${MOD_KEY}C`} onClick={act(() => copyDrawing(chart, d.id))}>
+      <Item icon="⎘" keys={shortcutLabel("drawing.copy")} onClick={act(() => copyDrawing(chart, d.id))}>
         Kopieren
       </Item>
       {hasClipboard() && (
-        <Item icon="📋" keys={`${MOD_KEY}V`} onClick={act(() => pasteDrawing(chart))}>
+        <Item icon="📋" keys={shortcutLabel("drawing.paste")} onClick={act(() => pasteDrawing(chart))}>
           Einfügen
         </Item>
       )}
@@ -261,11 +261,11 @@ export function DrawingMenu({ chart, target, onClose, onMove, onEditPosition }: 
         Ausblenden
       </Item>
       {canUndo(chart) && (
-        <Item icon="↶" keys={`${MOD_KEY}Z`} onClick={act(() => undoDrawings(chart))}>
+        <Item icon="↶" keys={shortcutLabel("edit.undo")} onClick={act(() => undoDrawings(chart))}>
           Rückgängig
         </Item>
       )}
-      <Item icon="🗑" keys="⌫" danger onClick={act(() => deleteDrawing(chart, d.id))}>
+      <Item icon="🗑" keys={shortcutLabel("drawing.delete")} danger onClick={act(() => deleteDrawing(chart, d.id))}>
         Entfernen
       </Item>
     </>
@@ -275,11 +275,11 @@ export function DrawingMenu({ chart, target, onClose, onMove, onEditPosition }: 
       <Item icon="⇩" onClick={act(() => void exportChart(chart))}>
         Chartdaten als CSV
       </Item>
-      <Item icon="📋" keys={`${MOD_KEY}V`} disabled={!hasClipboard()} onClick={act(() => pasteDrawing(chart))}>
+      <Item icon="📋" keys={shortcutLabel("drawing.paste")} disabled={!hasClipboard()} onClick={act(() => pasteDrawing(chart))}>
         Zeichnung einfügen
       </Item>
       {canUndo(chart) && (
-        <Item icon="↶" keys={`${MOD_KEY}Z`} onClick={act(() => undoDrawings(chart))}>
+        <Item icon="↶" keys={shortcutLabel("edit.undo")} onClick={act(() => undoDrawings(chart))}>
           Rückgängig
         </Item>
       )}

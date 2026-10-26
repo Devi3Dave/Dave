@@ -13,7 +13,8 @@ import { liquidationFeed } from "../market/liquidationFeed";
 import { DEFAULT_FIBEXT_LEVELS, DEFAULT_FIB_LEVELS, formatPrice } from "../chart/DrawingsPrimitive";
 import { placeOnSide } from "../../shared/position";
 import { activeChart, addDrawing, newId, pickReplayStart, removeIndicator, removeCompare, stepBackReplay, stepReplay, updateIndicator, updateSettings, useChart, workspace, type ChartStore, type Drawing, type Point } from "../store";
-import { cloneInPlace, copyDrawing, deleteDrawing, pasteDrawing, replaceDrawing, selectDrawing, selectedDrawing, trackHistory, undoDrawings, useSelectedDrawing } from "../drawingEdit";
+import { cloneInPlace, copyDrawing, deleteDrawing, pasteDrawing, redoDrawings, replaceDrawing, selectDrawing, selectedDrawing, trackHistory, undoDrawings, useSelectedDrawing } from "../drawingEdit";
+import { useShortcuts } from "../shortcuts";
 import { cloneDrawing, hasMovableAnchors, moveAnchor, shiftDrawing } from "../drawingOps";
 import { DrawingMenu, type MenuTarget } from "./DrawingMenu";
 import { FreshnessBadge } from "./FreshnessBadge";
@@ -137,6 +138,35 @@ export function ChartArea({ chart, onEngine, magnet, onEditIndicator, onEditPosi
   /** "Parallel verschieben/kopieren" from the menu: the drawing follows the pointer until the next tap. */
   const moveRef = useRef<{ id: string; clone: boolean; from: PointerEvent } | null>(null);
   const [moving, setMoving] = useState(false);
+
+  // Shortcuts like TradingView (keys editable in the shortcut list). The selected drawing lives in one
+  // chart; paste, undo and redo act on the active chart; replay steps on the chart that is replaying.
+  const isActive = () => activeChart() === chart;
+  useShortcuts({
+    "drawing.delete": () => {
+      const sel = selectedDrawing(chart.slot);
+      if (!sel) return false;
+      deleteDrawing(chart, sel);
+    },
+    "drawing.copy": () => {
+      const sel = selectedDrawing(chart.slot);
+      if (!sel) return false;
+      copyDrawing(chart, sel);
+    },
+    "drawing.clone": () => {
+      const sel = selectedDrawing(chart.slot);
+      if (!sel) return false;
+      cloneInPlace(chart, sel);
+    },
+    "drawing.paste": () => (isActive() ? pasteDrawing(chart) : false),
+    "edit.undo": () => (isActive() ? void undoDrawings(chart) : false),
+    "edit.redo": () => (isActive() ? void redoDrawings(chart) : false),
+    "replay.next": () => (chart.get().replay?.phase === "play" ? void stepReplay(chart) : false),
+    "replay.prev": () => {
+      if (chart.get().replay?.phase !== "play") return false;
+      if (!replayPositionsOpen(chart.slot)) stepBackReplay(chart);
+    },
+  });
   const startMoveRef = useRef<(id: string, clone: boolean, from: PointerEvent) => void>(() => {});
 
   useEffect(() => {
@@ -451,43 +481,13 @@ export function ChartArea({ chart, onEngine, magnet, onEditIndicator, onEditPosi
     const ro = new ResizeObserver(() => requestAnimationFrame(refreshLayout));
     ro.observe(containerRef.current!);
     const onKey = (ev: KeyboardEvent) => {
-      // Like TradingView: Shift + → shows the next replay candle (on the chart that is replaying), Shift + ← goes back.
-      if ((ev.key === "ArrowRight" || ev.key === "ArrowLeft") && ev.shiftKey && chart.get().replay?.phase === "play") {
-        ev.preventDefault();
-        if (ev.key === "ArrowRight") stepReplay(chart);
-        else if (!replayPositionsOpen(chart.slot)) stepBackReplay(chart);
-        return;
-      }
-      if (ev.key === "Escape") {
-        pendingRef.current = [];
-        positionRef.current = null;
-        engine.drawings.setPreview(null);
-        endMove();
-        selectDrawing(chart.slot, null);
-        chart.set({ tool: "cursor" });
-        return;
-      }
-      // Shortcuts like TradingView, not while typing (Claude panel, dialogs).
-      const el = ev.target as HTMLElement | null;
-      if (el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName))) return;
-      const sel = selectedDrawing(chart.slot);
-      const mod = ev.metaKey || ev.ctrlKey;
-      const key = ev.key.toLowerCase();
-      if (sel && (ev.key === "Delete" || ev.key === "Backspace") && !mod) {
-        ev.preventDefault();
-        deleteDrawing(chart, sel);
-      } else if (sel && mod && key === "c") {
-        copyDrawing(chart, sel);
-      } else if (sel && mod && key === "d") {
-        ev.preventDefault();
-        cloneInPlace(chart, sel);
-      } else if (mod && key === "v" && activeChart() === chart) {
-        ev.preventDefault();
-        pasteDrawing(chart);
-      } else if (mod && key === "z" && !ev.shiftKey && activeChart() === chart) {
-        ev.preventDefault();
-        undoDrawings(chart);
-      }
+      if (ev.key !== "Escape") return;
+      pendingRef.current = [];
+      positionRef.current = null;
+      engine.drawings.setPreview(null);
+      endMove();
+      selectDrawing(chart.slot, null);
+      chart.set({ tool: "cursor" });
     };
     window.addEventListener("keydown", onKey);
     onEngine(chart.slot, engine);
