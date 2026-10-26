@@ -13,9 +13,9 @@ export function DemoButton({ active, onClick }: { active: boolean; onClick: () =
   const count = useDemo((s) => s.account.positions.length);
   const pnl = useDemo((s) => openPnl(s.account, s.prices));
   return (
-    <button className={`pill ${active ? "active" : ""}`} onClick={onClick} data-tip={"Demo-Trading mit Spielgeld\nAlle Assets kaufen/verkaufen, Long/Short mit Hebel, SL/TP"}>
+    <button className={`pill ${active ? "active" : ""}`} onClick={onClick} aria-label="Demo" data-tip={"Demo-Trading mit Spielgeld\nAlle Assets kaufen/verkaufen, Long/Short mit Hebel, SL/TP"}>
       {/* With open positions the running result replaces the word, to keep the top bar short. */}
-      💰 {count > 0 ? <span className={`demo-pnl ${pnl > 0 ? "up" : pnl < 0 ? "down" : ""}`}>{money(pnl)}</span> : "Demo"}
+      <span className="pill-icon">💰</span> {count > 0 ? <span className={`demo-pnl ${pnl > 0 ? "up" : pnl < 0 ? "down" : ""}`}>{money(pnl)}</span> : <span className="pill-label">Demo</span>}
     </button>
   );
 }

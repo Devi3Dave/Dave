@@ -35,6 +35,12 @@ TradFi-Perpetuals von Binance Futures (Kennzeichen „Perp“). DAX-Werte, Indiz
 Agrarrohstoffe und Forex zeigen auf dem iPad Demo-Daten.
 Zeichnen per Touch: Werkzeug wählen und Punkte antippen.
 
+**iPad und Mac:** Die obere Leiste passt sich der Fensterbreite an. Auf schmaleren Bildschirmen
+(iPad, MacBook) stehen die Zeiteinheiten in einem Menü und die Seiten-Buttons zeigen nur ihr Symbol
+(Name als Hinweis beim Darüberfahren); im iPad-Hochformat bricht die Leiste in eine zweite Zeile um
+statt seitlich aus dem Bild zu laufen. Pinch-Zoom vergrößert nur den Chart, nicht die ganze Seite
+(in Safari auf dem Mac auch per Trackpad).
+
 Die Web-App wird bei jedem Push auf `master` per GitHub Actions gebaut (`npm run build:standalone`)
 und zusammen mit der Fill & Sign-App auf GitHub Pages veröffentlicht.
 

@@ -96,7 +96,7 @@ export function TemplatesMenu() {
   const workspaces = saved.filter((t) => t.kind === "workspace");
   return (
     <>
-      <Menu label="▤ Vorlagen" ariaLabel="Vorlagen" tip={"Vorlagen und gespeicherte Layouts\nz. B. Scalping oder Swing mit eigenen Indikatoren"}>
+      <Menu label={<><span className="pill-icon">▤</span><span className="pill-label"> Vorlagen</span></>} ariaLabel="Vorlagen" tip={"Vorlagen und gespeicherte Layouts\nz. B. Scalping oder Swing mit eigenen Indikatoren"}>
         {(close) => (
           <>
             <div className="menu-title">Vorlagen (auf aktiven Chart)</div>
