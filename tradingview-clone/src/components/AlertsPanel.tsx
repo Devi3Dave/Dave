@@ -3,6 +3,7 @@ import {
   CONDITION_LABELS,
   FREQUENCY_LABELS,
   describeAlert,
+  eventAlertRule,
   isChannelCondition,
   type AlertCondition,
   type AlertFrequency,
@@ -50,9 +51,16 @@ function useSourceOptions(): SourceOption[] {
       // Alerts compute on the price; an indicator on another indicator's line is not offered.
       if (!def || inst.source) continue;
       const lines = def.outputs.filter((o) => !o.helper && !o.sparse);
-      if (!lines.length) continue;
+      const events = def.outputs.filter((o) => o.event);
+      if (!lines.length && !events.length) continue;
       const params = resolveParams(def, inst.params);
       const name = indicatorLabel(def, params);
+      for (const o of events) {
+        for (const dir of ["up", "down"] as const) {
+          const label = `${name} · ${o.event![dir]}`;
+          options.push({ key: `${inst.id}:${o.key}:${dir}`, label, source: { kind: "indicator", type: inst.type, params, output: o.key, label, event: dir }, last: null });
+        }
+      }
       const out = bars.length ? def.compute(bars, params) : {};
       for (const o of lines) {
         const label = lines.length > 1 ? `${name} · ${o.label}` : name;
@@ -78,7 +86,8 @@ function AlertForm() {
   const [message, setMessage] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
   const option = options.find((o) => o.key === sourceKey) ?? options[0];
-  const channel = isChannelCondition(condition);
+  const event = option.source.kind === "indicator" ? option.source.event : undefined;
+  const channel = !event && isChannelCondition(condition);
 
   // A new asset or line: start from its current value.
   useEffect(() => {
@@ -96,7 +105,7 @@ function AlertForm() {
 
   const v1 = parseNum(value);
   const v2 = parseNum(value2);
-  const valid = v1 !== undefined && Number.isFinite(v1) && (!channel || (v2 !== undefined && Number.isFinite(v2)));
+  const valid = !!event || (v1 !== undefined && Number.isFinite(v1) && (!channel || (v2 !== undefined && Number.isFinite(v2))));
 
   const submit = () => {
     if (!valid) return;
@@ -104,8 +113,7 @@ function AlertForm() {
       symbol,
       interval,
       source: option.source,
-      condition,
-      target: channel ? { kind: "channel", top: Math.max(v1!, v2!), bottom: Math.min(v1!, v2!) } : { kind: "value", value: v1! },
+      ...(event ? eventAlertRule(event) : { condition, target: channel ? { kind: "channel", top: Math.max(v1!, v2!), bottom: Math.min(v1!, v2!) } : { kind: "value", value: v1! } }),
       frequency,
       message: message.trim(),
     });
@@ -131,15 +139,18 @@ function AlertForm() {
               </option>
             ))}
           </select>
-          <select value={condition} onChange={(e) => setCondition(e.target.value as AlertCondition)} aria-label="Bedingung">
+          {!event && (
+            <select value={condition} onChange={(e) => setCondition(e.target.value as AlertCondition)} aria-label="Bedingung">
             {CONDITIONS.map((c) => (
               <option key={c} value={c}>
                 {CONDITION_LABELS[c]}
               </option>
             ))}
           </select>
+          )}
         </div>
       </label>
+      {!event && (
       <div className="calc-inputs">
         <label className="calc-field">
           <span>{channel ? "Obere Kante" : "Wert"}</span>
@@ -156,7 +167,9 @@ function AlertForm() {
           </label>
         )}
       </div>
-      {option.last !== null && (
+      )}
+      {event && <div className="dm-muted">Löst aus, sobald eine Kerze den neuen Bruch bzw. die neue Lücke bestätigt. Tipp: „Einmal pro Kerzenschluss“.</div>}
+      {!event && option.last !== null && (
         <div className="calc-examples">
           <span>Aktuell {formatPrice(option.last)}:</span>
           {[-2, -1, 1, 2].map((p) => (

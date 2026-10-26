@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { journalStats, parseBackup, sortTrades, toCsv, tradePnl, tradeR, type JournalTrade, type Side } from "../../shared/journal";
+import { CHECKLIST, checklistStats, journalStats, parseBackup, sortTrades, toCsv, tradePnl, tradeR, type JournalTrade, type Side } from "../../shared/journal";
 import { JOURNAL_EVENT, refreshJournaled } from "../demoAccount";
 import { saveFile } from "../saveFile";
 import { useChartState } from "../store";
@@ -79,6 +79,8 @@ interface Draft {
   pnl: string;
   setup: string;
   note: string;
+  /** null = checklist not used for this trade. */
+  checks: string[] | null;
 }
 
 const parseNum = (s: string) => (s.trim() === "" ? undefined : Number(s.trim().replace(/\s/g, "").replace(",", ".")));
@@ -96,6 +98,7 @@ const emptyDraft = (symbol: string, prev?: Draft): Draft => ({
   pnl: "",
   setup: prev?.setup ?? "",
   note: "",
+  checks: prev?.checks ? [] : null,
 });
 
 const toDraft = (t: JournalTrade): Draft => ({
@@ -110,6 +113,7 @@ const toDraft = (t: JournalTrade): Draft => ({
   pnl: showNum(t.pnl),
   setup: t.setup ?? "",
   note: t.note ?? "",
+  checks: t.checks ?? null,
 });
 
 /** Turns the form into a trade, or explains what is missing. */
@@ -133,6 +137,7 @@ function fromDraft(d: Draft, id: string): JournalTrade | string {
     pnl: values.pnl,
     setup: d.setup.trim() || undefined,
     note: d.note.trim() || undefined,
+    ...(d.checks ? { checks: d.checks } : {}),
   };
 }
 
@@ -315,6 +320,7 @@ export function JournalView({ onClose }: { onClose: () => void }) {
     return trades.filter((t) => (kind === "sym" ? t.symbol === value : t.setup === value));
   }, [trades, filter]);
   const stats = useMemo(() => journalStats(shown), [shown]);
+  const checklist = useMemo(() => checklistStats(shown), [shown]);
   const ordered = useMemo(() => sortTrades(shown), [shown]);
 
   const curve = unit === "usd" ? stats.equity : stats.equityR;
@@ -448,6 +454,27 @@ export function JournalView({ onClose }: { onClose: () => void }) {
               <div className="jr-empty">Hier erscheint deine Kurve, sobald du Trades einträgst.</div>
             )}
             <div className="calc-note">Gelb gestrichelt: bisheriger Höchststand – der Abstand darunter ist dein Drawdown.</div>
+            {checklist[0].with.count + checklist[0].without.count > 0 && (
+              <table className="jr-checklist">
+                <thead>
+                  <tr>
+                    <th>Checkliste</th>
+                    <th>erfüllt: Trades · Treffer · Ø R</th>
+                    <th>nicht erfüllt</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {checklist.map((c) => (
+                    <tr key={c.key}>
+                      <td>{c.label}</td>
+                      {[c.with, c.without].map((s, k) => (
+                        <td key={k}>{s.count ? `${s.count} · ${pct(s.winRate, 0)} · ${s.avgR === null ? "–" : `${signed(s.avgR)} R`}` : "–"}</td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
 
             <div className="calc-stats">
               <Stat label="Trefferquote" value={stats.count ? `${pct(stats.winRate, 0)} (${stats.wins}/${stats.count})` : "–"} />
@@ -505,6 +532,22 @@ export function JournalView({ onClose }: { onClose: () => void }) {
               <Field label="Notiz" wide>
                 <TextInput value={draft.note} onChange={set("note")} placeholder="Was lief gut, was nicht?" />
               </Field>
+            </div>
+            <div className="jr-checks">
+              <label>
+                <input type="checkbox" checked={draft.checks !== null} onChange={(e) => set("checks")(e.target.checked ? [] : null)} /> Checkliste (Percoco 15m/1m)
+              </label>
+              {draft.checks !== null &&
+                CHECKLIST.map((c) => (
+                  <label key={c.key}>
+                    <input
+                      type="checkbox"
+                      checked={draft.checks!.includes(c.key)}
+                      onChange={(e) => set("checks")(e.target.checked ? [...draft.checks!, c.key] : draft.checks!.filter((k) => k !== c.key))}
+                    />{" "}
+                    {c.label}
+                  </label>
+                ))}
             </div>
             <datalist id="jr-symbols">
               {[...new Set([chartSymbol, ...symbols])].map((s) => (

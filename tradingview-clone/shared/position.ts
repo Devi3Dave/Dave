@@ -16,6 +16,8 @@ export interface PositionInput {
   account: number;
   /** Risk per trade in percent of the account. */
   risk: number;
+  /** Fixed risk per trade in quote currency; when > 0 it replaces `risk` (like a $-risk position size calculator). */
+  riskCash?: number;
   leverage: number;
 }
 
@@ -52,7 +54,7 @@ export function positionStats(p: PositionInput, bars: Bar[]): PositionStats {
   const valid = isValidPosition(p) && p.entry > 0;
   const riskDist = Math.abs(p.entry - p.stop);
   const rewardDist = Math.abs(p.target - p.entry);
-  const riskAmount = (p.account * p.risk) / 100;
+  const riskAmount = p.riskCash && p.riskCash > 0 ? p.riskCash : (p.account * p.risk) / 100;
   const qty = riskDist > 0 ? riskAmount / riskDist : 0;
   const notional = qty * p.entry;
   const leverage = Math.max(1, p.leverage || 1);
