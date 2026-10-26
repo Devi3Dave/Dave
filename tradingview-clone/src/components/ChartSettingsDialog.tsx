@@ -1,7 +1,8 @@
 import type { ReactNode } from "react";
 import { renkoBoxSize } from "../../shared/chartTypes";
 import { DEFAULT_SETTINGS, TIME_ZONES, type ChartSettings } from "../chartSettings";
-import { updateSettings, useChartState } from "../store";
+import { exportChart } from "../chartExport";
+import { activeChart, updateSettings, useChartState } from "../store";
 
 type Option<T extends string> = { value: T; label: string; tip?: string };
 
@@ -184,6 +185,9 @@ export function ChartSettingsDialog({ onClose }: { onClose: () => void }) {
         </div>
 
         <div className="modal-actions">
+          <button onClick={() => void exportChart(activeChart())} data-tip={"Kerzen und alle Indikatorlinien des Charts als Tabelle\n(Excel, Numbers; auch per Rechtsklick in den Chart)"}>
+            ⇩ Chartdaten (CSV)
+          </button>
           <button onClick={() => updateSettings(DEFAULT_SETTINGS)} data-tip="Alle Chart-Einstellungen auf Standard zurücksetzen">
             Zurücksetzen
           </button>

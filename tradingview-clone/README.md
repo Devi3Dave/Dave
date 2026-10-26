@@ -107,6 +107,10 @@ und zusammen mit der Fill & Sign-App auf GitHub Pages veröffentlicht.
   Symbol, Zeiteinheit, Indikatoren und Zeichnungen. Der angetippte Chart ist aktiv (blauer Rahmen); Kopfzeile,
   Werkzeuge und Claude wirken auf ihn. Wie bei TradingView lassen sich Symbol, Zeiteinheit, Fadenkreuz
   (Standard an) und Zeitbereich (Scrollen/Zoomen des aktiven Charts) über alle Charts synchronisieren
+- Chartdaten exportieren wie bei TradingView: Rechtsklick / langes Drücken in den leeren Chart → „Chartdaten als
+  CSV“ (oder ⚙ Chart-Einstellungen). Die Tabelle enthält Zeit (UTC und Unix), OHLC, Volumen und jede sichtbare
+  Indikatorlinie, so wie der Chart sie zeigt (Renko-Steine, im Replay bis zur aktuellen Kerze); Semikolon und
+  Dezimalkomma für Excel/Numbers, auf dem iPad über „In Dateien sichern“
 - Layout (Symbol, Indikatoren, Zeichnungen, Einstellungen) wird je Chart im Browser gespeichert
 - Vorlagen (▤ Vorlagen): fertige Setups Nur Chart (ohne Indikatoren), Scalping, Daytrading, Swing, Krypto-Zyklus und
   Smart Money, Mustererkennung; eigene Vorlagen aus dem aktiven Chart speichern (Indikatoren mit Parametern/Farben,
