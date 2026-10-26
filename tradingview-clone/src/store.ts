@@ -22,12 +22,16 @@ interface DrawingBase {
   author: Author;
   color: string;
   label?: string;
+  /** Locked drawings cannot be moved or erased (context menu: Sperren). */
+  locked?: boolean;
+  /** Hidden drawings are kept but not drawn (context menu: Ausblenden). */
+  hidden?: boolean;
 }
 
 export type Drawing =
   | (DrawingBase & { kind: "trendline"; a: Point; b: Point; extend: "none" | "right" | "left" | "both"; style: LineStyleName; width: number })
-  | (DrawingBase & { kind: "hline"; price: number; style: LineStyleName })
-  | (DrawingBase & { kind: "vline"; time: number })
+  | (DrawingBase & { kind: "hline"; price: number; style: LineStyleName; width?: number })
+  | (DrawingBase & { kind: "vline"; time: number; style?: LineStyleName; width?: number })
   | (DrawingBase & { kind: "zone"; top: number; bottom: number; from?: number; to?: number; extendRight: boolean })
   | (DrawingBase & { kind: "fib"; a: Point; b: Point; levels: number[] })
   | (DrawingBase & { kind: "text"; at: Point; text: string })

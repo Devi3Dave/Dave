@@ -118,6 +118,12 @@ export class ChartEngine {
   private dragMode = false;
   /** Dragging a trade line to `price` ("cancel": the browser took the touch over, nothing to save). */
   onTradeLineDrag: (phase: "move" | "end" | "cancel", dragId: string, price: number) => void = () => {};
+  /** Asked on pointer down: true takes the pointer to move a drawing (`touch`: finger or pen) instead of panning. */
+  grabDrawing: (e: PointerEvent, touch: boolean) => boolean = () => false;
+  /** Moving a grabbed drawing ("cancel": nothing to save). */
+  onDrawingDrag: (phase: "move" | "end" | "cancel", e: PointerEvent | null) => void = () => {};
+  /** Right click, or a long press with the finger; `e` is null outside the panes (price scale). */
+  onContextMenu: (e: PointerEvent | null, clientX: number, clientY: number) => void = () => {};
 
   constructor(container: HTMLElement) {
     this.chart = createChart(container, {
@@ -143,7 +149,7 @@ export class ChartEngine {
     // click, which would swallow the second point of a two-point drawing.
     let down: { x: number; y: number } | null = null;
     let dragging = false;
-    const toEvent = (ev: globalThis.PointerEvent): PointerEvent | null => {
+    const toEvent = (ev: { clientX: number; clientY: number }): PointerEvent | null => {
       const rect = container.getBoundingClientRect();
       // Pane x starts after a left-side price scale.
       const x = ev.clientX - rect.left - (this.side === "left" ? this.priceScaleWidth() : 0);
@@ -158,18 +164,45 @@ export class ChartEngine {
     // Trade lines (stop, target) are dragged with mouse or finger. The chart listens to mouse
     // and touch events, which come after the pointer event, so those are kept away from it.
     let lineDrag: { id: string; pointerId: number } | null = null;
+    let drawingDrag: { pointerId: number } | null = null;
+    // Long press (finger) opens the context menu, like a right click with the mouse.
+    let press: { timer: number; x: number; y: number } | null = null;
+    let pressedAt = 0;
+    const cancelPress = () => {
+      if (press) window.clearTimeout(press.timer);
+      press = null;
+    };
     const linePrice = (ev: globalThis.PointerEvent) => {
       const top = this.paneLayout()[0]?.top ?? 0;
       return this.main?.coordinateToPrice(ev.clientY - container.getBoundingClientRect().top - top) ?? null;
     };
     const keepFromChart = (ev: Event) => {
-      if (!lineDrag) return;
+      if (!lineDrag && !drawingDrag) return;
       ev.stopPropagation();
       if (ev.cancelable) ev.preventDefault();
     };
     for (const type of ["mousedown", "touchstart", "touchmove"]) container.addEventListener(type, keepFromChart, { capture: true, passive: false });
     container.addEventListener("pointerdown", (ev) => {
       down = { x: ev.clientX, y: ev.clientY };
+      cancelPress();
+      if (ev.pointerType !== "mouse" && ev.isPrimary && !this.dragMode) {
+        const at = { clientX: ev.clientX, clientY: ev.clientY };
+        press = {
+          x: ev.clientX,
+          y: ev.clientY,
+          timer: window.setTimeout(() => {
+            press = null;
+            down = null;
+            pressedAt = Date.now();
+            if (drawingDrag) {
+              drawingDrag = null;
+              container.classList.remove("drawing-dragging");
+              this.onDrawingDrag("cancel", null);
+            }
+            this.onContextMenu(toEvent(at), at.clientX, at.clientY);
+          }, 550),
+        };
+      }
       const hit = this.dragMode || ev.button > 0 ? null : this.tradeLineAt(ev.clientY - container.getBoundingClientRect().top, ev.pointerType === "mouse" ? 6 : 16);
       if (hit) {
         lineDrag = { id: hit, pointerId: ev.pointerId };
@@ -178,7 +211,15 @@ export class ChartEngine {
         container.classList.add("trade-line-dragging");
         return;
       }
-      if (!this.dragMode) return;
+      if (!this.dragMode) {
+        const e = ev.button === 0 ? toEvent(ev) : null;
+        if (e && e.paneIndex === 0 && this.grabDrawing(e, ev.pointerType !== "mouse")) {
+          drawingDrag = { pointerId: ev.pointerId };
+          container.setPointerCapture(ev.pointerId);
+          container.classList.add("drawing-dragging");
+        }
+        return;
+      }
       const e = toEvent(ev);
       if (!e || e.paneIndex !== 0) return;
       dragging = true;
@@ -186,6 +227,12 @@ export class ChartEngine {
       this.onDrag("start", e);
     });
     container.addEventListener("pointermove", (ev) => {
+      if (press && Math.hypot(ev.clientX - press.x, ev.clientY - press.y) > 10) cancelPress();
+      if (drawingDrag) {
+        const e = ev.pointerId === drawingDrag.pointerId ? toEvent(ev) : null;
+        if (e && e.paneIndex === 0) this.onDrawingDrag("move", e);
+        return;
+      }
       if (lineDrag) {
         const price = ev.pointerId === lineDrag.pointerId ? linePrice(ev) : null;
         if (price !== null && price > 0) this.onTradeLineDrag("move", lineDrag.id, price);
@@ -206,8 +253,33 @@ export class ChartEngine {
       this.onTradeLineDrag(phase === "end" && price !== null && price > 0 ? "end" : "cancel", id, price ?? 0);
       return true;
     };
-    container.addEventListener("pointercancel", (ev) => endLineDrag(ev, "cancel"));
+    const endDrawingDrag = (ev: globalThis.PointerEvent, phase: "end" | "cancel") => {
+      if (!drawingDrag || ev.pointerId !== drawingDrag.pointerId) return false;
+      drawingDrag = null;
+      container.classList.remove("drawing-dragging");
+      const e = toEvent(ev);
+      const moved = !!down && Math.hypot(ev.clientX - down.x, ev.clientY - down.y) > 4;
+      // A tap on a drawing without moving it is still a click (selects, opens position settings).
+      this.onDrawingDrag(phase === "end" && moved && e ? "end" : "cancel", e);
+      return moved;
+    };
+    container.addEventListener("pointercancel", (ev) => {
+      cancelPress();
+      if (endDrawingDrag(ev, "cancel")) return;
+      endLineDrag(ev, "cancel");
+    });
+    container.addEventListener("contextmenu", (ev) => {
+      ev.preventDefault();
+      // Some touch browsers send their own context menu event after the long press.
+      if (Date.now() - pressedAt < 1000) return;
+      this.onContextMenu(toEvent(ev), ev.clientX, ev.clientY);
+    });
     container.addEventListener("pointerup", (ev) => {
+      cancelPress();
+      if (endDrawingDrag(ev, "end")) {
+        down = null;
+        return;
+      }
       if (endLineDrag(ev, "end")) return;
       if (dragging) {
         dragging = false;

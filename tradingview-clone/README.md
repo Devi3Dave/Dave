@@ -41,6 +41,16 @@ Zeichnen per Touch: Werkzeug wählen und Punkte antippen.
 statt seitlich aus dem Bild zu laufen. Pinch-Zoom vergrößert nur den Chart, nicht die ganze Seite
 (in Safari auf dem Mac auch per Trackpad).
 
+**Zeichnungen bearbeiten (wie in TradingView)**
+Rechtsklick auf eine Linie (Mac) oder lange drücken (iPad) öffnet das Kontextmenü:
+- Farbe (auch eigene), Linienstil, Linienstärke, Verlängern (Trendlinie), Beschriftung / Text
+- Parallel verschieben und parallel kopieren: danach die neue Stelle antippen
+- Klonen (⌘D), Kopieren (⌘C) und Einfügen (⌘V, auch in einen anderen Chart)
+- Anordnen: Vordergrund, nach vorne, nach hinten, Hintergrund
+- Sperren, Ausblenden (Rechtsklick auf leeren Chart blendet wieder ein), Rückgängig (⌘Z), Entfernen (⌫)
+- Antippen wählt eine Zeichnung aus; ausgewählte Zeichnungen lassen sich mit Maus oder Finger ziehen,
+  ihre Ankerpunkte einzeln verschieben. Mit der Maus lässt sich jede Zeichnung direkt ziehen.
+
 Die Web-App wird bei jedem Push auf `master` per GitHub Actions gebaut (`npm run build:standalone`)
 und zusammen mit der Fill & Sign-App auf GitHub Pages veröffentlicht.
 
