@@ -116,6 +116,10 @@ und zusammen mit der Fill & Sign-App auf GitHub Pages veröffentlicht.
 - Spread-Charts: in der Suche zwei Symbole mit / - + * verbinden, z. B. `BTCUSDT/ETHUSDT` (Verhältnis),
   `BTCUSDT - ETHUSDT` oder `GC=F / SI=F`. Open, High, Low und Close werden Kerze für Kerze verrechnet; der Chart
   lädt alle 60 s neu (kein eigener Live-Stream)
+- Volumenprofile wie bei TradingView (Indikatoren → Volumen): „Volume Profile (Visible Range)“ rechnet über die
+  sichtbaren Kerzen und folgt Scrollen und Zoomen, „Session Volume Profile“ zeigt ein Profil je Tag, Woche oder Monat
+  (UTC) ab der ersten Kerze der Sitzung, „Market Profile (TPO)“ zählt je Sitzung die 30-Minuten-Perioden pro Preis
+  (Steidlmayer). Alle mit POC (orange) und Value Area (kräftiger)
 - Layout (Symbol, Indikatoren, Zeichnungen, Einstellungen) wird je Chart im Browser gespeichert
 - Vorlagen (▤ Vorlagen): fertige Setups Nur Chart (ohne Indikatoren), Scalping, Daytrading, Swing, Krypto-Zyklus und
   Smart Money, Mustererkennung; eigene Vorlagen aus dem aktiven Chart speichern (Indikatoren mit Parametern/Farben,

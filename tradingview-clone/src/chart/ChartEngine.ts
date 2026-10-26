@@ -169,6 +169,7 @@ export class ChartEngine {
     this.chart.timeScale().subscribeVisibleTimeRangeChange((r) => {
       if (r && !this.syncing) this.onVisibleTime(r.from as number, r.to as number);
     });
+    this.chart.timeScale().subscribeVisibleLogicalRangeChange(() => this.scheduleVisibleProfiles());
     // Own click detection: the library folds two quick clicks into a double
     // click, which would swallow the second point of a two-point drawing.
     let down: { x: number; y: number } | null = null;
@@ -770,9 +771,11 @@ export class ChartEngine {
         return { primitive, host, upper: f.upper, lower: f.lower };
       });
       let profile: BuiltIndicator["profile"];
-      if (def.profile && series[0]) {
-        profile = { primitive: new VolumeProfilePrimitive(), host: series[0] };
-        series[0].attachPrimitive(profile.primitive);
+      // Profiles without lines of their own (visible range, sessions, TPO) hang on the price series.
+      const profileHost = series[0] ?? (def.overlay ? this.main : null);
+      if (def.profile && profileHost) {
+        profile = { primitive: new VolumeProfilePrimitive(def.profileAnchor ?? "right", def.outputs.length === 0), host: profileHost };
+        profileHost.attachPrimitive(profile.primitive);
       }
       let heatmap: BuiltIndicator["heatmap"];
       if (def.heatmap && series[0]) {
@@ -818,6 +821,30 @@ export class ChartEngine {
     }
     if (isVolume) s.priceScale().applyOptions({ scaleMargins: { top: 0.82, bottom: 0 } });
     return s;
+  }
+
+  /** Bar indices on screen (all bars before the first layout). */
+  private visibleBars(): { from: number; to: number } {
+    const r = this.chart.timeScale().getVisibleLogicalRange();
+    const last = this.bars.length - 1;
+    if (!r) return { from: 0, to: last };
+    return { from: Math.max(0, Math.ceil(r.from)), to: Math.min(last, Math.floor(r.to)) };
+  }
+
+  private visibleFrame = 0;
+
+  /** Visible-range profiles follow scrolling and zooming, at most once per frame. */
+  private scheduleVisibleProfiles() {
+    if (this.visibleFrame || !this.built.some((b) => b.profile && b.computed.def.visibleRange)) return;
+    this.visibleFrame = requestAnimationFrame(() => {
+      this.visibleFrame = 0;
+      if (this.destroyed) return;
+      const view = this.visibleBars();
+      for (const b of this.built) {
+        const { def, params, instance } = b.computed;
+        if (b.profile && def.visibleRange) b.profile.primitive.setProfile(instance.hidden ? null : (def.profile?.(this.bars, params, view) ?? null));
+      }
+    });
   }
 
   private fillIndicators() {
@@ -869,7 +896,7 @@ export class ChartEngine {
         }
         band.primitive.setPoints(pts);
       }
-      if (b.profile) b.profile.primitive.setProfile(b.computed.instance.hidden ? null : (def.profile?.(bars, params) ?? null));
+      if (b.profile) b.profile.primitive.setProfile(b.computed.instance.hidden ? null : (def.profile?.(bars, params, this.visibleBars()) ?? null));
       if (b.heatmap) {
         const contrast = def.heatmapContrastKey ? params[def.heatmapContrastKey] : 1;
         b.heatmap.primitive.setHeatmap(b.computed.instance.hidden ? null : (def.heatmap?.(bars, params) ?? null), contrast);
