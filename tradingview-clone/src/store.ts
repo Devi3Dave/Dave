@@ -1,6 +1,8 @@
 import { useSyncExternalStore } from "react";
 import { binanceInterval, bucketTime, loadMarketData, loadOpenInterest, type MarketData, type OpenInterestPoint } from "../shared/marketData";
-import type { LiveTick, RestCheck } from "../shared/freshness";
+import { findAsset } from "../shared/assets";
+import { applyPrice, type FeedSymbol } from "../shared/exchangeFeed";
+import { marketNow, referenceMarket, type LiveTick, type RestCheck } from "../shared/freshness";
 import type { Bar } from "../shared/math";
 import type { PositionInput } from "../shared/position";
 import { barIndexAt, carryReplay, randomStart } from "../shared/replay";
@@ -8,6 +10,7 @@ import type { CHART_TYPES, INTERVALS } from "../shared/tools";
 import { DEFAULT_SETTINGS, type ChartSettings } from "./chartSettings";
 import { STANDALONE } from "./config";
 import { measureClock } from "./market/clockSync";
+import { connectFeedLive, feedFor, loadFeedData } from "./market/exchangeFeed";
 
 export type Interval = (typeof INTERVALS)[number];
 export type ChartType = (typeof CHART_TYPES)[number];
@@ -180,6 +183,8 @@ function createChartStore(slot: number): ChartStore {
   let lastData = 0;
   let retries = 0;
   let retryTimer: number | undefined;
+  /** The exchange feed refused to stream this symbol (plan): the chart is reloaded over REST instead. */
+  let streamRefused = false;
 
   const closeSocket = () => {
     window.clearTimeout(retryTimer);
@@ -200,12 +205,22 @@ function createChartStore(slot: number): ChartStore {
   };
 
   const startLive = (json: MarketData, interval: Interval, seq: number) => {
-    if (json.source !== "binance" && json.source !== "binance_futures") return;
     const current = () => seq === loadSeq;
-    const ws = connectLive(chart, json.symbol, interval, json.source === "binance_futures", current, () => {
+    const onData = () => {
       lastData = Date.now();
       retries = 0;
-    });
+    };
+    let ws: WebSocket;
+    if (json.source === "twelvedata") {
+      const f = feedFor(json.symbol);
+      if (!f || streamRefused) return;
+      ws = connectExchangeLive(chart, f.feed, interval, current, onData, () => {
+        streamRefused = true;
+        if (socket === ws) closeSocket();
+      });
+    } else if (json.source === "binance" || json.source === "binance_futures") {
+      ws = connectLive(chart, json.symbol, interval, json.source === "binance_futures", current, onData);
+    } else return;
     ws.onclose = () => {
       if (socket === ws) socket = null;
       if (current() && started) scheduleRetry(seq);
@@ -254,7 +269,10 @@ function createChartStore(slot: number): ChartStore {
       const seq = ++loadSeq;
       closeSocket();
       retries = 0;
-      const symbolChanged = symbol !== state.symbol;
+      // The exchange symbol and the Binance perpetual of one asset (TSLA / TSLAUSDT) count as the same chart.
+      const asset = findAsset(symbol);
+      const symbolChanged = symbol !== state.symbol && (!asset || asset !== findAsset(state.symbol));
+      if (symbolChanged) streamRefused = false;
       // A new time frame keeps the replay at the same moment; another asset ends it.
       const replay = symbolChanged ? null : state.replay;
       chart.set({
@@ -309,7 +327,12 @@ function createChartStore(slot: number): ChartStore {
     watchdog() {
       // A replay shows the past on purpose; polling would only disturb it.
       if (!started || state.loading || state.replay || !state.source || state.source === "demo") return;
-      const live = state.source === "binance" || state.source === "binance_futures";
+      let live = state.source === "binance" || state.source === "binance_futures";
+      if (state.source === "twelvedata") {
+        // Exchange prices only move while the exchange trades; reloading a closed market would only use up the plan's credits.
+        if (!marketNow(referenceMarket(state.symbol, state.source), Math.floor(Date.now() / 1000)).open) return;
+        live = !streamRefused;
+      }
       if (Date.now() - lastData > (live ? STALL_MS : POLL_MS)) void chart.refresh();
     },
   };
@@ -546,6 +569,15 @@ export async function loadChart(symbol: string, interval: Interval): Promise<voi
 export async function fetchMarketData(symbol: string, interval: string, limit = 1000): Promise<MarketData> {
   // Without the Node server the browser fetches directly (Binance allows it; Yahoo does not, so stocks
   // use Binance perpetuals where one exists, see shared/assets.ts, and otherwise fall back to demo data).
+  // With the user's exchange-feed key, stocks, indices and forex come from the exchange; without it (or on errors) as before.
+  const feed = feedFor(symbol);
+  if (feed) {
+    try {
+      return await loadFeedData(feed.id, feed.feed, interval, limit);
+    } catch (err) {
+      console.warn(`[market] twelvedata ${symbol} ${interval}: ${(err as Error).message}`);
+    }
+  }
   if (STANDALONE) return loadMarketData(symbol, interval, limit);
   const res = await fetch(`/api/klines?symbol=${encodeURIComponent(symbol)}&interval=${interval}&limit=${limit}`);
   const json = await res.json();
@@ -603,6 +635,30 @@ function connectLive(chart: ChartStore, symbol: string, interval: Interval, futu
     });
   };
   return ws;
+}
+
+/** Exchange prices from the Twelve Data WebSocket, folded into the chart's candles. */
+function connectExchangeLive(chart: ChartStore, feed: FeedSymbol, interval: Interval, current: () => boolean, onData: () => void, onRefused: () => void): WebSocket {
+  let dayVolume: number | undefined;
+  return connectFeedLive(
+    feed,
+    (e) => {
+      if (!current()) return;
+      onData();
+      const receivedAt = Date.now();
+      // The exchange reports the day's volume so far; the candle gets what was added since the last price.
+      const volume = e.dayVolume !== undefined && dayVolume !== undefined && e.dayVolume >= dayVolume ? e.dayVolume - dayVolume : 0;
+      dayVolume = e.dayVolume;
+      const liveTick: LiveTick = { eventTime: e.time, receivedAt };
+      chart.set((s) => {
+        const series = s.replay ? s.replay.all : s.bars;
+        const bars = applyPrice(series, interval, e.price, e.time, volume);
+        if (!s.replay) return { bars, liveTick };
+        return s.replay.phase === "select" && !s.replay.shown ? { bars, liveTick, replay: { ...s.replay, all: bars } } : { liveTick, replay: { ...s.replay, all: bars } };
+      });
+    },
+    () => current() && onRefused(),
+  );
 }
 
 /** Loads the newest candles again over REST and compares them with what the chart shows. */

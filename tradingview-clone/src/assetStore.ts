@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from "react";
 import { findAsset, parseFuturesInfo, parseSpotTickers, resolveAsset, type Asset, type FuturesSymbol } from "../shared/assets";
 import { STANDALONE } from "./config";
+import { feedSettings } from "./market/exchangeFeed";
 
 const FAV_KEY = "chartai.assetFavorites.v1";
 const LISTS_KEY = "chartai.binanceSymbols.v1";
@@ -119,5 +120,5 @@ export function refreshBinanceLists(): Promise<void> {
 /** Symbol to load for a picker entry: catalog assets may switch to their Binance perpetual. */
 export function symbolFor(symbol: string, asset?: Asset): string {
   const a = asset ?? findAsset(symbol);
-  return a ? resolveAsset(a, STANDALONE, state.futuresSet).symbol : symbol;
+  return a ? resolveAsset(a, STANDALONE, state.futuresSet, feedSettings.active()).symbol : symbol;
 }

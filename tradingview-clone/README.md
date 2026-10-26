@@ -73,6 +73,12 @@ und zusammen mit der Fill & Sign-App auf GitHub Pages veröffentlicht.
   der letzten Kerze beim Datenserver. „Nachweis kopieren“ gibt das Protokoll mit UTC-Zeitstempeln aus.
   Ein Kursabgleich mit der Börse selbst (Xetra, Nasdaq …) ist ohne Börsen-Feed nicht möglich; Perp-Preise
   und Demo-Daten werden entsprechend gekennzeichnet.
+- Börsenkurse mit eigenem Schlüssel (Aktualitäts-Nachweis → „Börsenkurs einrichten“): Mit einem
+  Twelve-Data-Schlüssel laden US-Aktien, Xetra-Aktien, Indizes und Forex Kerzen und Live-Kurse direkt
+  aus dem Browser von Twelve Data (auch auf dem iPad ohne Server), Kennzeichen „Börse“, und der Nachweis
+  zeigt „Börsenkurs“. Der Schlüssel bleibt im localStorage des Geräts. Ob ein Kurs in Echtzeit kommt,
+  hängt vom Tarif ab; der Nachweis misst das Alter jedes Live-Kurses. Streamt der Tarif ein Symbol nicht,
+  lädt der Chart während der Börsenzeit jede Minute neu. Ohne Schlüssel oder bei Fehlern bleibt alles wie bisher.
 - Aktualisieren (⟳ neben der Suche): lädt alle Charts neu, verbindet den Live-Stream neu und gleicht die
   Uhr ab. Automatisch passiert das, wenn die Live-Verbindung abreißt (Neuverbinden nach 2 s, 4 s … bis 30 s),
   beim Zurückkehren zur App, wenn das Netz wieder da ist und wenn der Live-Stream 1 min stillsteht.

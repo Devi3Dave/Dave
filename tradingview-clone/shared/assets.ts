@@ -1,5 +1,7 @@
 /** Asset catalog for the symbol picker: popular assets by category and where their prices come from. */
 
+import { feedSymbol } from "./exchangeFeed.js";
+
 export type AssetCategory = "Krypto" | "Aktien" | "Indizes & ETFs" | "Edelmetalle" | "Rohstoffe" | "Forex";
 
 export const ASSET_CATEGORIES: AssetCategory[] = ["Krypto", "Aktien", "Indizes & ETFs", "Edelmetalle", "Rohstoffe", "Forex"];
@@ -177,16 +179,18 @@ export function categoryOfFutures(f: FuturesSymbol): AssetCategory {
   return "Aktien";
 }
 
-export type DataSource = "binance" | "binance_futures" | "yahoo" | "demo";
+export type DataSource = "binance" | "binance_futures" | "yahoo" | "twelvedata" | "demo";
 
 /**
  * Which symbol to load for an asset and where its prices come from.
  * With the Node server Yahoo delivers real exchange prices; the standalone
  * iPad build cannot reach Yahoo and uses Binance perpetuals where one exists.
  * `futures` is the set of listed perpetuals, or null while it is unknown.
+ * With an exchange-feed key (`exchangeFeed`) stocks, indices and forex load real exchange prices from Twelve Data.
  */
-export function resolveAsset(asset: Asset, standalone: boolean, futures: Set<string> | null): { symbol: string; source: DataSource } {
+export function resolveAsset(asset: Asset, standalone: boolean, futures: Set<string> | null, exchangeFeed = false): { symbol: string; source: DataSource } {
   if (asset.category === "Krypto" || asset.id.endsWith("USDT")) return { symbol: asset.id, source: "binance" };
+  if (exchangeFeed && feedSymbol(asset.id)) return { symbol: asset.id, source: "twelvedata" };
   if (!standalone) return { symbol: asset.id, source: "yahoo" };
   if (asset.perp && (futures === null || futures.has(asset.perp))) return { symbol: asset.perp, source: "binance_futures" };
   return { symbol: asset.id, source: "demo" };
