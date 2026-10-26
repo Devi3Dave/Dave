@@ -120,6 +120,12 @@ und zusammen mit der Fill & Sign-App auf GitHub Pages veröffentlicht.
   sichtbaren Kerzen und folgt Scrollen und Zoomen, „Session Volume Profile“ zeigt ein Profil je Tag, Woche oder Monat
   (UTC) ab der ersten Kerze der Sitzung, „Market Profile (TPO)“ zählt je Sitzung die 30-Minuten-Perioden pro Preis
   (Steidlmayer). Alle mit POC (orange) und Value Area (kräftiger)
+- Watchlists (Seitenleiste „📋 Liste“): mehrere benannte Listen mit Kurs und 24-h-Veränderung (Krypto von Binance,
+  sonst zum Vortagesschluss, alle 15 s neu); antippen öffnet den Chart, ☆ nimmt den aktiven Chart auf
+- Krypto-Screener (📊 Screener in der Watchlist): alle Binance-USDT-Paare mit Kurs, 24 h, Volumen und Lage in der
+  Tagesspanne, sortier- und filterbar (Volumen, Gewinner/Verlierer, Suche). „📈 Technik laden“ ergänzt für die ersten
+  60 Paare 7 und 30 Tage, RSI(14) und den Abstand zu SMA 50/200, danach lässt sich auch nach überverkauft/überkauft
+  und Trend filtern; ☆ legt ein Paar in die aktive Watchlist
 - Layout (Symbol, Indikatoren, Zeichnungen, Einstellungen) wird je Chart im Browser gespeichert
 - Vorlagen (▤ Vorlagen): fertige Setups Nur Chart (ohne Indikatoren), Scalping, Daytrading, Swing, Krypto-Zyklus und
   Smart Money, Mustererkennung; eigene Vorlagen aus dem aktiven Chart speichern (Indikatoren mit Parametern/Farben,

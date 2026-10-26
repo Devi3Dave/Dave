@@ -4,13 +4,15 @@ import { ClaudePanel } from "./ClaudePanel";
 import { DemoPanel } from "./DemoPanel";
 import { LiquidationsPanel } from "./LiquidationsPanel";
 import { OrderBookPanel } from "./OrderBookPanel";
+import { WatchlistPanel } from "./WatchlistPanel";
 
-export type SideTab = "claude" | "demo" | "alerts" | "book" | "liq";
+export type SideTab = "claude" | "demo" | "alerts" | "watch" | "book" | "liq";
 
 const TABS: { id: SideTab; label: string; tip: string }[] = [
   { id: "claude", label: "✦ Claude", tip: "Chart-Analyse mit Claude" },
   { id: "demo", label: "💰 Demo", tip: "Demo-Trading mit Spielgeld\nKaufen, verkaufen, Long/Short mit Hebel, SL/TP" },
   { id: "alerts", label: "🔔 Alarme", tip: "Alarme auf Preis, Indikatoren, Linien und Zonen" },
+  { id: "watch", label: "📋 Liste", tip: "Watchlists mit Kurs und 24-h-Veränderung, Krypto-Screener" },
   { id: "book", label: "Orderbuch", tip: "Live-Orderbuch von Binance (Spot oder Futures)" },
   { id: "liq", label: "Liquidationen", tip: "Liquidations-Heatmap und Live-Liquidationen" },
 ];
@@ -20,9 +22,10 @@ interface Props {
   onTab: (t: SideTab) => void;
   getEngine: () => ChartEngine | null;
   onOpenHeatmap: () => void;
+  onOpenScreener: () => void;
 }
 
-export function SidePanel({ tab, onTab, getEngine, onOpenHeatmap }: Props) {
+export function SidePanel({ tab, onTab, getEngine, onOpenHeatmap, onOpenScreener }: Props) {
   return (
     <div className="side-panel">
       <div className="side-tabs" role="tablist">
@@ -45,6 +48,11 @@ export function SidePanel({ tab, onTab, getEngine, onOpenHeatmap }: Props) {
         {tab === "alerts" && (
           <div className="side-page">
             <AlertsPanel />
+          </div>
+        )}
+        {tab === "watch" && (
+          <div className="side-page">
+            <WatchlistPanel onOpenScreener={onOpenScreener} />
           </div>
         )}
         {tab === "book" && (
