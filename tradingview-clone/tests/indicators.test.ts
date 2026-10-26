@@ -99,7 +99,7 @@ describe("registry", () => {
     for (const o of def.outputs) {
       expect(out[o.key], o.key).toHaveLength(daily.length);
       const defined = out[o.key].filter((v) => v !== null);
-      expect(defined.length, `${def.id}.${o.key} has values`).toBeGreaterThan(0);
+      if (!o.sparse) expect(defined.length, `${def.id}.${o.key} has values`).toBeGreaterThan(0);
       for (const v of defined) expect(Number.isFinite(v)).toBe(true);
     }
   });

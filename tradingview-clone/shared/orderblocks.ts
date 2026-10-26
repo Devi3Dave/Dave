@@ -15,6 +15,8 @@ export interface OrderBlock {
   end: number | null;
   /** Box label; order blocks default to "OB <tf>". */
   label?: string;
+  /** Dashed line at 50 % (FVG "consequential encroachment"). */
+  mid?: boolean;
 }
 
 export interface OrderBlockSignal {

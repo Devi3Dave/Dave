@@ -9,6 +9,7 @@ import { barSeconds, tfLabel, type OrderBlock } from "./orderblocks";
  * - bearish: low of candle 1 > high of candle 3 and candle 2 closes down → zone high₃ … low₁
  * A gap counts as mitigated once price trades back into it (smc: bullish low ≤ top,
  * bearish high ≥ bottom); "half" and "full" wait for the midpoint or the far edge instead.
+ * `ce` adds the 50 % line, ICT's "consequential encroachment" (midpoint of the gap).
  */
 export type FvgMitigation = "touch" | "half" | "full";
 
@@ -19,6 +20,7 @@ export interface FvgOptions {
   /** Most recent zones per side and state that are returned. */
   maxZones: number;
   showMitigated: boolean;
+  ce?: boolean;
 }
 
 export function fairValueGaps(bars: Bar[], opts: FvgOptions): OrderBlock[] {
@@ -34,7 +36,7 @@ export function fairValueGaps(bars: Bar[], opts: FvgOptions): OrderBlock[] {
     if (a.high < c.low && mid.close > mid.open) [side, top, bottom] = ["bull", c.low, a.high];
     else if (a.low > c.high && mid.close < mid.open) [side, top, bottom] = ["bear", a.low, c.high];
     if (!side || ((top - bottom) / bottom) * 100 < opts.minPct) continue;
-    found.push({ tf, tfSeconds: step, side, top, bottom, from: a.time, activeIndex: i + 1, end: null, label: `FVG ${tf}` });
+    found.push({ tf, tfSeconds: step, side, top, bottom, from: a.time, activeIndex: i + 1, end: null, label: `FVG ${tf}`, ...(opts.ce ? { mid: true } : {}) });
   }
   for (const z of found) {
     const level =

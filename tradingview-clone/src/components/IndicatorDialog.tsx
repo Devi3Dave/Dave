@@ -100,7 +100,7 @@ export function IndicatorSettings({ id, onClose }: { id: string; onClose: () => 
               />
             </label>
           ))}
-          {def.outputs.map((o, k) => (
+          {def.outputs.map((o, k) => o.helper ? null : (
             <label key={o.key}>
               Farbe {o.label}
               <input

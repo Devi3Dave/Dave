@@ -99,16 +99,23 @@ export const BUILTIN_TEMPLATES: Template[] = [
     chart: { indicators: [ind("volume"), ind("candlepatterns"), ind("chartpatterns")] },
   },
   {
+    // Weitere Elemente nach Devis Liste seines Setups (2026-10-26): Sessions + NY-Open (statt "IT Foundation"),
+    // RSI mit Wolken und Divergenzen (statt "Inevitrade Pro Plus" / "Cloud Highlight RSI"), FVG mit CE und
+    // CHoCH/BOS (wie LuxAlgo SMC / FVG), Volumen.
     // Quellen: Craig Percoco, "My Trading Strategy is Boring But Made Me $18,565 (Step By Step)"
     // (youtube.com/watch?v=c5ATdFHneJo) – 15m-FVGs vor dem New-York-Open markieren, Einstieg nach
-    // Change of Character + FVG auf 1m (CHoCH nach smart-money-concepts, BOS ausgeblendet); RSI-Überkauft/Überverkauft aus seinem Einsteiger-Tutorial
+    // Change of Character + FVG auf 1m (CHoCH/BOS nach smart-money-concepts); RSI-Überkauft/Überverkauft aus seinem Einsteiger-Tutorial
     // "How to Start Day Trading as a Beginner". Seine bezahlten Layout-Einstellungen sind nicht öffentlich.
     id: "builtin-percoco",
     name: "Craig Percoco",
     kind: "chart",
     builtin: true,
-    description: "15m · Fair Value Gaps, CHoCH, RSI 14 (70/30) – Einstieg auf 1m wechseln",
-    chart: { interval: "15m", chartType: "candles", indicators: [ind("fvg"), ind("structure", { bos: 0 }), ind("rsi", { length: 14 })] },
+    description: "15m · Sessions + NY-Open, FVG mit CE, CHoCH/BOS, Volumen, RSI-Wolken mit Divergenzen – Einstieg auf 1m",
+    chart: {
+      interval: "15m",
+      chartType: "candles",
+      indicators: [ind("volume"), ind("sessions"), ind("fvg", { ce: 1 }), ind("structure"), ind("rsicloud", { length: 14 })],
+    },
   },
 ];
 

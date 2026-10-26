@@ -28,6 +28,7 @@ import { getExchange, tradingDays } from "../../shared/exchanges";
 import { INTERVAL_SECONDS, isCalendarInterval } from "../../shared/marketData";
 import type { OrderBlock, OrderBlockSignal } from "../../shared/orderblocks";
 import type { CandlePattern, Formation } from "../../shared/patterns";
+import type { SessionBox, TimeLine } from "../../shared/sessions";
 import type { StructureBreak } from "../../shared/structure";
 import { resolveTimeZone, type ChartSettings } from "../chartSettings";
 import type { ChartMarker, ChartState, ChartType, IndicatorInstance } from "../store";
@@ -97,7 +98,7 @@ export class ChartEngine {
   private markers: ChartMarker[] = [];
   private readonly axisLabels = new AxisLabelsPrimitive();
   private readonly liquidationBubbles = new LiquidationBubblesPrimitive();
-  private readonly patterns = new PatternsPrimitive((t) => this.drawings.timeToX(t));
+  private readonly patterns = new PatternsPrimitive((t) => this.timeToXInterpolated(t));
   private readonly sessions = new SessionsPrimitive((t) => this.timeToXInterpolated(t));
   private exchangeIds: string[] = [];
   private sessionKey = "";
@@ -695,7 +696,7 @@ export class ChartEngine {
 
   private addOutputSeries(def: IndicatorDef, o: OutputDef, color: string, paneIndex: number, isVolume: boolean, hidden: boolean) {
     const base = {
-      visible: !hidden,
+      visible: !hidden && !o.helper,
       ...(o.noAutoscale ? { autoscaleInfoProvider: () => null } : {}),
       priceLineVisible: false,
       lastValueVisible: !def.overlay && !isVolume,
@@ -790,6 +791,8 @@ export class ChartEngine {
     const zones: OrderBlock[] = [];
     const signals: OrderBlockSignal[] = [];
     const structure: StructureBreak[] = [];
+    const sessions: SessionBox[] = [];
+    const timeLines: TimeLine[] = [];
     for (const b of this.built) {
       const { def, params, instance } = b.computed;
       if (!def.patterns || instance.hidden) continue;
@@ -799,10 +802,13 @@ export class ChartEngine {
       zones.push(...(r.zones ?? []));
       signals.push(...(r.signals ?? []));
       structure.push(...(r.structure ?? []));
+      sessions.push(...(r.sessions ?? []));
+      timeLines.push(...(r.timeLines ?? []));
     }
     this.patterns.setFormations(formations);
     this.patterns.setZones(zones);
     this.patterns.setStructure(structure);
+    this.patterns.setSessions(sessions, timeLines);
     const markers: SeriesMarker<Time>[] = candles.map((c) => ({
       time: ts(c.time),
       position: c.direction === "bullish" ? "belowBar" : "aboveBar",
