@@ -69,7 +69,7 @@ textarea {
 .app {
   display: grid;
   grid-template-columns: 44px 1fr;
-  grid-template-rows: 42px 1fr;
+  grid-template-rows: auto 1fr;
   grid-template-areas:
     "top top"
     "tools chart";
@@ -85,6 +85,7 @@ textarea {
 
 .topbar {
   grid-area: top;
+  min-height: 42px;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -276,6 +277,63 @@ textarea {
 .claude-toggle.active {
   color: var(--claude);
   background: rgba(217, 119, 87, 0.12);
+}
+
+/* ---------- top bar on smaller windows (iPad, MacBook) ---------- */
+
+/* Wide windows show the time frames as buttons, narrower ones as a drop-down. */
+.intervals-compact {
+  display: none;
+}
+
+.intervals-compact .caret {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.menu-icon.interval-key {
+  width: 40px;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: left;
+}
+
+@media (max-width: 2099px) {
+  .intervals-full {
+    display: none;
+  }
+
+  .intervals-compact {
+    display: block;
+  }
+}
+
+/* Below that the page buttons keep only their icon; the hint names them. */
+@media (max-width: 1679px) {
+  .pill .pill-label {
+    display: none;
+  }
+
+  .brand .brand-name {
+    display: none;
+  }
+}
+
+@media (max-width: 1023px) {
+  .asset-button .asset-name {
+    display: none;
+  }
+}
+
+/* iPad portrait and small windows: a second row instead of a hidden, sideways scrolling bar. */
+@media (max-width: 1179px) {
+  .topbar {
+    flex-wrap: wrap;
+    row-gap: 2px;
+    padding-top: 3px;
+    padding-bottom: 3px;
+    overflow-x: visible;
+  }
 }
 
 .toolbar {
@@ -871,7 +929,7 @@ textarea {
 @media (max-width: 900px) {
   .app.with-claude {
     grid-template-columns: 44px 1fr;
-    grid-template-rows: 42px 1fr 45vh;
+    grid-template-rows: auto 1fr 45vh;
     grid-template-areas:
       "top top"
       "tools chart"
@@ -915,6 +973,13 @@ body {
   overscroll-behavior: none;
 }
 
+/* No double-tap zoom on the iPad; the chart sets its own touch handling. */
+html {
+  touch-action: manipulation;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 .app {
   /* The black-translucent status bar of the home-screen app overlaps the page. */
   padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
@@ -935,9 +1000,13 @@ select,
 }
 
 @media (pointer: coarse) {
+  .topbar {
+    min-height: 50px;
+  }
+
   .app {
     grid-template-columns: 52px 1fr;
-    grid-template-rows: 50px 1fr;
+    grid-template-rows: auto 1fr;
   }
 
   .app.with-claude {
@@ -988,6 +1057,23 @@ select,
   }
 }
 
+@media (pointer: coarse) and (max-height: 900px) {
+  .toolbar {
+    gap: 0;
+    padding: 4px 0;
+  }
+
+  .toolbar button {
+    width: 42px;
+    height: 40px;
+    font-size: 17px;
+  }
+
+  .toolbar-sep {
+    margin: 3px 0;
+  }
+}
+
 @media (pointer: coarse) and (max-width: 900px) {
   /* The version stays visible, only the name goes. */
   .brand .logo,
@@ -1009,7 +1095,7 @@ select,
 
   .app.with-claude {
     grid-template-columns: 52px 1fr;
-    grid-template-rows: 50px 1fr 45vh;
+    grid-template-rows: auto 1fr 45vh;
   }
 }
 
@@ -2788,4 +2874,14 @@ select,
   background: rgba(41, 98, 255, 0.1);
   font-size: 12px;
   line-height: 1.4;
+}
+
+
+/* The side panel below the chart follows Safari's moving address bar. */
+@supports (height: 100dvh) {
+  @media (max-width: 900px) {
+    .app.with-claude {
+      grid-template-rows: auto 1fr 45dvh;
+    }
+  }
 }

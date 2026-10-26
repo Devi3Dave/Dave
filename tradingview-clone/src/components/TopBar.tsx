@@ -165,6 +165,34 @@ function FavoritesMenu() {
   );
 }
 
+/** Time frames as one drop-down; replaces the button row when the top bar gets narrow. */
+function IntervalMenu() {
+  const symbol = useChartState((s) => s.symbol);
+  const interval = useChartState((s) => s.interval);
+  return (
+    <Menu label={<>{INTERVAL_SHORT[interval] ?? interval} <span className="caret">▾</span></>} className="intervals-compact" ariaLabel="Zeiteinheit" tip={`Zeiteinheit: ${INTERVAL_LABELS[interval] ?? interval}`}>
+      {(close) => (
+        <>
+          <div className="menu-title">Zeiteinheit</div>
+          {INTERVALS.map((iv) => (
+            <button
+              key={iv}
+              className={`menu-item ${iv === interval ? "active" : ""}`}
+              onClick={() => {
+                loadChart(symbol, iv);
+                close();
+              }}
+            >
+              <span className="menu-icon interval-key">{INTERVAL_SHORT[iv] ?? iv}</span>
+              {INTERVAL_LABELS[iv]}
+            </button>
+          ))}
+        </>
+      )}
+    </Menu>
+  );
+}
+
 export function TopBar({ onOpenIndicators, onOpenSettings, heatmapOpen, onToggleHeatmap, calcOpen, onToggleCalc, journalOpen, onToggleJournal, exchangesOpen, onToggleExchanges, demoOpen, onToggleDemo, claudeOpen, onToggleClaude }: Props) {
   const { symbol, interval, chartType } = useChartState((s) => s);
   const showPrice = useChartState((s) => s.settings.headerPrice);
@@ -196,13 +224,14 @@ export function TopBar({ onOpenIndicators, onOpenSettings, heatmapOpen, onToggle
           )}
         </div>
       )}
-      <div className="group">
+      <div className="group intervals-full">
         {INTERVALS.map((iv) => (
           <button key={iv} className={iv === interval ? "active" : ""} onClick={() => loadChart(symbol, iv)} data-tip={`Zeiteinheit: ${INTERVAL_LABELS[iv]}`}>
             {INTERVAL_SHORT[iv] ?? iv}
           </button>
         ))}
       </div>
+      <IntervalMenu />
       <select value={chartType} onChange={(e) => store.set({ chartType: e.target.value as ChartType })} aria-label="Charttyp" data-tip="Charttyp">
         {CHART_TYPES.map((t) => (
           <option key={t} value={t}>
@@ -210,15 +239,18 @@ export function TopBar({ onOpenIndicators, onOpenSettings, heatmapOpen, onToggle
           </option>
         ))}
       </select>
-      <button className="pill" onClick={onOpenIndicators} data-tip={`Indikatoren hinzufügen (${INDICATORS.length} verfügbar)`}>
-        ƒx Indikatoren
+      <button className="pill" onClick={onOpenIndicators} aria-label="Indikatoren" data-tip={`Indikatoren hinzufügen (${INDICATORS.length} verfügbar)`}>
+        <span className="pill-icon">ƒx</span>
+        <span className="pill-label"> Indikatoren</span>
       </button>
       <button
         className={`pill ${replaying ? "active" : ""}`}
         onClick={() => (replaying ? exitReplay() : startReplay())}
+        aria-label="Replay"
         data-tip={replaying ? "Replay beenden, zurück zum Live-Chart" : "Bar-Replay\nStartkerze wählen und den Chart Kerze für Kerze abspielen\nMit eigenem Replay-Konto zum Üben"}
       >
-        ⏪ Replay
+        <span className="pill-icon">⏪</span>
+        <span className="pill-label"> Replay</span>
       </button>
       <FavoritesMenu />
       <TemplatesMenu />
@@ -227,21 +259,26 @@ export function TopBar({ onOpenIndicators, onOpenSettings, heatmapOpen, onToggle
         ⚙
       </button>
       <DemoButton active={demoOpen} onClick={onToggleDemo} />
-      <button className={`pill ${heatmapOpen ? "active" : ""}`} onClick={onToggleHeatmap} data-tip={"Liquidations-Heatmap im CoinGlass-Stil\nVollbild mit Zeiträumen von 12 h bis 1 Jahr"}>
-        🔥 Heatmap
+      <button className={`pill ${heatmapOpen ? "active" : ""}`} onClick={onToggleHeatmap} aria-label="Heatmap" data-tip={"Liquidations-Heatmap im CoinGlass-Stil\nVollbild mit Zeiträumen von 12 h bis 1 Jahr"}>
+        <span className="pill-icon">🔥</span>
+        <span className="pill-label"> Heatmap</span>
       </button>
-      <button className={`pill ${calcOpen ? "active" : ""}`} onClick={onToggleCalc} data-tip={"Trading-Rechner\nPositionsgröße, Erwartungswert, R-Multiple, Fibonacci, Hebel"}>
-        🧮 Rechner
+      <button className={`pill ${calcOpen ? "active" : ""}`} onClick={onToggleCalc} aria-label="Rechner" data-tip={"Trading-Rechner\nPositionsgröße, Erwartungswert, R-Multiple, Fibonacci, Hebel"}>
+        <span className="pill-icon">🧮</span>
+        <span className="pill-label"> Rechner</span>
       </button>
-      <button className={`pill ${journalOpen ? "active" : ""}`} onClick={onToggleJournal} data-tip={"Trading-Journal\nTrades eintragen, Equity-Kurve: bin ich profitabel?"}>
-        📒 Journal
+      <button className={`pill ${journalOpen ? "active" : ""}`} onClick={onToggleJournal} aria-label="Journal" data-tip={"Trading-Journal\nTrades eintragen, Equity-Kurve: bin ich profitabel?"}>
+        <span className="pill-icon">📒</span>
+        <span className="pill-label"> Journal</span>
       </button>
-      <button className={`pill ${exchangesOpen ? "active" : ""}`} onClick={onToggleExchanges} data-tip={"Börsenzeiten\nÖffnungszeiten der großen Börsen in deiner Zeitzone\nAusgewählte Börsen erscheinen im Chart"}>
-        🕐 Börsen
+      <button className={`pill ${exchangesOpen ? "active" : ""}`} onClick={onToggleExchanges} aria-label="Börsen" data-tip={"Börsenzeiten\nÖffnungszeiten der großen Börsen in deiner Zeitzone\nAusgewählte Börsen erscheinen im Chart"}>
+        <span className="pill-icon">🕐</span>
+        <span className="pill-label"> Börsen</span>
       </button>
       <div className="spacer" />
-      <button className={`pill claude-toggle ${claudeOpen ? "active" : ""}`} onClick={onToggleClaude} data-tip={"Seitenleiste ein-/ausblenden\nClaude, Orderbuch, Liquidationen"}>
-        ✦ Claude
+      <button className={`pill claude-toggle ${claudeOpen ? "active" : ""}`} onClick={onToggleClaude} aria-label="Claude" data-tip={"Seitenleiste ein-/ausblenden\nClaude, Orderbuch, Liquidationen"}>
+        <span className="pill-icon">✦</span>
+        <span className="pill-label"> Claude</span>
       </button>
     </header>
   );

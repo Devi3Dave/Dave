@@ -221,6 +221,27 @@ export class ChartEngine {
       const e = toEvent(ev);
       if (e) this.onClick(e);
     });
+    // Safari on the Mac reports a trackpad pinch as gesture events (Chrome sends ctrl+wheel,
+    // which the chart handles itself): zoom the time axis around the fingers instead of the page.
+    // On the iPad the chart gets the pinch as touches, so there it only stops the page zoom.
+    let pinch: { from: number; to: number; anchor: number } | null = null;
+    const onGesture = (ev: Event) => {
+      ev.preventDefault();
+      const g = ev as Event & { scale: number; clientX: number; type: string };
+      if (navigator.maxTouchPoints > 0 || this.dragMode || this.destroyed) return;
+      const ts = this.chart.timeScale();
+      if (g.type === "gesturestart") {
+        const range = ts.getVisibleLogicalRange();
+        const x = g.clientX - container.getBoundingClientRect().left - (this.side === "left" ? this.priceScaleWidth() : 0);
+        const anchor = ts.coordinateToLogical(Math.max(0, Math.min(ts.width(), x)));
+        pinch = range && anchor !== null ? { from: range.from, to: range.to, anchor } : null;
+      } else if (g.type === "gesturechange" && pinch && g.scale > 0) {
+        const { from, to, anchor } = pinch;
+        if ((to - from) / g.scale < 5) return;
+        ts.setVisibleLogicalRange({ from: anchor - (anchor - from) / g.scale, to: anchor + (to - anchor) / g.scale });
+      } else pinch = null;
+    };
+    for (const type of ["gesturestart", "gesturechange", "gestureend"]) container.addEventListener(type, onGesture, { passive: false });
   }
 
   /** While on, dragging draws instead of panning/zooming the chart. */
