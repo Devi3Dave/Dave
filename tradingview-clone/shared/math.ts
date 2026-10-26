@@ -1238,15 +1238,29 @@ export interface VolumeProfile {
   vah: number;
   val: number;
   fromIndex: number;
+  /** Last bar of the range (inclusive). */
+  toIndex: number;
+  /** TPO profile: `volume` counts time periods, not volume. */
+  tpo?: boolean;
 }
 
 /** Volume profile of the last `lookback` bars, each bar's volume spread over the rows its range covers. */
 export function volumeProfile(bars: Bar[], lookback: number, rowCount: number, valueAreaPct: number): VolumeProfile | null {
-  const fromIndex = Math.max(0, bars.length - lookback);
-  const win = bars.slice(fromIndex);
+  return volumeProfileRange(bars, bars.length - lookback, bars.length - 1, rowCount, valueAreaPct);
+}
+
+/** Volume profile of the bars `from`..`to` (indices, inclusive, clamped to the data). */
+export function volumeProfileRange(bars: Bar[], from: number, to: number, rowCount: number, valueAreaPct: number): VolumeProfile | null {
+  const fromIndex = Math.max(0, Math.floor(from));
+  const toIndex = Math.min(bars.length - 1, Math.ceil(to));
+  const win = bars.slice(fromIndex, toIndex + 1);
   if (win.length === 0) return null;
-  const lo = Math.min(...win.map((b) => b.low));
-  const hi = Math.max(...win.map((b) => b.high));
+  let lo = Infinity;
+  let hi = -Infinity;
+  for (const b of win) {
+    lo = Math.min(lo, b.low);
+    hi = Math.max(hi, b.high);
+  }
   if (!(hi > lo)) return null;
   const size = (hi - lo) / rowCount;
   const rows: ProfileRow[] = Array.from({ length: rowCount }, (_, r) => ({ low: lo + r * size, high: lo + (r + 1) * size, volume: 0, buy: 0, inValueArea: false }));
@@ -1262,6 +1276,20 @@ export function volumeProfile(bars: Bar[], lookback: number, rowCount: number, v
       rows[r].buy += v * buyShare;
     }
   }
+  const { pocRow, up, down } = valueArea(rows, valueAreaPct);
+  return {
+    rows,
+    poc: (rows[pocRow].low + rows[pocRow].high) / 2,
+    vah: rows[up].high,
+    val: rows[down].low,
+    fromIndex,
+    toIndex,
+  };
+}
+
+/** POC (row with the most volume) and the value area grown from it, one row at a time towards the larger neighbour. */
+function valueArea(rows: ProfileRow[], valueAreaPct: number): { pocRow: number; up: number; down: number } {
+  const rowCount = rows.length;
   let pocRow = 0;
   rows.forEach((r, i) => {
     if (r.volume > rows[pocRow].volume) pocRow = i;
@@ -1284,11 +1312,79 @@ export function volumeProfile(bars: Bar[], lookback: number, rowCount: number, v
       rows[down].inValueArea = true;
     }
   }
-  return {
-    rows,
-    poc: (rows[pocRow].low + rows[pocRow].high) / 2,
-    vah: rows[up].high,
-    val: rows[down].low,
-    fromIndex,
-  };
+  return { pocRow, up, down };
+}
+
+/** Start (unix seconds, UTC) of the day, the week (Monday) or the month a time belongs to. */
+export function sessionStart(time: number, period: "day" | "week" | "month"): number {
+  const day = Math.floor(time / 86400);
+  if (period === "day") return day * 86400;
+  // 1970-01-01 was a Thursday: (day + 3) % 7 is 0 on Mondays.
+  if (period === "week") return (day - ((day + 3) % 7)) * 86400;
+  const d = new Date(time * 1000);
+  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1) / 1000;
+}
+
+/** One volume profile per session (day, week or month), as TradingView's Session Volume Profile. */
+export function sessionVolumeProfiles(bars: Bar[], period: "day" | "week" | "month", rowCount: number, valueAreaPct: number, maxSessions = 60): VolumeProfile[] {
+  const out: VolumeProfile[] = [];
+  let end = bars.length - 1;
+  while (end >= 0 && out.length < maxSessions) {
+    const key = sessionStart(bars[end].time, period);
+    let start = end;
+    while (start > 0 && sessionStart(bars[start - 1].time, period) === key) start--;
+    const vp = volumeProfileRange(bars, start, end, rowCount, valueAreaPct);
+    if (vp) out.push(vp);
+    end = start - 1;
+  }
+  return out.reverse();
+}
+
+/**
+ * Market Profile (TPO) per session: the session is cut into periods of `periodSeconds` (30 min as in the
+ * CBOT Market Profile, J. Peter Steidlmayer); every price row a period traded through gets one TPO. POC is
+ * the row with the most TPOs, the value area holds `valueAreaPct` % of all TPOs (grown from the POC as in
+ * the volume profile). Sources: CBOT "Market Profile Handbook"; TradingView Help Center, "TPO".
+ */
+export function tpoProfiles(
+  bars: Bar[],
+  period: "day" | "week" | "month",
+  rowCount: number,
+  valueAreaPct: number,
+  periodSeconds = 1800,
+  maxSessions = 60,
+): VolumeProfile[] {
+  const out: VolumeProfile[] = [];
+  let end = bars.length - 1;
+  while (end >= 0 && out.length < maxSessions) {
+    const key = sessionStart(bars[end].time, period);
+    let start = end;
+    while (start > 0 && sessionStart(bars[start - 1].time, period) === key) start--;
+    // The high and low of each period of the session.
+    const periods = new Map<number, { high: number; low: number }>();
+    let lo = Infinity;
+    let hi = -Infinity;
+    for (let i = start; i <= end; i++) {
+      const b = bars[i];
+      const k = Math.floor(b.time / periodSeconds);
+      const p = periods.get(k);
+      periods.set(k, p ? { high: Math.max(p.high, b.high), low: Math.min(p.low, b.low) } : { high: b.high, low: b.low });
+      lo = Math.min(lo, b.low);
+      hi = Math.max(hi, b.high);
+    }
+    if (hi > lo) {
+      const size = (hi - lo) / rowCount;
+      const rows: ProfileRow[] = Array.from({ length: rowCount }, (_, r) => ({ low: lo + r * size, high: lo + (r + 1) * size, volume: 0, buy: 0, inValueArea: false }));
+      for (const p of periods.values()) {
+        const first = Math.max(0, Math.floor((p.low - lo) / size));
+        // A high exactly on a row boundary does not reach into the row above.
+        const last = Math.max(first, Math.min(rowCount - 1, Math.ceil((p.high - lo) / size) - 1));
+        for (let r = first; r <= last; r++) rows[r].volume += 1;
+      }
+      const { pocRow, up, down } = valueArea(rows, valueAreaPct);
+      out.push({ rows, poc: (rows[pocRow].low + rows[pocRow].high) / 2, vah: rows[up].high, val: rows[down].low, fromIndex: start, toIndex: end, tpo: true });
+    }
+    end = start - 1;
+  }
+  return out.reverse();
 }

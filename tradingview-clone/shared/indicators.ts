@@ -10,6 +10,8 @@ import type { Bar, Series } from "./math.js";
 
 export type { Bar, Series };
 
+const SESSION_PERIODS: Record<number, "day" | "week" | "month"> = { 1: "day", 2: "week", 3: "month" };
+
 export interface ParamDef {
   key: string;
   label: string;
@@ -54,8 +56,11 @@ export interface IndicatorDef {
   // Shade the area between two outputs.
   fills?: { upper: string; lower: string; color: string; colorBelow?: string }[];
   compute: (bars: Bar[], p: Record<string, number>) => Record<string, Series>;
-  // Horizontal volume histogram drawn next to the price axis.
-  profile?: (bars: Bar[], p: Record<string, number>) => m.VolumeProfile | null;
+  // Horizontal volume histograms: one at the price axis ("right") or one per session from its first candle ("start").
+  profile?: (bars: Bar[], p: Record<string, number>, view: { from: number; to: number }) => m.VolumeProfile | m.VolumeProfile[] | null;
+  profileAnchor?: "right" | "start";
+  // The profile follows the visible candles (recomputed on scroll and zoom).
+  visibleRange?: boolean;
   // Time × price intensity grid drawn behind the candles.
   heatmap?: (bars: Bar[], p: Record<string, number>) => Heatmap | null;
   // Contrast exponent for the heatmap colors (param key).
@@ -949,6 +954,62 @@ export const INDICATORS: IndicatorDef[] = [
       const line = (v: number) => b.map((_, i) => (vp && i >= vp.fromIndex ? v : null));
       return vp ? { poc: line(vp.poc), vah: line(vp.vah), val: line(vp.val) } : { poc: line(0), vah: line(0), val: line(0) };
     },
+  },
+
+  {
+    id: "vpvr_visible",
+    name: "Volume Profile (Visible Range)",
+    short: "VPVR",
+    category: "Volumen",
+    overlay: true,
+    description:
+      "Volumen je Preisniveau über die gerade sichtbaren Kerzen, mit POC und Value Area; rechnet beim Scrollen und Zoomen neu (wie TradingViews „Visible Range Volume Profile“).",
+    params: [
+      { key: "rows", label: "Zeilen", default: 24, min: 5, max: 100 },
+      { key: "valueArea", label: "Value Area %", default: 70, min: 10, max: 95 },
+    ],
+    outputs: [],
+    visibleRange: true,
+    profileAnchor: "right",
+    profile: (b, p, view) => m.volumeProfileRange(b, view.from, view.to, p.rows, p.valueArea),
+    compute: () => ({}),
+  },
+  {
+    id: "vp_session",
+    name: "Session Volume Profile",
+    short: "SVP",
+    category: "Volumen",
+    overlay: true,
+    description:
+      "Ein Volumenprofil je Sitzung (Tag, Woche oder Monat, UTC) ab deren erster Kerze, mit POC und Value Area (wie TradingViews „Session Volume Profile“). Am besten auf Intraday-Charts.",
+    params: [
+      { key: "period", label: "Sitzung (1 Tag, 2 Woche, 3 Monat)", default: 1, min: 1, max: 3, step: 1 },
+      { key: "rows", label: "Zeilen", default: 24, min: 5, max: 100 },
+      { key: "valueArea", label: "Value Area %", default: 70, min: 10, max: 95 },
+    ],
+    outputs: [],
+    profileAnchor: "start",
+    profile: (b, p) => m.sessionVolumeProfiles(b, SESSION_PERIODS[p.period] ?? "day", p.rows, p.valueArea),
+    compute: () => ({}),
+  },
+  {
+    id: "tpo",
+    name: "Market Profile (TPO)",
+    short: "TPO",
+    category: "Volumen",
+    overlay: true,
+    description:
+      "Market Profile nach Steidlmayer: je Sitzung zählt jede 30-Minuten-Periode, durch welche Preise sie lief (TPO). Zeigt POC und Value Area nach Zeit statt nach Volumen. Nur auf Intraday-Charts bis 30 m sinnvoll.",
+    params: [
+      { key: "period", label: "Sitzung (1 Tag, 2 Woche, 3 Monat)", default: 1, min: 1, max: 3, step: 1 },
+      { key: "rows", label: "Zeilen", default: 24, min: 5, max: 100 },
+      { key: "valueArea", label: "Value Area %", default: 70, min: 10, max: 95 },
+      { key: "minutes", label: "Periode (Minuten)", default: 30, min: 5, max: 240, step: 5 },
+    ],
+    outputs: [],
+    profileAnchor: "start",
+    profile: (b, p) => m.tpoProfiles(b, SESSION_PERIODS[p.period] ?? "day", p.rows, p.valueArea, p.minutes * 60),
+    compute: () => ({}),
   },
 
   // ---------------- Crypto cycle indicators ----------------
