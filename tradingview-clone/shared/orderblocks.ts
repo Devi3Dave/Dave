@@ -88,6 +88,7 @@ export function resample(bars: Bar[], seconds: number): TfBar[] {
  * Order blocks: when a close breaks the last swing high (bullish break of structure), the
  * candle with the lowest low between that swing and the break is the bullish order block –
  * mirrored for bearish ones. Zones stay valid until a close goes through them.
+ * Source: smart-money-concepts `smc.ob` (joshyattridge/smart-money-concepts, MIT).
  */
 function detect(src: TfBar[], swing: number, tf: string, tfSeconds: number): OrderBlock[] {
   const out: OrderBlock[] = [];

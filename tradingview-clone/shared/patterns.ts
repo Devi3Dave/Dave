@@ -40,7 +40,13 @@ const mid = (b: Bar) => (b.open + b.close) / 2;
 const hammerShape = (b: Bar, avgBody: number) => range(b) > avgBody && body(b) > 0 && lowerWick(b) >= 2 * body(b) && upperWick(b) <= Math.max(body(b) * 0.5, range(b) * 0.1);
 const invertedShape = (b: Bar, avgBody: number) => range(b) > avgBody && body(b) > 0 && upperWick(b) >= 2 * body(b) && lowerWick(b) <= Math.max(body(b) * 0.5, range(b) * 0.1);
 
-/** Ordered by priority: when several match on one candle, the first (longest) one wins. */
+/**
+ * Candle definitions after Steve Nison, "Japanese Candlestick Charting Techniques" (2nd ed. 2001):
+ * a reversal pattern needs a prior trend, hammer-type wicks are at least twice the body, harami
+ * bodies sit inside the first body, piercing/dark cloud close beyond the first body's midpoint.
+ * Nison's opening-gap requirements are relaxed because 24/7 crypto markets rarely gap.
+ * Ordered by priority: when several match on one candle, the first (longest) one wins.
+ */
 const CANDLES: CandleDef[] = [
   {
     id: "three_white_soldiers",
@@ -179,6 +185,8 @@ export function detectCandlePatterns(bars: Bar[], lookback = 300, includeDoji = 
 }
 
 // ---------------- chart formations ----------------
+// Shapes and price targets (pattern height projected from the neckline) after Thomas
+// Bulkowski, "Encyclopedia of Chart Patterns" (2nd ed. 2005).
 
 export interface Pivot {
   index: number;
