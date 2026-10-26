@@ -27,6 +27,7 @@ import {
 import { displayBars, hollowStyle, isPriceDriven } from "../../shared/chartTypes";
 import { getIndicator, resolveParams, type IndicatorDef, type OutputDef } from "../../shared/indicators";
 import { heikinAshi, type Bar, type Series } from "../../shared/math";
+import { barIndexAt } from "../../shared/replay";
 import { getExchange, tradingDays } from "../../shared/exchanges";
 import { intervalSeconds, isCalendarInterval } from "../../shared/marketData";
 import type { OrderBlock, OrderBlockSignal } from "../../shared/orderblocks";
@@ -132,6 +133,12 @@ export class ChartEngine {
   onDrawingDrag: (phase: "move" | "end" | "cancel", e: PointerEvent | null) => void = () => {};
   /** Right click, or a long press with the finger; `e` is null outside the panes (price scale). */
   onContextMenu: (e: PointerEvent | null, clientX: number, clientY: number) => void = () => {};
+  /** The user moved the crosshair to the candle at `time` (null: left the chart), for syncing other charts. */
+  onCrosshairTime: (time: number | null) => void = () => {};
+  /** The visible time range changed (scroll, zoom), for syncing other charts. */
+  onVisibleTime: (from: number, to: number) => void = () => {};
+  /** Set while another chart moves this one, so the change is not sent back. */
+  private syncing = false;
 
   constructor(container: HTMLElement) {
     this.chart = createChart(container, {
@@ -152,6 +159,10 @@ export class ChartEngine {
     this.chart.subscribeCrosshairMove((p: MouseEventParams<Time>) => {
       if (p.logical === undefined || !p.point) this.onCrosshair(null, null);
       else this.onCrosshair(Math.round(p.logical), { x: p.point.x, y: p.point.y, logical: p.logical, paneIndex: p.paneIndex ?? 0 });
+      if (!this.syncing) this.onCrosshairTime(p.logical === undefined || !p.point ? null : this.logicalToTime(Math.round(p.logical)));
+    });
+    this.chart.timeScale().subscribeVisibleTimeRangeChange((r) => {
+      if (r && !this.syncing) this.onVisibleTime(r.from as number, r.to as number);
     });
     // Own click detection: the library folds two quick clicks into a double
     // click, which would swallow the second point of a two-point drawing.
@@ -907,6 +918,33 @@ export class ChartEngine {
     if (i >= 0 && i < n) return bars[i].time;
     const step = n > 1 ? bars[n - 1].time - bars[n - 2].time : 60;
     return i < 0 ? bars[0].time + i * step : bars[n - 1].time + (i - n + 1) * step;
+  }
+
+  /** Shows the crosshair at the candle containing `time` (from another chart); null hides it. */
+  showCrosshairAt(time: number | null) {
+    if (this.destroyed || !this.main) return;
+    this.syncing = true;
+    try {
+      const i = time === null ? -1 : barIndexAt(this.bars, time);
+      if (i < 0) this.chart.clearCrosshairPosition();
+      else this.chart.setCrosshairPosition(this.bars[i].close, this.bars[i].time as UTCTimestamp, this.main);
+    } finally {
+      this.syncing = false;
+    }
+  }
+
+  /** Scrolls and zooms to the same time range as another chart. */
+  showTimeRange(from: number, to: number) {
+    if (this.destroyed || this.bars.length < 2 || !(to > from)) return;
+    this.syncing = true;
+    try {
+      this.chart.timeScale().setVisibleRange({ from: from as UTCTimestamp, to: to as UTCTimestamp });
+    } catch {
+      // range outside the loaded candles
+    } finally {
+      // The library reports the change on the next frame.
+      requestAnimationFrame(() => (this.syncing = false));
+    }
   }
 
   priceAt(y: number): number | null {

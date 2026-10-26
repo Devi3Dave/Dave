@@ -102,10 +102,11 @@ und zusammen mit der Fill & Sign-App auf GitHub Pages veröffentlicht.
   sichtbaren Bereichs, Kurs mit 24-h-Veränderung in der Kopfzeile; Zeitzone, Sekunden, Gitter, Fadenkreuz
 - Schnellbuttons unten rechts im Chart: log, %, Auto-Skalierung, Ansicht zurücksetzen
 - Hinweise beim Überfahren mit der Maus für alle Buttons (auf Touch-Geräten ausgeblendet)
-- Mehrere Charts gleichzeitig (Layout-Button ▢ in der Kopfzeile): 1, 2 nebeneinander/übereinander,
-  3 (einer groß) oder 2 × 2 – jeder mit eigenem Symbol, Zeiteinheit, Indikatoren und Zeichnungen.
-  Der angetippte Chart ist aktiv (blauer Rahmen); Kopfzeile, Werkzeuge und Claude wirken auf ihn.
-  Optional wird die Zeiteinheit in allen Charts synchron gewechselt
+- Mehrere Charts gleichzeitig (Layout-Button in der Kopfzeile): 1, 2 nebeneinander/übereinander,
+  3 (einer groß oder nebeneinander), 2 × 2, 3 × 2 und 4 × 2 (iPad hochkant: zwei Spalten) – jeder mit eigenem
+  Symbol, Zeiteinheit, Indikatoren und Zeichnungen. Der angetippte Chart ist aktiv (blauer Rahmen); Kopfzeile,
+  Werkzeuge und Claude wirken auf ihn. Wie bei TradingView lassen sich Symbol, Zeiteinheit, Fadenkreuz
+  (Standard an) und Zeitbereich (Scrollen/Zoomen des aktiven Charts) über alle Charts synchronisieren
 - Layout (Symbol, Indikatoren, Zeichnungen, Einstellungen) wird je Chart im Browser gespeichert
 - Vorlagen (▤ Vorlagen): fertige Setups Nur Chart (ohne Indikatoren), Scalping, Daytrading, Swing, Krypto-Zyklus und
   Smart Money, Mustererkennung; eigene Vorlagen aus dem aktiven Chart speichern (Indikatoren mit Parametern/Farben,

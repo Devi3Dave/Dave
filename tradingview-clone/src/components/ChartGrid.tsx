@@ -10,7 +10,7 @@ interface Props {
   onEditPosition: (id: string) => void;
 }
 
-/** One to four charts side by side; tapping a chart makes it the active one. */
+/** One to eight charts side by side; tapping a chart makes it the active one. */
 export function ChartGrid({ onEngine, magnet, onEditIndicator, onEditPosition }: Props) {
   const layout = useWorkspace((w) => w.layout);
   const active = useWorkspace((w) => w.active);

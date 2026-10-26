@@ -128,8 +128,8 @@ const STALL_MS = 60_000;
 /** Sources without a live stream (Yahoo) are reloaded this often. */
 const POLL_MS = 60_000;
 
-export const MAX_CHARTS = 4;
-const DEFAULT_SYMBOLS = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT"];
+export const MAX_CHARTS = 8;
+const DEFAULT_SYMBOLS = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT", "BNBUSDT", "DOGEUSDT", "ADAUSDT", "LINKUSDT"];
 const storageKey = (slot: number) => (slot === 0 ? "chartai.layout.v1" : `chartai.layout.v1.chart${slot + 1}`);
 
 function readJson<T>(key: string): Partial<T> {
@@ -358,14 +358,17 @@ if (typeof window !== "undefined") {
 
 // ---------------- Workspace (layout + active chart) ----------------
 
-export type LayoutId = "1" | "2h" | "2v" | "3" | "4";
+export type LayoutId = "1" | "2h" | "2v" | "3" | "3h" | "4" | "6" | "8";
 
 export const LAYOUTS: { id: LayoutId; count: number; label: string; icon: string }[] = [
   { id: "1", count: 1, label: "Ein Chart", icon: "▢" },
   { id: "2h", count: 2, label: "Zwei Charts nebeneinander", icon: "◫" },
   { id: "2v", count: 2, label: "Zwei Charts übereinander", icon: "⊟" },
   { id: "3", count: 3, label: "Drei Charts (einer groß)", icon: "◧" },
+  { id: "3h", count: 3, label: "Drei Charts nebeneinander", icon: "⫼" },
   { id: "4", count: 4, label: "Vier Charts (2 × 2)", icon: "⊞" },
+  { id: "6", count: 6, label: "Sechs Charts (3 × 2)", icon: "☷" },
+  { id: "8", count: 8, label: "Acht Charts (4 × 2)", icon: "▦" },
 ];
 
 export interface Workspace {
@@ -373,6 +376,12 @@ export interface Workspace {
   active: number;
   /** A new time frame on one chart is applied to all visible charts. */
   syncInterval: boolean;
+  /** A new symbol on one chart is applied to all visible charts. */
+  syncSymbol: boolean;
+  /** The crosshair is shown at the same time in all charts. */
+  syncCrosshair: boolean;
+  /** Scrolling and zooming one chart shows the same time range in the others. */
+  syncTime: boolean;
 }
 
 export function layoutCount(id: LayoutId): number {
@@ -386,6 +395,9 @@ let workspaceState: Workspace = {
   layout: initialLayout,
   active: Math.min(savedWorkspace.active ?? 0, layoutCount(initialLayout) - 1),
   syncInterval: savedWorkspace.syncInterval ?? false,
+  syncSymbol: savedWorkspace.syncSymbol ?? false,
+  syncCrosshair: savedWorkspace.syncCrosshair ?? true,
+  syncTime: savedWorkspace.syncTime ?? false,
 };
 const workspaceListeners = new Set<Listener>();
 
@@ -560,10 +572,15 @@ export function exitReplay(chart: ChartStore = activeChart()) {
 
 export async function loadChart(symbol: string, interval: Interval): Promise<void> {
   const target = activeChart();
-  if (!workspaceState.syncInterval || interval === target.get().interval) return target.load(symbol, interval);
-  // Synced time frame: the other visible charts follow.
-  const count = layoutCount(workspaceState.layout);
-  await Promise.all(charts.slice(0, count).map((c) => c.load(c === target ? symbol : c.get().symbol, interval)));
+  const w = workspaceState;
+  const syncI = w.syncInterval && interval !== target.get().interval;
+  const syncS = w.syncSymbol && symbol !== target.get().symbol;
+  if (!syncI && !syncS) return target.load(symbol, interval);
+  // Synced time frame or symbol: the other visible charts follow.
+  const count = layoutCount(w.layout);
+  await Promise.all(
+    charts.slice(0, count).map((c) => (c === target ? c.load(symbol, interval) : c.load(syncS ? symbol : c.get().symbol, syncI ? interval : c.get().interval))),
+  );
 }
 
 export async function fetchMarketData(symbol: string, interval: string, limit = 1000): Promise<MarketData> {

@@ -3,12 +3,13 @@ import { displayBars, isPriceDriven } from "../../shared/chartTypes";
 import { indicatorLabel } from "../../shared/indicators";
 import { ChartEngine, type ComputedIndicator, type PointerEvent } from "../chart/ChartEngine";
 import { alertLinesFor, alertStore } from "../alerts";
+import { publishSync, subscribeSync } from "../chartSync";
 import { demo, dropLevel, replayPositionsOpen, tradeLinesFor, type LineDraft } from "../demoAccount";
 import { getSelectedExchanges, subscribeExchanges } from "../exchangeSelection";
 import { liquidationFeed } from "../market/liquidationFeed";
 import { DEFAULT_FIBEXT_LEVELS, DEFAULT_FIB_LEVELS, formatPrice } from "../chart/DrawingsPrimitive";
 import { placeOnSide } from "../../shared/position";
-import { activeChart, addDrawing, newId, pickReplayStart, removeIndicator, stepBackReplay, stepReplay, updateIndicator, updateSettings, useChart, type ChartStore, type Drawing, type Point } from "../store";
+import { activeChart, addDrawing, newId, pickReplayStart, removeIndicator, stepBackReplay, stepReplay, updateIndicator, updateSettings, useChart, workspace, type ChartStore, type Drawing, type Point } from "../store";
 import { cloneInPlace, copyDrawing, deleteDrawing, pasteDrawing, replaceDrawing, selectDrawing, selectedDrawing, trackHistory, undoDrawings, useSelectedDrawing } from "../drawingEdit";
 import { cloneDrawing, hasMovableAnchors, moveAnchor, shiftDrawing } from "../drawingOps";
 import { DrawingMenu, type MenuTarget } from "./DrawingMenu";
@@ -425,6 +426,21 @@ export function ChartArea({ chart, onEngine, magnet, onEditIndicator, onEditPosi
     const unsubscribeDemo = demo.subscribe(pushTradeLines);
     const unsubscribeDemoChart = chart.subscribe(pushTradeLines);
     const unsubscribeAlerts = alertStore.subscribe(pushTradeLines);
+    // Layout sync: the chart under the pointer leads the crosshair, the active chart the time range.
+    engine.onCrosshairTime = (time) => {
+      if (containerRef.current?.matches(":hover")) publishSync(chart.slot, { kind: "crosshair", time });
+    };
+    engine.onVisibleTime = (from, to) => {
+      if (workspace.get().active === chart.slot) publishSync(chart.slot, { kind: "range", from, to });
+    };
+    const container = containerRef.current!;
+    const onLeave = () => publishSync(chart.slot, { kind: "crosshair", time: null });
+    container.addEventListener("pointerleave", onLeave);
+    const unsubscribeSync = subscribeSync((from, ev) => {
+      if (from === chart.slot) return;
+      if (ev.kind === "crosshair") engine.showCrosshairAt(ev.time);
+      else engine.showTimeRange(ev.from, ev.to);
+    });
     engine.setExchanges(getSelectedExchanges());
     const unsubscribeExchanges = subscribeExchanges(() => engine.setExchanges(getSelectedExchanges()));
     const ro = new ResizeObserver(() => requestAnimationFrame(refreshLayout));
@@ -482,6 +498,8 @@ export function ChartArea({ chart, onEngine, magnet, onEditIndicator, onEditPosi
       unsubscribeDemo();
       unsubscribeDemoChart();
       unsubscribeAlerts();
+      unsubscribeSync();
+      container.removeEventListener("pointerleave", onLeave);
       window.clearTimeout(lineErrorTimer);
       onEngine(chart.slot, null);
       engine.destroy();
