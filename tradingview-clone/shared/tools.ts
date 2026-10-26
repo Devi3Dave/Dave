@@ -3,8 +3,13 @@
 // validate tool inputs before touching the chart.
 import { z } from "zod";
 import { INDICATOR_IDS } from "./indicators.js";
+import { isValidInterval } from "./marketData.js";
 
-export const INTERVALS = ["1m", "5m", "15m", "30m", "1h", "4h", "1d", "1w", "1M", "3M", "1y", "all"] as const;
+/** Preset time frames (menu); any other like 7m, 90s, 2d works too (see parseInterval). */
+export const INTERVALS = ["1s", "5s", "15s", "30s", "1m", "3m", "5m", "15m", "30m", "45m", "1h", "2h", "3h", "4h", "6h", "8h", "12h", "1d", "3d", "1w", "1M", "3M", "1y", "all"] as const;
+/** Time frames shown as buttons in the top bar. */
+export const MAIN_INTERVALS = ["1m", "5m", "15m", "30m", "1h", "4h", "1d", "1w", "1M", "3M", "1y", "all"] as const;
+export type CustomInterval = `${number}${"s" | "m" | "h" | "d"}`;
 export const CHART_TYPES = ["candles", "hollow_candles", "bars", "heikin_ashi", "line", "step_line", "area", "baseline", "renko", "line_break"] as const;
 
 const time = z
@@ -48,7 +53,15 @@ export const toolSchemas = {
     description: "Wechselt Symbol, Zeiteinheit oder Charttyp. Danach sind neue Kerzen geladen.",
     schema: z.object({
       symbol: z.string().optional().describe("z. B. BTCUSDT, ETHUSDT (Binance) oder AAPL, ^GDAXI, EURUSD=X (Yahoo)."),
-      interval: z.enum(INTERVALS).optional().describe("1M = Monat, 3M = Quartal, 1y = Jahr, all = gesamte Historie (Wochenkerzen)."),
+      interval: z
+        .string()
+        .refine(isValidInterval, "Zeiteinheit wie 1m, 15m, 4h, 1d oder eigene wie 7m, 90s, 2d")
+        .optional()
+        .describe(
+          "Voreinstellungen: " +
+            INTERVALS.join(", ") +
+            ". 1M = Monat, 3M = Quartal, 1y = Jahr, all = gesamte Historie (Wochenkerzen). Eigene Zeiteinheiten: Zahl + s/m/h/d bis 7 Tage (z. B. 7m, 90s, 2d). Sekunden nur für Binance-Spot-Krypto.",
+        ),
       chart_type: z.enum(CHART_TYPES).optional(),
     }),
   },

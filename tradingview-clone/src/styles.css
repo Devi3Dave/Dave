@@ -3340,3 +3340,82 @@ select,
   border-radius: 4px;
   text-align: right;
 }
+
+/* ---------- time frame menu ---------- */
+
+.iv-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 2px 4px 6px;
+}
+
+.iv-chip-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.iv-chip {
+  min-width: 42px;
+  padding: 5px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.iv-chip.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.iv-remove {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: var(--border);
+  color: var(--text);
+  font-size: 11px;
+  line-height: 16px;
+  cursor: pointer;
+}
+
+.iv-custom {
+  display: flex;
+  gap: 6px;
+  padding: 2px 4px 6px;
+}
+
+.iv-custom input {
+  flex: 1;
+  min-width: 0;
+  padding: 6px;
+  background: var(--bg, #131722);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+.iv-custom button {
+  padding: 6px 10px;
+  border: none;
+  border-radius: 4px;
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+}
+
+.iv-error {
+  padding: 0 4px 6px;
+  color: var(--down);
+  font-size: 12px;
+}

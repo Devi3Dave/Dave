@@ -6,13 +6,13 @@ import { marketNow, referenceMarket, type LiveTick, type RestCheck } from "../sh
 import type { Bar } from "../shared/math";
 import type { PositionInput } from "../shared/position";
 import { barIndexAt, carryReplay, randomStart } from "../shared/replay";
-import type { CHART_TYPES, INTERVALS } from "../shared/tools";
+import type { CHART_TYPES, CustomInterval, INTERVALS } from "../shared/tools";
 import { DEFAULT_SETTINGS, type ChartSettings } from "./chartSettings";
 import { STANDALONE } from "./config";
 import { measureClock } from "./market/clockSync";
 import { connectFeedLive, feedFor, loadFeedData } from "./market/exchangeFeed";
 
-export type Interval = (typeof INTERVALS)[number];
+export type Interval = (typeof INTERVALS)[number] | CustomInterval;
 export type ChartType = (typeof CHART_TYPES)[number];
 export type Author = "user" | "claude";
 export type LineStyleName = "solid" | "dashed" | "dotted";
@@ -587,8 +587,8 @@ export async function fetchMarketData(symbol: string, interval: string, limit = 
 
 function connectLive(chart: ChartStore, symbol: string, interval: Interval, futures: boolean, current: () => boolean, onData: () => void): WebSocket {
   const stream = binanceInterval(interval);
-  // Quarter and year candles follow the monthly stream; `seen` is the last monthly kline, for volume deltas.
-  const merge = stream === "1M" && interval !== "1M";
+  // Quarter and year candles follow the monthly stream, 5 s the 1 s stream, 45 m the 15 m one …; `seen` is the last source kline, for volume deltas.
+  const merge = stream !== interval && interval !== "all";
   let seen: Bar | null = null;
   const host = futures ? "wss://fstream.binance.com" : "wss://stream.binance.com:9443";
   const ws = new WebSocket(`${host}/ws/${symbol.toLowerCase()}@kline_${stream}`);

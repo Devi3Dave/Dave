@@ -27,6 +27,7 @@ import {
   store,
   type ChartMarker,
   type Drawing,
+  type Interval,
   type Point,
 } from "../store";
 import { barRows, iso, num } from "./context";
@@ -139,7 +140,7 @@ async function run(name: ToolName, input: unknown, engine: ChartEngine | null): 
     case "set_chart": {
       const { symbol, interval, chart_type } = input as ToolInput<"set_chart">;
       if (chart_type) store.set({ chartType: chart_type });
-      if (symbol || interval) await loadChart(symbol?.toUpperCase() ?? s.symbol, interval ?? s.interval);
+      if (symbol || interval) await loadChart(symbol?.toUpperCase() ?? s.symbol, (interval as Interval | undefined) ?? s.interval);
       const after = store.get();
       if (after.error) return fail(`Laden fehlgeschlagen: ${after.error}`);
       const last = after.bars[after.bars.length - 1];
