@@ -15,8 +15,9 @@ import { positionStats } from "../../shared/position";
 import type { Drawing, LineStyleName, Point } from "../store";
 
 export const DEFAULT_FIB_LEVELS = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1, 1.618];
-export const DEFAULT_FIBEXT_LEVELS = [0, 0.618, 1, 1.272, 1.618, 2, 2.618];
-const FIBEXT_COLORS = ["#787b86", "#00bcd4", "#2962ff", "#4caf50", "#ff9800", "#f23645", "#9c27b0"];
+// TradingView "Trend-Based Fib Extension" levels up to 3.618 (golden-ratio multiples 1.618 / 2.618 / 3.618).
+export const DEFAULT_FIBEXT_LEVELS = [0, 0.618, 1, 1.272, 1.618, 2, 2.618, 3.618];
+const FIBEXT_COLORS = ["#787b86", "#00bcd4", "#2962ff", "#4caf50", "#ff9800", "#f23645", "#9c27b0", "#e91e63"];
 const FIB_COLORS = ["#787b86", "#f23645", "#ff9800", "#4caf50", "#089981", "#00bcd4", "#787b86", "#2962ff"];
 
 interface Segment {

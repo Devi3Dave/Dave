@@ -91,6 +91,7 @@ export function buildChartState(s: ChartState, engine: ChartEngine | null, recen
     const params = resolveParams(def, inst.params);
     const out = def.compute(bars, params);
     const values = def.outputs
+      .filter((o) => !o.helper)
       .map((o) => {
         const arr = out[o.key] ?? [];
         return `${o.key}=${num(arr[arr.length - 1])} (vorher ${num(arr[arr.length - 2])})`;

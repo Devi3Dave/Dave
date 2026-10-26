@@ -518,7 +518,7 @@ export function ChartArea({ chart, onEngine, magnet, onEditIndicator, onEditPosi
           {!c.instance.hidden &&
             c.def.outputs.map((o, k) => {
               const v = c.outputs[o.key]?.[idx];
-              return v === null || v === undefined ? null : (
+              return o.helper || v === null || v === undefined ? null : (
                 <span key={o.key} style={{ color: c.instance.colors?.[k] ?? o.color }}>
                   {formatPrice(v)}
                 </span>

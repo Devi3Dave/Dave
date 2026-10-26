@@ -4,6 +4,8 @@ import * as m from "./math.js";
 import { orderBlocks, type OrderBlock, type OrderBlockSignal } from "./orderblocks.js";
 import { detectCandlePatterns, detectFormations, type CandlePattern, type Formation } from "./patterns.js";
 import { marketStructure, type StructureBreak } from "./structure.js";
+import { divergenceLine, divergences } from "./divergence.js";
+import { SESSION_EXCHANGES, newYorkOpens, sessionBoxes, type SessionBox, type TimeLine } from "./sessions.js";
 import type { Bar, Series } from "./math.js";
 
 export type { Bar, Series };
@@ -29,6 +31,10 @@ export interface OutputDef {
   // Plot the value N bars to the right (positive) or left (negative) of its bar.
   offset?: (params: Record<string, number>) => number;
   // Per-point color (histogram bars, dots, line segments); `base` is the configured color.
+  // Only feeds a fill (e.g. the clamp line of a cloud): no line, no legend value, no color picker.
+  helper?: boolean;
+  // Only set where an event occurs (divergence lines); may be empty.
+  sparse?: boolean;
   pointColor?: (ctx: { values: Series; i: number; bar: Bar; outputs: Record<string, Series>; base: string }) => string;
 }
 
@@ -64,6 +70,8 @@ export interface PatternResult {
   zones?: OrderBlock[];
   signals?: OrderBlockSignal[];
   structure?: StructureBreak[];
+  sessions?: SessionBox[];
+  timeLines?: TimeLine[];
 }
 
 const MINUTES = 60;
@@ -128,20 +136,49 @@ export const INDICATORS: IndicatorDef[] = [
     category: "Muster",
     overlay: true,
     description:
-      "Drei-Kerzen-Imbalance (ICT): bullisch, wenn das Tief von Kerze 3 über dem Hoch von Kerze 1 liegt (Kerze 2 grün), bärisch spiegelbildlich. Die Lücke bleibt als Zone stehen, bis der Kurs zurückkommt (Mitigation: 0 = Berührung, 1 = 50 %, 2 = ganz gefüllt). Quelle: smart-money-concepts (smc.fvg) / Fair Value Gap [LuxAlgo].",
+      "Drei-Kerzen-Imbalance (ICT): bullisch, wenn das Tief von Kerze 3 über dem Hoch von Kerze 1 liegt (Kerze 2 grün), bärisch spiegelbildlich. Die Lücke bleibt als Zone stehen, bis der Kurs zurückkommt (Mitigation: 0 = Berührung, 1 = 50 %, 2 = ganz gefüllt). Optional die 50-%-Linie (Consequential Encroachment, ICT). Quelle: smart-money-concepts (smc.fvg) / Fair Value Gap [LuxAlgo].",
     params: [
       { key: "minPct", label: "Mindestgröße %", default: 0, min: 0, max: 10, step: 0.05 },
       { key: "mitigation", label: "Mitigation (0/1/2)", default: 0, min: 0, max: 2, step: 1 },
       { key: "zones", label: "Zonen je Richtung", default: 5, min: 1, max: 30 },
       { key: "mitigated", label: "Mitigierte zeigen (0/1)", default: 0, min: 0, max: 1 },
+      { key: "ce", label: "50-%-Linie (CE) (0/1)", default: 0, min: 0, max: 1 },
     ],
     outputs: [],
     compute: () => ({}),
     patterns: (b, p) => ({
       candles: [],
       formations: [],
-      zones: fairValueGaps(b, { minPct: p.minPct, mitigation: FVG_MITIGATION[Math.round(p.mitigation)] ?? "touch", maxZones: p.zones, showMitigated: p.mitigated >= 1 }),
+      zones: fairValueGaps(b, { minPct: p.minPct, mitigation: FVG_MITIGATION[Math.round(p.mitigation)] ?? "touch", maxZones: p.zones, showMitigated: p.mitigated >= 1, ce: p.ce >= 1 }),
     }),
+  },
+  {
+    id: "sessions",
+    name: "Sessions & New-York-Open",
+    short: "Sessions",
+    category: "Muster",
+    overlay: true,
+    description:
+      "Graue Boxen für die Handelszeiten Tokio (9:00–15:30), London (8:00–16:30) und New York (9:30–16:00), jeweils Ortszeit mit Sommerzeit und Börsenfeiertagen, von Hoch bis Tief der Session. Rote gepunktete Linie bei der NYSE-Eröffnung um 9:30 Uhr New York. Nur auf Intraday-Charts. Offene Annäherung an Percocos \"IT Foundation\"-Indikator (dessen Code ist nicht öffentlich).",
+    params: [
+      { key: "nyopen", label: "NY-Open-Linie (0/1)", default: 1, min: 0, max: 1 },
+      { key: "tokyo", label: "Tokio (0/1)", default: 1, min: 0, max: 1 },
+      { key: "london", label: "London (0/1)", default: 1, min: 0, max: 1 },
+      { key: "newyork", label: "New York (0/1)", default: 1, min: 0, max: 1 },
+      { key: "days", label: "Tage", default: 10, min: 1, max: 60 },
+    ],
+    outputs: [],
+    compute: () => ({}),
+    patterns: (b, p) => {
+      const intraday = b.length > 1 && b[b.length - 1].time - b[b.length - 2].time < 86400;
+      if (!intraday) return { candles: [], formations: [] };
+      return {
+        candles: [],
+        formations: [],
+        sessions: SESSION_EXCHANGES.filter((s) => p[s.key] >= 1).flatMap((s) => sessionBoxes(b, s.id, s.label, p.days)),
+        timeLines: p.nyopen >= 1 ? newYorkOpens(b, p.days) : [],
+      };
+    },
   },
   {
     id: "structure",
@@ -442,6 +479,50 @@ export const INDICATORS: IndicatorDef[] = [
     compute: (b, p) => {
       const value = m.rsi(m.closes(b), p.length);
       return { value, ma: m.sma(value, p.maLength) };
+    },
+  },
+  {
+    id: "rsicloud",
+    name: "RSI mit Wolken & Divergenzen",
+    short: "RSI Cloud",
+    category: "Momentum",
+    overlay: false,
+    description:
+      "RSI (Wilder) mit farbiger Wolke über der Überkauft- und unter der Überverkauft-Grenze und Divergenzlinien (regulär; versteckt optional) nach TradingViews quelloffenem \"RSI Divergence Indicator\": Pivots 5/5, Abstand 5–60 Kerzen. Bullisch: Kurs tieferes Tief, RSI höheres Tief; bärisch umgekehrt. Eine Divergenz erscheint erst \"Pivot rechts\" Kerzen nach dem Pivot. Offene Annäherung an \"Cloud Highlight RSI\" / Inevitrade Pro Plus.",
+    params: [
+      len(14),
+      { key: "ob", label: "Überkauft", default: 70, min: 50, max: 100 },
+      { key: "os", label: "Überverkauft", default: 30, min: 0, max: 50 },
+      { key: "left", label: "Pivot links", default: 5, min: 1, max: 50 },
+      { key: "right", label: "Pivot rechts", default: 5, min: 1, max: 50 },
+      { key: "rangeLower", label: "Mindestabstand", default: 5, min: 0, max: 200 },
+      { key: "rangeUpper", label: "Höchstabstand", default: 60, min: 1, max: 500 },
+      { key: "hidden", label: "Versteckte Divergenzen (0/1)", default: 0, min: 0, max: 1 },
+    ],
+    outputs: [
+      { key: "value", label: "RSI", color: "#7e57c2" },
+      { key: "clamp", label: "Grenze", color: "#787b86", helper: true },
+      { key: "bull", label: "Bullische Divergenz", color: "#089981", lineWidth: 2, sparse: true },
+      { key: "bear", label: "Bärische Divergenz", color: "#f23645", lineWidth: 2, sparse: true },
+      { key: "hbull", label: "Versteckt bullisch", color: "#089981", lineWidth: 1, dashed: true, sparse: true },
+      { key: "hbear", label: "Versteckt bärisch", color: "#f23645", lineWidth: 1, dashed: true, sparse: true },
+    ],
+    levels: [30, 50, 70],
+    fills: [{ upper: "value", lower: "clamp", color: "rgba(242,54,69,0.35)", colorBelow: "rgba(8,153,129,0.35)" }],
+    compute: (b, p) => {
+      const value = m.rsi(m.closes(b), p.length);
+      // Equals the RSI between the bounds, so the fill only shows beyond them.
+      const clamp = value.map((v) => (v === null ? null : Math.min(Math.max(v, p.os), p.ob)));
+      const divs = divergences(b, value, { left: p.left, right: p.right, rangeLower: p.rangeLower, rangeUpper: p.rangeUpper });
+      const none: Series = value.map(() => null);
+      return {
+        value,
+        clamp,
+        bull: divergenceLine(value, divs, "bull"),
+        bear: divergenceLine(value, divs, "bear"),
+        hbull: p.hidden >= 1 ? divergenceLine(value, divs, "hiddenBull") : none,
+        hbear: p.hidden >= 1 ? divergenceLine(value, divs, "hiddenBear") : none,
+      };
     },
   },
   {

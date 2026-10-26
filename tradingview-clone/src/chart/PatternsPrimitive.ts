@@ -1,6 +1,7 @@
 import type { IPrimitivePaneRenderer, IPrimitivePaneView, ISeriesApi, ISeriesPrimitive, SeriesAttachedParameter, SeriesType, Time } from "lightweight-charts";
 import type { OrderBlock } from "../../shared/orderblocks";
 import type { Formation } from "../../shared/patterns";
+import type { SessionBox, TimeLine } from "../../shared/sessions";
 import type { StructureBreak } from "../../shared/structure";
 import { formatPrice, withAlpha } from "./DrawingsPrimitive";
 
@@ -13,14 +14,17 @@ export class PatternsPrimitive implements ISeriesPrimitive<Time> {
   private formations: Formation[] = [];
   private zones: OrderBlock[] = [];
   private structure: StructureBreak[] = [];
+  private sessions: SessionBox[] = [];
+  private timeLines: TimeLine[] = [];
   private readonly view: IPrimitivePaneView;
   private readonly zoneView: IPrimitivePaneView;
 
   constructor(private readonly timeToX: (time: number) => number | null) {
     const renderer: IPrimitivePaneRenderer = {
       draw: (target) =>
-        target.useMediaCoordinateSpace(({ context: ctx }) => {
+        target.useMediaCoordinateSpace(({ context: ctx, mediaSize }) => {
           ctx.save();
+          this.drawTimeLines(ctx, mediaSize.height);
           ctx.font = "11px -apple-system, BlinkMacSystemFont, 'Trebuchet MS', Roboto, sans-serif";
           ctx.textBaseline = "middle";
           for (const f of this.formations) this.drawOne(ctx, f);
@@ -36,6 +40,7 @@ export class PatternsPrimitive implements ISeriesPrimitive<Time> {
           ctx.save();
           ctx.font = "10px -apple-system, BlinkMacSystemFont, 'Trebuchet MS', Roboto, sans-serif";
           ctx.textBaseline = "middle";
+          this.drawSessions(ctx);
           this.drawZones(ctx, mediaSize.width);
           ctx.restore();
         }),
@@ -68,6 +73,44 @@ export class PatternsPrimitive implements ISeriesPrimitive<Time> {
     this.requestUpdate?.();
   }
 
+  setSessions(sessions: SessionBox[], timeLines: TimeLine[]) {
+    this.sessions = sessions;
+    this.timeLines = timeLines;
+    this.requestUpdate?.();
+  }
+
+  /** Session ranges as grey boxes (open → close, session high → low) with the name on top. */
+  private drawSessions(ctx: CanvasRenderingContext2D) {
+    for (const s of this.sessions) {
+      const a = this.xy(s.from, s.top);
+      const b = this.xy(s.to, s.bottom);
+      if (!a || !b) continue;
+      ctx.fillStyle = "rgba(120,123,134,0.10)";
+      ctx.fillRect(a.x, a.y, b.x - a.x, b.y - a.y);
+      ctx.strokeStyle = "rgba(120,123,134,0.45)";
+      ctx.lineWidth = 1;
+      ctx.strokeRect(a.x, a.y, b.x - a.x, b.y - a.y);
+      ctx.fillStyle = "rgba(120,123,134,0.9)";
+      ctx.fillText(s.label, a.x + 4, a.y - 7);
+    }
+  }
+
+  /** Full-height dotted lines at fixed times (New York open). */
+  private drawTimeLines(ctx: CanvasRenderingContext2D, height: number) {
+    ctx.lineWidth = 1;
+    ctx.setLineDash([2, 3]);
+    for (const l of this.timeLines) {
+      const x = this.timeToX(l.time);
+      if (x === null) continue;
+      ctx.strokeStyle = l.color;
+      ctx.beginPath();
+      ctx.moveTo(Math.round(x) + 0.5, 0);
+      ctx.lineTo(Math.round(x) + 0.5, height);
+      ctx.stroke();
+    }
+    ctx.setLineDash([]);
+  }
+
   setZones(zones: OrderBlock[]) {
     this.zones = zones;
     this.requestUpdate?.();
@@ -96,6 +139,14 @@ export class PatternsPrimitive implements ISeriesPrimitive<Time> {
       ctx.lineWidth = z.tfSeconds === maxTf && sorted.length > 1 ? 1.5 : 1;
       ctx.setLineDash(broken ? [3, 3] : []);
       ctx.strokeRect(x1, yTop, x2 - x1, h);
+      if (z.mid) {
+        const yMid = yTop + h / 2;
+        ctx.setLineDash([4, 3]);
+        ctx.beginPath();
+        ctx.moveTo(x1, yMid);
+        ctx.lineTo(x2, yMid);
+        ctx.stroke();
+      }
       ctx.setLineDash([]);
       const text = `${z.label ?? `OB ${z.tf}`}${broken ? " ✕" : ""}`;
       ctx.fillStyle = withAlpha(broken ? "#787b86" : color, 0.95);
