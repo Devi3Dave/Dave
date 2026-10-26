@@ -13,6 +13,8 @@ export interface OrderBlock {
   activeIndex: number;
   /** Time the zone was invalidated (close through it), or null while it holds. */
   end: number | null;
+  /** Box label; order blocks default to "OB <tf>". */
+  label?: string;
 }
 
 export interface OrderBlockSignal {

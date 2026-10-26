@@ -135,6 +135,14 @@ export const toolSchemas = {
       swing: z.number().int().min(2).max(30).optional().describe("Standard 5"),
     }),
   },
+  get_fair_value_gaps: {
+    description:
+      "Liefert offene Fair Value Gaps (Drei-Kerzen-Imbalance: bullisch, wenn Tief von Kerze 3 über Hoch von Kerze 1 liegt, bärisch umgekehrt) auf dem Chart-Zeitrahmen mit Ober-/Unterkante und Abstand zum Kurs. Zum Anzeigen den Indikator fvg hinzufügen.",
+    schema: z.object({
+      min_pct: z.number().min(0).max(10).optional().describe("Mindestgröße in % des Kurses, Standard 0"),
+      mitigation: z.enum(["touch", "half", "full"]).optional().describe("Wann eine Lücke als erledigt gilt, Standard touch"),
+    }),
+  },
   get_patterns: {
     description:
       "Erkennt Kerzenmuster (Engulfing, Hammer, Shooting Star, Morning/Evening Star, Harami, …) und Chartformationen (Doppeltop/-boden, Schulter-Kopf-Schulter, Dreiecke) in den geladenen Kerzen. Zum Einzeichnen die Indikatoren candlepatterns bzw. chartpatterns hinzufügen.",

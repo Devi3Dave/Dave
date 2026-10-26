@@ -130,3 +130,16 @@ describe("countdown", () => {
     expect(formatCountdown(-5)).toBe("00:00");
   });
 });
+
+describe("standard definitions", () => {
+  it("chandelier exit trails the highest high, not the highest close (LeBeau)", () => {
+    const bars = Array.from({ length: 30 }, (_, i) =>
+      i < 25
+        ? { time: i * 86400, open: 100, high: 101, low: 99, close: 100, volume: 1 }
+        : { time: i * 86400, open: 118, high: i === 25 ? 120 : 119, low: 117, close: 118, volume: 1 },
+    );
+    const { long } = m.chandelierExit(bars, 22, 3);
+    const atrLast = m.atr(bars, 22)[29] as number;
+    expect(long[29]).toBeCloseTo(120 - 3 * atrLast, 6);
+  });
+});

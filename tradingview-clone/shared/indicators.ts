@@ -1,3 +1,4 @@
+import { FVG_MITIGATION, fairValueGaps } from "./fvg.js";
 import { liquidationHeatmap, strongestLevels, type Heatmap } from "./liquidations.js";
 import * as m from "./math.js";
 import { orderBlocks, type OrderBlock, type OrderBlockSignal } from "./orderblocks.js";
@@ -117,6 +118,28 @@ export const INDICATORS: IndicatorDef[] = [
       const r = orderBlocks(b, { swing: p.swing, higher: [p.tf2 * MINUTES, p.tf3 * MINUTES].filter((s) => s > 0), maxZones: p.zones, showBroken: p.broken >= 1 });
       return { candles: [], formations: [], zones: r.zones, signals: p.signals >= 1 ? r.signals : [] };
     },
+  },
+  {
+    id: "fvg",
+    name: "Fair Value Gaps (FVG)",
+    short: "FVG",
+    category: "Muster",
+    overlay: true,
+    description:
+      "Drei-Kerzen-Imbalance (ICT): bullisch, wenn das Tief von Kerze 3 über dem Hoch von Kerze 1 liegt (Kerze 2 grün), bärisch spiegelbildlich. Die Lücke bleibt als Zone stehen, bis der Kurs zurückkommt (Mitigation: 0 = Berührung, 1 = 50 %, 2 = ganz gefüllt). Quelle: smart-money-concepts (smc.fvg) / Fair Value Gap [LuxAlgo].",
+    params: [
+      { key: "minPct", label: "Mindestgröße %", default: 0, min: 0, max: 10, step: 0.05 },
+      { key: "mitigation", label: "Mitigation (0/1/2)", default: 0, min: 0, max: 2, step: 1 },
+      { key: "zones", label: "Zonen je Richtung", default: 5, min: 1, max: 30 },
+      { key: "mitigated", label: "Mitigierte zeigen (0/1)", default: 0, min: 0, max: 1 },
+    ],
+    outputs: [],
+    compute: () => ({}),
+    patterns: (b, p) => ({
+      candles: [],
+      formations: [],
+      zones: fairValueGaps(b, { minPct: p.minPct, mitigation: FVG_MITIGATION[Math.round(p.mitigation)] ?? "touch", maxZones: p.zones, showMitigated: p.mitigated >= 1 }),
+    }),
   },
   {
     id: "chartpatterns",
@@ -731,7 +754,7 @@ export const INDICATORS: IndicatorDef[] = [
     name: "Chandelier Exit",
     category: "Trend",
     overlay: true,
-    description: "ATR-Trailing-Stop vom höchsten/tiefsten Schlusskurs; Wechsel signalisiert Trendumkehr.",
+    description: "ATR-Trailing-Stop nach LeBeau: höchstes Hoch − ATR × Faktor (Long) bzw. tiefstes Tief + ATR × Faktor (Short); Wechsel signalisiert Trendumkehr.",
     params: [len(22, "ATR-Länge"), { key: "mult", label: "Faktor", default: 3, min: 0.1, max: 10, step: 0.1 }],
     outputs: [
       { key: "long", label: "Long-Stop", color: "#26a69a", style: "dots" },
