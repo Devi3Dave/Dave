@@ -7,6 +7,7 @@ import { LAYOUTS, addIndicator, exitReplay, loadChart, setLayout, startReplay, s
 import { APP_VERSION, BUILD_SHA, BUILD_TIME, formatBuildTime, reloadToLatest, useUpdateCheck } from "../version";
 import { AssetMenu, AssetSearchDialog } from "./AssetPicker";
 import { DemoButton } from "./DemoToasts";
+import { RefreshButton } from "./FreshnessBadge";
 import { Menu } from "./Menu";
 import { TemplatesMenu } from "./TemplatesMenu";
 
@@ -211,6 +212,7 @@ export function TopBar({ onOpenIndicators, onOpenSettings, heatmapOpen, onToggle
         <button className="pill" onClick={() => setSearchOpen(true)} aria-label="Assets suchen" data-tip={"Assets suchen\nNach Rubriken, mit Favoriten"}>
           🔍
         </button>
+        <RefreshButton />
       </div>
       {searchOpen && <AssetSearchDialog onClose={() => setSearchOpen(false)} />}
       {showPrice && last && (

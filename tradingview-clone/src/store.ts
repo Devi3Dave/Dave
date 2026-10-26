@@ -7,6 +7,7 @@ import { barIndexAt, carryReplay, randomStart } from "../shared/replay";
 import type { CHART_TYPES, INTERVALS } from "../shared/tools";
 import { DEFAULT_SETTINGS, type ChartSettings } from "./chartSettings";
 import { STANDALONE } from "./config";
+import { measureClock } from "./market/clockSync";
 
 export type Interval = (typeof INTERVALS)[number];
 export type ChartType = (typeof CHART_TYPES)[number];
@@ -113,7 +114,16 @@ export interface ChartStore {
   ensureLoaded(): void;
   /** Stops the live stream of a chart that is no longer shown. */
   stop(): void;
+  /** Reloads the candles over REST and reconnects the live stream, keeping drawings and replay. */
+  refresh(): Promise<void>;
+  /** Refreshes when the live stream went quiet or REST-only data is due (called by the watchdog). */
+  watchdog(): void;
 }
+
+/** Live stream without a message this long counts as stalled (Binance sends several per second). */
+const STALL_MS = 60_000;
+/** Sources without a live stream (Yahoo) are reloaded this often. */
+const POLL_MS = 60_000;
 
 export const MAX_CHARTS = 4;
 const DEFAULT_SYMBOLS = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT"];
@@ -165,6 +175,58 @@ function createChartStore(slot: number): ChartStore {
   let socket: WebSocket | null = null;
   let loadSeq = 0;
   let started = false;
+  let refreshing = false;
+  /** Device time of the last live message or REST load (ms). */
+  let lastData = 0;
+  let retries = 0;
+  let retryTimer: number | undefined;
+
+  const closeSocket = () => {
+    window.clearTimeout(retryTimer);
+    if (socket) {
+      socket.onclose = null;
+      socket.close();
+    }
+    socket = null;
+  };
+
+  /** Reconnects after a dropped connection: 2 s, 4 s, 8 s … up to 30 s. */
+  const scheduleRetry = (seq: number) => {
+    window.clearTimeout(retryTimer);
+    const delay = Math.min(30_000, 2000 * 2 ** retries++);
+    retryTimer = window.setTimeout(() => {
+      if (seq === loadSeq && started) void chart.refresh();
+    }, delay);
+  };
+
+  const startLive = (json: MarketData, interval: Interval, seq: number) => {
+    if (json.source !== "binance" && json.source !== "binance_futures") return;
+    const current = () => seq === loadSeq;
+    const ws = connectLive(chart, json.symbol, interval, json.source === "binance_futures", current, () => {
+      lastData = Date.now();
+      retries = 0;
+    });
+    ws.onclose = () => {
+      if (socket === ws) socket = null;
+      if (current() && started) scheduleRetry(seq);
+    };
+    socket = ws;
+  };
+
+  /** Puts freshly loaded candles into the chart (or the hidden part of a running replay). */
+  const applyBars = (json: MarketData, keepPlaying = false) => {
+    lastData = Date.now();
+    const base = { source: json.source, symbol: json.symbol, loading: false, error: null, loadedAt: Date.now(), liveTick: null };
+    const r = chart.get().replay;
+    if (r?.phase === "play") {
+      const shown = carryReplay(r.all, r.shown, json.bars);
+      // Without a finished candle before that moment, a new start has to be chosen.
+      const next: ReplayState = shown > 0 ? { ...r, all: json.bars, shown, playing: keepPlaying && r.playing } : { ...r, phase: "select", all: json.bars, shown: 0, playing: false };
+      chart.set({ ...base, bars: next.phase === "play" ? json.bars.slice(0, shown) : json.bars, replay: next });
+    } else if (r) {
+      chart.set({ ...base, bars: json.bars, replay: { ...r, all: json.bars, shown: 0 } });
+    } else chart.set({ ...base, bars: json.bars });
+  };
 
   const persist = () => {
     window.clearTimeout(persistTimer);
@@ -190,8 +252,8 @@ function createChartStore(slot: number): ChartStore {
     async load(symbol, interval) {
       started = true;
       const seq = ++loadSeq;
-      socket?.close();
-      socket = null;
+      closeSocket();
+      retries = 0;
       const symbolChanged = symbol !== state.symbol;
       // A new time frame keeps the replay at the same moment; another asset ends it.
       const replay = symbolChanged ? null : state.replay;
@@ -210,17 +272,8 @@ function createChartStore(slot: number): ChartStore {
       try {
         const json = await fetchMarketData(symbol, interval);
         if (seq !== loadSeq) return;
-        chart.set({ loadedAt: Date.now() });
-        const r = chart.get().replay;
-        if (r?.phase === "play") {
-          const shown = carryReplay(r.all, r.shown, json.bars);
-          // Without a finished candle before that moment, a new start has to be chosen.
-          const next: ReplayState = shown > 0 ? { ...r, all: json.bars, shown, playing: false } : { ...r, phase: "select", all: json.bars, shown: 0, playing: false };
-          chart.set({ bars: next.phase === "play" ? json.bars.slice(0, shown) : json.bars, replay: next, source: json.source, symbol: json.symbol, loading: false });
-        } else if (r) {
-          chart.set({ bars: json.bars, replay: { ...r, all: json.bars, shown: 0 }, source: json.source, symbol: json.symbol, loading: false });
-        } else chart.set({ bars: json.bars, source: json.source, symbol: json.symbol, loading: false });
-        if (json.source === "binance" || json.source === "binance_futures") socket = connectLive(chart, json.symbol, interval, json.source === "binance_futures", () => seq === loadSeq);
+        applyBars(json);
+        startLive(json, interval, seq);
       } catch (err) {
         if (seq !== loadSeq) return;
         chart.set({ loading: false, error: (err as Error).message });
@@ -232,15 +285,53 @@ function createChartStore(slot: number): ChartStore {
     stop() {
       started = false;
       loadSeq++;
-      socket?.close();
-      socket = null;
+      closeSocket();
       if (state.loading) chart.set({ loading: false });
+    },
+    async refresh() {
+      if (!started || state.loading || refreshing) return;
+      refreshing = true;
+      const seq = ++loadSeq;
+      closeSocket();
+      const { symbol, interval } = state;
+      try {
+        const json = await fetchMarketData(symbol, interval);
+        if (seq !== loadSeq) return;
+        applyBars(json, true);
+        startLive(json, interval, seq);
+      } catch {
+        // Offline or blocked: keep the candles shown (the freshness light turns red) and try again.
+        if (seq === loadSeq) scheduleRetry(seq);
+      } finally {
+        refreshing = false;
+      }
+    },
+    watchdog() {
+      // A replay shows the past on purpose; polling would only disturb it.
+      if (!started || state.loading || state.replay || !state.source || state.source === "demo") return;
+      const live = state.source === "binance" || state.source === "binance_futures";
+      if (Date.now() - lastData > (live ? STALL_MS : POLL_MS)) void chart.refresh();
     },
   };
   return chart;
 }
 
 export const charts: ChartStore[] = Array.from({ length: MAX_CHARTS }, (_, i) => createChartStore(i));
+
+/** Reloads every running chart (candles and live stream) and measures the clock again. */
+export async function refreshAll(): Promise<void> {
+  await Promise.all([...charts.map((c) => c.refresh()), measureClock()]);
+}
+
+// Keeps the data current on its own: browsers and iPads drop WebSockets while the app sleeps
+// in the background or the screen is locked, and a stream can stall without closing.
+if (typeof window !== "undefined") {
+  window.setInterval(() => charts.forEach((c) => c.watchdog()), 15_000);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") void refreshAll();
+  });
+  window.addEventListener("online", () => void refreshAll());
+}
 
 // ---------------- Workspace (layout + active chart) ----------------
 
@@ -462,7 +553,7 @@ export async function fetchMarketData(symbol: string, interval: string, limit = 
   return json as MarketData;
 }
 
-function connectLive(chart: ChartStore, symbol: string, interval: Interval, futures: boolean, current: () => boolean): WebSocket {
+function connectLive(chart: ChartStore, symbol: string, interval: Interval, futures: boolean, current: () => boolean, onData: () => void): WebSocket {
   const stream = binanceInterval(interval);
   // Quarter and year candles follow the monthly stream; `seen` is the last monthly kline, for volume deltas.
   const merge = stream === "1M" && interval !== "1M";
@@ -471,6 +562,7 @@ function connectLive(chart: ChartStore, symbol: string, interval: Interval, futu
   const ws = new WebSocket(`${host}/ws/${symbol.toLowerCase()}@kline_${stream}`);
   ws.onmessage = (ev) => {
     if (!current()) return;
+    onData();
     const receivedAt = Date.now();
     const msg = JSON.parse(ev.data);
     const k = msg.k;

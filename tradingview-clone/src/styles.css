@@ -3227,3 +3227,17 @@ select,
   gap: 8px;
   margin-top: 10px;
 }
+
+.refresh-btn .refresh-icon {
+  display: inline-block;
+}
+
+.refresh-btn.busy .refresh-icon {
+  animation: refresh-spin 0.8s linear infinite;
+}
+
+@keyframes refresh-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
