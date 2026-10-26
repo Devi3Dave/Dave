@@ -1,6 +1,7 @@
 import type { IPrimitivePaneRenderer, IPrimitivePaneView, ISeriesApi, ISeriesPrimitive, SeriesAttachedParameter, SeriesType, Time } from "lightweight-charts";
 import type { OrderBlock } from "../../shared/orderblocks";
 import type { Formation } from "../../shared/patterns";
+import type { StructureBreak } from "../../shared/structure";
 import { formatPrice, withAlpha } from "./DrawingsPrimitive";
 
 const COLORS = { bullish: "#26a69a", bearish: "#ef5350", neutral: "#2962ff" };
@@ -11,6 +12,7 @@ export class PatternsPrimitive implements ISeriesPrimitive<Time> {
   private requestUpdate: (() => void) | null = null;
   private formations: Formation[] = [];
   private zones: OrderBlock[] = [];
+  private structure: StructureBreak[] = [];
   private readonly view: IPrimitivePaneView;
   private readonly zoneView: IPrimitivePaneView;
 
@@ -22,6 +24,7 @@ export class PatternsPrimitive implements ISeriesPrimitive<Time> {
           ctx.font = "11px -apple-system, BlinkMacSystemFont, 'Trebuchet MS', Roboto, sans-serif";
           ctx.textBaseline = "middle";
           for (const f of this.formations) this.drawOne(ctx, f);
+          for (const s of this.structure) this.drawBreak(ctx, s);
           ctx.restore();
         }),
     };
@@ -60,6 +63,11 @@ export class PatternsPrimitive implements ISeriesPrimitive<Time> {
     this.requestUpdate?.();
   }
 
+  setStructure(structure: StructureBreak[]) {
+    this.structure = structure;
+    this.requestUpdate?.();
+  }
+
   setZones(zones: OrderBlock[]) {
     this.zones = zones;
     this.requestUpdate?.();
@@ -93,6 +101,25 @@ export class PatternsPrimitive implements ISeriesPrimitive<Time> {
       ctx.fillStyle = withAlpha(broken ? "#787b86" : color, 0.95);
       ctx.fillText(text, Math.max(x1, 0) + 4, yTop + Math.min(8, h / 2));
     }
+  }
+
+  /** BOS (solid) / CHoCH (dashed): level line from the swing to the breaking candle, label in the middle. */
+  private drawBreak(ctx: CanvasRenderingContext2D, s: StructureBreak) {
+    const a = this.xy(s.time, s.level);
+    const b = this.xy(s.brokenTime, s.level);
+    if (!a || !b) return;
+    const color = s.side === "bull" ? COLORS.bullish : COLORS.bearish;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1;
+    ctx.setLineDash(s.kind === "choch" ? [4, 3] : []);
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    const text = s.kind === "choch" ? "CHoCH" : "BOS";
+    ctx.fillStyle = color;
+    ctx.fillText(text, (a.x + b.x) / 2 - ctx.measureText(text).width / 2, a.y + (s.side === "bull" ? -7 : 7));
   }
 
   private xy(time: number, price: number): { x: number; y: number } | null {
