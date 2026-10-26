@@ -14,6 +14,7 @@ import {
   undoDrawings,
 } from "../drawingEdit";
 import { createAlert, openAlertsPanel, targetOf } from "../alerts";
+import { exportChart } from "../chartExport";
 import { drawingName } from "../drawingOps";
 import { useChart, type ChartStore, type Drawing, type LineStyleName } from "../store";
 
@@ -271,6 +272,9 @@ export function DrawingMenu({ chart, target, onClose, onMove, onEditPosition }: 
   ) : (
     <>
       <div className="menu-title ctx-title">Chart</div>
+      <Item icon="⇩" onClick={act(() => void exportChart(chart))}>
+        Chartdaten als CSV
+      </Item>
       <Item icon="📋" keys={`${MOD_KEY}V`} disabled={!hasClipboard()} onClick={act(() => pasteDrawing(chart))}>
         Zeichnung einfügen
       </Item>
