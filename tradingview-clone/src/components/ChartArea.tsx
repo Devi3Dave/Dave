@@ -10,6 +10,7 @@ import { activeChart, addDrawing, newId, pickReplayStart, removeIndicator, stepB
 import { cloneInPlace, copyDrawing, deleteDrawing, pasteDrawing, replaceDrawing, selectDrawing, selectedDrawing, trackHistory, undoDrawings, useSelectedDrawing } from "../drawingEdit";
 import { cloneDrawing, hasMovableAnchors, moveAnchor, shiftDrawing } from "../drawingOps";
 import { DrawingMenu, type MenuTarget } from "./DrawingMenu";
+import { FreshnessBadge } from "./FreshnessBadge";
 import { lastPositionDefaults } from "./PositionDialog";
 import { ReplayBar } from "./ReplayBar";
 
@@ -547,6 +548,7 @@ export function ChartArea({ chart, onEngine, magnet, onEditIndicator, onEditPosi
               <span className="legend-symbol">
                 {symbol} · {interval} · {source === "demo" ? "DEMO-DATEN" : source === "binance_futures" ? "BINANCE PERP" : source?.toUpperCase()}
               </span>
+              <FreshnessBadge chart={chart} />
               {replaying && <span className="legend-replay">REPLAY</span>}
               {bar && (
                 <span className={up ? "up" : "down"}>
