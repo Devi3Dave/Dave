@@ -6,6 +6,7 @@ import { toggleFavorite, useFavorites } from "../favorites";
 import { LAYOUTS, addIndicator, exitReplay, loadChart, setLayout, startReplay, store, useChartState, useWorkspace, workspace, type ChartType } from "../store";
 import { APP_VERSION, BUILD_SHA, BUILD_TIME, formatBuildTime, reloadToLatest, useUpdateCheck } from "../version";
 import { AssetMenu, AssetSearchDialog } from "./AssetPicker";
+import { useAlerts } from "../alerts";
 import { DemoButton } from "./DemoToasts";
 import { RefreshButton } from "./FreshnessBadge";
 import { Menu } from "./Menu";
@@ -50,6 +51,8 @@ interface Props {
   onToggleExchanges: () => void;
   demoOpen: boolean;
   onToggleDemo: () => void;
+  alertsOpen: boolean;
+  onToggleAlerts: () => void;
   claudeOpen: boolean;
   onToggleClaude: () => void;
 }
@@ -194,7 +197,8 @@ function IntervalMenu() {
   );
 }
 
-export function TopBar({ onOpenIndicators, onOpenSettings, heatmapOpen, onToggleHeatmap, calcOpen, onToggleCalc, journalOpen, onToggleJournal, exchangesOpen, onToggleExchanges, demoOpen, onToggleDemo, claudeOpen, onToggleClaude }: Props) {
+export function TopBar({ onOpenIndicators, onOpenSettings, heatmapOpen, onToggleHeatmap, calcOpen, onToggleCalc, journalOpen, onToggleJournal, exchangesOpen, onToggleExchanges, demoOpen, onToggleDemo, alertsOpen, onToggleAlerts, claudeOpen, onToggleClaude }: Props) {
+  const activeAlerts = useAlerts((s) => s.alerts.filter((a) => a.active).length);
   const { symbol, interval, chartType } = useChartState((s) => s);
   const showPrice = useChartState((s) => s.settings.headerPrice);
   const { last, change } = useHeaderPrice();
@@ -261,6 +265,11 @@ export function TopBar({ onOpenIndicators, onOpenSettings, heatmapOpen, onToggle
         ⚙
       </button>
       <DemoButton active={demoOpen} onClick={onToggleDemo} />
+      <button className={`pill ${alertsOpen ? "active" : ""}`} onClick={onToggleAlerts} aria-label="Alarme" data-tip={"Alarme (Alt + A)\nPreis, Indikator, Linie oder Zone – mit Ton und Hinweis"}>
+        <span className="pill-icon">🔔</span>
+        <span className="pill-label"> Alarme</span>
+        {activeAlerts > 0 && <span className="al-count">{activeAlerts}</span>}
+      </button>
       <button className={`pill ${heatmapOpen ? "active" : ""}`} onClick={onToggleHeatmap} aria-label="Heatmap" data-tip={"Liquidations-Heatmap im CoinGlass-Stil\nVollbild mit Zeiträumen von 12 h bis 1 Jahr"}>
         <span className="pill-icon">🔥</span>
         <span className="pill-label"> Heatmap</span>

@@ -193,6 +193,23 @@ aktiven Charts, wie bei einem Futures-Konto mit isolierter Margin; das Konto lie
 - Historie mit Trefferquote und Gebühren; Trades einzeln, alle oder automatisch ins Journal (Setup „Demo“)
 - Gebühr pro Seite einstellbar (0 / 0,02 / 0,05 / 0,1 %), Konto jederzeit neu starten
 
+**Alarme (🔔 Alarme in der Kopfzeile, Alt + A)**
+Wie die Alarme von TradingView: ChartAI meldet sich mit Hinweis, Ton und optional einer Systemmitteilung,
+sobald eine Bedingung eintritt.
+- Bedingungen: kreuzt, kreuzt nach oben, kreuzt nach unten, größer als, kleiner als, tritt in Kanal ein,
+  verlässt Kanal. Kreuzen ist wie `ta.crossover` / `ta.crossunder` in Pine Script definiert (jetzt über
+  dem Wert, eine Kerze vorher darunter oder gleich)
+- Überwacht wird der Kurs oder jede Linie eines Indikators im Chart (z. B. „RSI 14 kreuzt nach oben 30“)
+- Auslösen: nur einmal, einmal pro Kerze oder einmal pro Kerzenschluss (nur abgeschlossene Kerzen)
+- Rechtsklick / langes Drücken auf horizontale Linie, Trendlinie oder Zone → „Alarm hinzufügen“; der Alarm
+  folgt der Zeichnung, wenn sie verschoben wird. Trendlinien gelten verlängert in beide Richtungen
+- Preis-Alarme erscheinen als gestrichelte orange Linie mit 🔔 an der Preisachse; Liste mit Pausieren,
+  Löschen und Verlauf der ausgelösten Alarme
+- Geprüft wird bei jedem Live-Kurs des Charts; Alarme auf Symbole, die kein Chart zeigt, alle 15 s.
+  Nur bei geöffneter App (ohne eigenen Server kann bei geschlossener App nichts auslösen); Demo-Daten
+  lösen keine Alarme aus
+- Claude kann Alarme anlegen, auflisten und löschen (`create_alert`, `list_alerts`, `delete_alert`)
+
 **Bar-Replay (⏪ Replay in der Kopfzeile)**
 Wie das Bar Replay von TradingView: den Chart an einer Kerze in der Vergangenheit abschneiden und die
 folgenden Kerzen nacheinander aufdecken, um Setups ohne Blick in die Zukunft zu üben.
@@ -244,6 +261,7 @@ Zeitzone des Geräts.
 | `remove_drawing`, `clear_drawings` | Zeichnungen entfernen |
 | `get_orderbook` | Live-Orderbuch mit Wänden und Kauf-/Verkaufsverhältnis |
 | `get_liquidations` | Geschätzte Liquidations-Cluster und Live-Liquidationen |
+| `create_alert`, `list_alerts`, `delete_alert` | Alarme auf Kurs oder Indikator anlegen, auflisten, löschen |
 | `take_screenshot` | Chart als Bild prüfen |
 
 Von Claude erstellte Objekte sind mit ✦ markiert und lassen sich über „Zeichnungen ✕“ im Panel

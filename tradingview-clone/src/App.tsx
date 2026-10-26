@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ChartEngine } from "./chart/ChartEngine";
 import { CalculatorView } from "./components/CalculatorView";
+import { AlertToasts } from "./components/AlertsPanel";
 import { ChartGrid } from "./components/ChartGrid";
 import { ChartSettingsDialog } from "./components/ChartSettingsDialog";
 import { DemoToasts } from "./components/DemoToasts";
@@ -14,6 +15,7 @@ import { SidePanel, type SideTab } from "./components/SidePanel";
 import { TooltipLayer } from "./components/Tooltip";
 import { TopBar } from "./components/TopBar";
 import { isCryptoSymbol } from "../shared/marketData";
+import { OPEN_ALERTS_EVENT, startAlertFeed } from "./alerts";
 import { startDemoFeed } from "./demoAccount";
 import { liquidationFeed } from "./market/liquidationFeed";
 import { MAX_CHARTS, useChartState, workspace } from "./store";
@@ -43,6 +45,36 @@ export default function App() {
 
   // Demo positions are watched (stop, target, liquidation) whether or not their tab is open.
   useEffect(() => startDemoFeed(), []);
+  // Alerts are checked on every price, whatever is open.
+  useEffect(() => startAlertFeed(), []);
+
+  const closePages = () => {
+    setHeatmapOpen(false);
+    setCalcOpen(false);
+    setJournalOpen(false);
+    setExchangesOpen(false);
+  };
+  const openAlerts = useCallback(() => {
+    setClaudeOpen(true);
+    setSideTab("alerts");
+  }, []);
+  // Drawing menu ("Alarm hinzufügen") and Alt + A, as in TradingView.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null;
+      if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable)) return;
+      if (e.altKey && e.code === "KeyA") {
+        e.preventDefault();
+        openAlerts();
+      }
+    };
+    window.addEventListener(OPEN_ALERTS_EVENT, openAlerts);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener(OPEN_ALERTS_EVENT, openAlerts);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [openAlerts]);
 
   const onEngine = useCallback((slot: number, e: ChartEngine | null) => {
     enginesRef.current[slot] = e;
@@ -94,6 +126,11 @@ export default function App() {
           setClaudeOpen(true);
           setSideTab("demo");
         }}
+        alertsOpen={claudeOpen && sideTab === "alerts"}
+        onToggleAlerts={() => {
+          if (claudeOpen && sideTab === "alerts") return setSideTab("claude");
+          openAlerts();
+        }}
         claudeOpen={claudeOpen} onToggleClaude={() => setClaudeOpen((o) => !o)} />
       <DrawingToolbar magnet={magnet} onToggleMagnet={() => setMagnet((m) => !m)} getEngine={getEngine} />
       <ChartGrid onEngine={onEngine} magnet={magnet} onEditIndicator={setEditing} onEditPosition={setEditingPosition} />
@@ -115,6 +152,10 @@ export default function App() {
       {editing && <IndicatorSettings id={editing} onClose={() => setEditing(null)} />}
       {editingPosition && <PositionDialog id={editingPosition} onClose={() => setEditingPosition(null)} />}
       {showSettings && <ChartSettingsDialog onClose={() => setShowSettings(false)} />}
+      <AlertToasts onOpen={() => {
+        closePages();
+        openAlerts();
+      }} />
       <DemoToasts onOpen={() => {
         setClaudeOpen(true);
         setSideTab("demo");

@@ -17,6 +17,7 @@ Arbeitsweise:
 - Für Analysen ohne Zeichenwunsch reicht get_indicator_values; füge Indikatoren nur hinzu, wenn der Nutzer sie sehen will oder sie die Erklärung klar unterstützen.
 - Fasse zusammengehörige Zeichnungen zusammen (mehrere Tool-Aufrufe in einer Antwort sind erlaubt) und nutze kurze, aussagekräftige Labels.
 - Farben: Unterstützung/bullish grün (#26a69a), Widerstand/bearish rot (#ef5350), neutral blau (#2962ff) oder orange (#ff9800). Zonen mit transparenter Füllung, z. B. rgba(38,166,154,0.15).
+- Wenn der Nutzer an ein Niveau erinnert werden will ("sag mir, wenn …"), lege mit create_alert einen Alarm an.
 - Nutze take_screenshot, wenn du das Ergebnis komplexer Zeichnungen prüfen willst.
 - Wenn der Nutzer Symbol oder Zeiteinheit wechseln will, nutze set_chart.
 - Orderblöcke und Buy/Sell-Signale über mehrere Zeitrahmen liefert get_order_blocks; anzeigen mit dem Indikator orderblocks.
