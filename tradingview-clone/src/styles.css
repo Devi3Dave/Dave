@@ -1035,6 +1035,8 @@ textarea {
   border-radius: 8px;
   width: min(640px, calc(100vw - 32px));
   max-height: 80vh;
+  /* Safari: vh counts the hidden toolbar, dvh only the visible area. */
+  max-height: 80dvh;
   display: flex;
   flex-direction: column;
   padding: 12px;
@@ -1370,13 +1372,47 @@ select,
 
 .settings-modal {
   width: min(520px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  max-height: calc(100dvh - 32px);
+}
+
+/* Head and buttons stay put, only the content in between scrolls. */
+.settings-modal .modal-head,
+.settings-modal .modal-actions {
+  flex-shrink: 0;
 }
 
 .settings-body {
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   display: flex;
   flex-direction: column;
   gap: 14px;
+  padding-right: 4px;
+  /* Shadows at the top/bottom edge show that there is more to scroll
+     (Safari hides the scrollbar until you scroll). */
+  background:
+    linear-gradient(var(--panel) 30%, transparent) top / 100% 24px no-repeat local,
+    linear-gradient(transparent, var(--panel) 70%) bottom / 100% 24px no-repeat local,
+    radial-gradient(farthest-side at 50% 0, rgba(0, 0, 0, 0.5), transparent) top / 100% 10px no-repeat scroll,
+    radial-gradient(farthest-side at 50% 100%, rgba(0, 0, 0, 0.5), transparent) bottom / 100% 10px no-repeat scroll;
+}
+
+/* Wide screens (iPad landscape, Mac): two columns so everything fits without scrolling. */
+@media (min-width: 900px) {
+  .settings-modal {
+    width: min(880px, calc(100vw - 32px));
+  }
+
+  .settings-body {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    align-items: start;
+    gap: 16px 28px;
+  }
 }
 
 .settings-body section {
@@ -1394,9 +1430,14 @@ select,
 
 .settings-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 6px 12px;
+}
+
+.settings-row select {
+  max-width: 100%;
 }
 
 .settings-toggle {
