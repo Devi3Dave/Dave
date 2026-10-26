@@ -3595,3 +3595,7 @@ select,
     display: none;
   }
 }
+
+.legend-source {
+  color: var(--muted);
+}

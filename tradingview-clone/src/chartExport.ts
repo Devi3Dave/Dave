@@ -1,6 +1,6 @@
 import { chartCsv, exportName, type ExportColumn } from "../shared/chartExport";
 import { displayBars } from "../shared/chartTypes";
-import { getIndicator, indicatorLabel, resolveParams } from "../shared/indicators";
+import { computeInstances, indicatorLabel } from "../shared/indicators";
 import { saveFile } from "./saveFile";
 import type { ChartStore } from "./store";
 
@@ -9,11 +9,8 @@ export function chartCsvOf(chart: ChartStore): string {
   const s = chart.get();
   const bars = displayBars(s.bars, s.chartType, s.settings);
   const columns: ExportColumn[] = [];
-  for (const inst of s.indicators) {
-    const def = getIndicator(inst.type);
-    if (!def || inst.hidden) continue;
-    const params = resolveParams(def, inst.params);
-    const out = def.compute(bars, params);
+  for (const { instance: inst, def, params, outputs: out } of computeInstances(s.indicators, bars)) {
+    if (inst.hidden) continue;
     const name = indicatorLabel(def, params);
     for (const o of def.outputs) {
       if (o.helper || !out[o.key]) continue;

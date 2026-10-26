@@ -47,7 +47,8 @@ function useSourceOptions(): SourceOption[] {
     const options: SourceOption[] = [{ key: "price", label: "Kurs", source: { kind: "price" }, last: bars[bars.length - 1]?.close ?? null }];
     for (const inst of indicators) {
       const def = getIndicator(inst.type);
-      if (!def) continue;
+      // Alerts compute on the price; an indicator on another indicator's line is not offered.
+      if (!def || inst.source) continue;
       const lines = def.outputs.filter((o) => !o.helper && !o.sparse);
       if (!lines.length) continue;
       const params = resolveParams(def, inst.params);

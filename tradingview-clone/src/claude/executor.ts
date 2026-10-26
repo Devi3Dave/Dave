@@ -1,6 +1,6 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { describeAlert, isChannelCondition } from "../../shared/alerts";
-import { getIndicator, indicatorLabel, resolveParams } from "../../shared/indicators";
+import { SOURCE_INDICATORS, computeInstances, getIndicator, indicatorLabel, resolveParams } from "../../shared/indicators";
 import type { Bar } from "../../shared/math";
 import { fairValueGaps } from "../../shared/fvg";
 import { liquidationClusters, liquidationHeatmap } from "../../shared/liquidations";
@@ -122,11 +122,18 @@ async function run(name: ToolName, input: unknown, engine: ChartEngine | null): 
     }
 
     case "add_indicator": {
-      const { indicator, params, colors } = input as ToolInput<"add_indicator">;
+      const { indicator, params, colors, source } = input as ToolInput<"add_indicator">;
       const def = getIndicator(indicator)!;
       const p = resolveParams(def, params);
-      const inst = addIndicator(indicator, p, "claude", colors);
-      const out = def.compute(bars, p);
+      if (source) {
+        if (!SOURCE_INDICATORS.has(indicator)) return fail(`${def.name} hat keine Kurs-Eingabe und lässt sich nicht auf einen Indikator setzen`);
+        const from = s.indicators.find((i) => i.id === source.id);
+        const fromDef = from && getIndicator(from.type);
+        if (!from || !fromDef) return fail(`Kein Indikator mit id=${source.id}`);
+        if (!fromDef.outputs.some((o) => o.key === source.output)) return fail(`${fromDef.name} hat keine Ausgabe ${source.output} (${fromDef.outputs.map((o) => o.key).join(", ")})`);
+      }
+      const inst = addIndicator(indicator, p, "claude", colors, source);
+      const out = computeInstances(store.get().indicators, bars).find((c) => c.instance.id === inst.id)?.outputs ?? {};
       const latest = Object.fromEntries(def.outputs.map((o) => [o.key, num(out[o.key]?.[bars.length - 1])]));
       return ok(`${indicatorLabel(def, p)} hinzugefügt`, { id: inst.id, label: indicatorLabel(def, p), panel: def.overlay ? "overlay" : "eigenes Panel", latest });
     }

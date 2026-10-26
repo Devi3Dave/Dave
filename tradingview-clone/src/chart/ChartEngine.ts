@@ -26,7 +26,7 @@ import {
 } from "lightweight-charts";
 import { displayBars, hollowStyle, isPriceDriven } from "../../shared/chartTypes";
 import { alignCompare } from "../../shared/compare";
-import { getIndicator, resolveParams, type IndicatorDef, type OutputDef } from "../../shared/indicators";
+import { SOURCE_INDICATORS, computeIndicator, getIndicator, resolveParams, type IndicatorDef, type OutputDef } from "../../shared/indicators";
 import { heikinAshi, type Bar, type Series } from "../../shared/math";
 import { barIndexAt } from "../../shared/replay";
 import { getExchange, tradingDays } from "../../shared/exchanges";
@@ -756,7 +756,9 @@ export class ChartEngine {
       if (!def) continue;
       const params = resolveParams(def, instance.params);
       const isVolume = def.id === "volume";
-      const paneIndex = def.overlay || isVolume ? 0 : nextPane++;
+      // On another indicator's line: drawn in that indicator's pane.
+      const source = instance.source && SOURCE_INDICATORS.has(def.id) ? this.built.find((b) => b.computed.instance.id === instance.source!.id) : undefined;
+      const paneIndex = source ? source.computed.paneIndex : def.overlay || isVolume ? 0 : nextPane++;
       const series = def.outputs.map((o, k) => this.addOutputSeries(def, o, instance.colors?.[k] ?? o.color, paneIndex, isVolume, !!instance.hidden));
 
       if (def.levels && series[0]) {
@@ -854,9 +856,11 @@ export class ChartEngine {
     const step = n > 1 ? bars[n - 1].time - bars[n - 2].time : 60;
     const timeAt = (j: number) => (j < n ? bars[j].time : bars[n - 1].time + (j - n + 1) * step);
 
+    const done = new Map<string, Record<string, Series>>();
     for (const b of this.built) {
-      const { def, params } = b.computed;
-      const outputs = def.compute(bars, params);
+      const { def, params, instance } = b.computed;
+      const outputs = computeIndicator(def, params, bars, instance.source ? done.get(instance.source.id)?.[instance.source.output] : null);
+      done.set(instance.id, outputs);
       b.computed.outputs = outputs;
       def.outputs.forEach((o, k) => {
         const values = outputs[o.key] ?? [];

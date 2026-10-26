@@ -1494,3 +1494,63 @@ export function indicatorLabel(def: IndicatorDef, params: Record<string, number>
   const values = def.params.map((p) => params[p.key]);
   return values.length ? `${short} ${values.join(", ")}` : short;
 }
+
+// ---------------- Indicator on indicator ----------------
+// As TradingView's "Source" input: indicators that work on a single price series (moving averages, RSI,
+// MACD, Bollinger Bands …) can take another indicator's line instead of the close, e.g. an SMA of the RSI.
+
+/** Indicators whose only input is the close, so another indicator's line can stand in for it. */
+export const SOURCE_INDICATORS = new Set([
+  "sma", "ema", "wma", "hma", "dema", "tema", "smma", "kama", "alma", "lsma", "mcginley", "bb", "envelope", "linregchannel",
+  "rsi", "macd", "stochrsi", "roc", "mom", "trix", "stdev", "percentb", "ppo", "kst", "coppock", "dpo", "crsi", "stc",
+]);
+
+/** Another indicator's line as the input (`id` of the indicator instance, `output` key). */
+export interface IndicatorSourceRef {
+  id: string;
+  output: string;
+}
+
+/**
+ * Computes an indicator on the bars or, with `source`, on another indicator's values: the values become
+ * the closes of stand-in candles from the first value on (gaps keep the last value), and the result is
+ * padded to the bars again.
+ */
+export function computeIndicator(def: IndicatorDef, params: Record<string, number>, bars: Bar[], source?: Series | null): Record<string, Series> {
+  if (!source || !SOURCE_INDICATORS.has(def.id)) return def.compute(bars, params);
+  const first = source.findIndex((v) => v !== null && Number.isFinite(v));
+  if (first < 0) return Object.fromEntries(def.outputs.map((o) => [o.key, bars.map(() => null)]));
+  const stand: Bar[] = [];
+  let last = source[first] as number;
+  for (let i = first; i < bars.length; i++) {
+    const v = source[i];
+    if (v !== null && v !== undefined && Number.isFinite(v)) last = v;
+    stand.push({ time: bars[i].time, open: last, high: last, low: last, close: last, volume: bars[i].volume });
+  }
+  const out = def.compute(stand, params);
+  const pad: Series = new Array<number | null>(first).fill(null);
+  return Object.fromEntries(Object.entries(out).map(([k, v]) => [k, [...pad, ...v]]));
+}
+
+export interface InstanceLike {
+  id: string;
+  type: string;
+  params: Record<string, number>;
+  source?: IndicatorSourceRef;
+}
+
+/** All indicators of a chart in order; a source must come earlier in the list, otherwise the close is used. */
+export function computeInstances<T extends InstanceLike>(instances: T[], bars: Bar[]): { instance: T; def: IndicatorDef; params: Record<string, number>; outputs: Record<string, Series>; sourced: boolean }[] {
+  const done = new Map<string, Record<string, Series>>();
+  const out: { instance: T; def: IndicatorDef; params: Record<string, number>; outputs: Record<string, Series>; sourced: boolean }[] = [];
+  for (const instance of instances) {
+    const def = getIndicator(instance.type);
+    if (!def) continue;
+    const params = resolveParams(def, instance.params);
+    const src = instance.source ? done.get(instance.source.id)?.[instance.source.output] : undefined;
+    const outputs = computeIndicator(def, params, bars, src);
+    done.set(instance.id, outputs);
+    out.push({ instance, def, params, outputs, sourced: !!src && SOURCE_INDICATORS.has(def.id) });
+  }
+  return out;
+}
