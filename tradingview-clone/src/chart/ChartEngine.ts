@@ -28,6 +28,7 @@ import { getExchange, tradingDays } from "../../shared/exchanges";
 import { INTERVAL_SECONDS, isCalendarInterval } from "../../shared/marketData";
 import type { OrderBlock, OrderBlockSignal } from "../../shared/orderblocks";
 import type { CandlePattern, Formation } from "../../shared/patterns";
+import type { StructureBreak } from "../../shared/structure";
 import { resolveTimeZone, type ChartSettings } from "../chartSettings";
 import type { ChartMarker, ChartState, ChartType, IndicatorInstance } from "../store";
 import type { LiveLiquidation } from "../market/liquidationFeed";
@@ -788,6 +789,7 @@ export class ChartEngine {
     const formations: Formation[] = [];
     const zones: OrderBlock[] = [];
     const signals: OrderBlockSignal[] = [];
+    const structure: StructureBreak[] = [];
     for (const b of this.built) {
       const { def, params, instance } = b.computed;
       if (!def.patterns || instance.hidden) continue;
@@ -796,9 +798,11 @@ export class ChartEngine {
       formations.push(...r.formations);
       zones.push(...(r.zones ?? []));
       signals.push(...(r.signals ?? []));
+      structure.push(...(r.structure ?? []));
     }
     this.patterns.setFormations(formations);
     this.patterns.setZones(zones);
+    this.patterns.setStructure(structure);
     const markers: SeriesMarker<Time>[] = candles.map((c) => ({
       time: ts(c.time),
       position: c.direction === "bullish" ? "belowBar" : "aboveBar",

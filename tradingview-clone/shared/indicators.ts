@@ -3,6 +3,7 @@ import { liquidationHeatmap, strongestLevels, type Heatmap } from "./liquidation
 import * as m from "./math.js";
 import { orderBlocks, type OrderBlock, type OrderBlockSignal } from "./orderblocks.js";
 import { detectCandlePatterns, detectFormations, type CandlePattern, type Formation } from "./patterns.js";
+import { marketStructure, type StructureBreak } from "./structure.js";
 import type { Bar, Series } from "./math.js";
 
 export type { Bar, Series };
@@ -62,6 +63,7 @@ export interface PatternResult {
   formations: Formation[];
   zones?: OrderBlock[];
   signals?: OrderBlockSignal[];
+  structure?: StructureBreak[];
 }
 
 const MINUTES = 60;
@@ -139,6 +141,30 @@ export const INDICATORS: IndicatorDef[] = [
       candles: [],
       formations: [],
       zones: fairValueGaps(b, { minPct: p.minPct, mitigation: FVG_MITIGATION[Math.round(p.mitigation)] ?? "touch", maxZones: p.zones, showMitigated: p.mitigated >= 1 }),
+    }),
+  },
+  {
+    id: "structure",
+    name: "Marktstruktur (CHoCH / BOS)",
+    short: "CHoCH/BOS",
+    category: "Muster",
+    overlay: true,
+    description:
+      "Change of Character (Trendwechsel: erst tieferes Tief, dann Bruch des letzten Hochs; gestrichelt) und Break of Structure (Trendfortsetzung; durchgezogen) an Swing-Hochs/-Tiefs. Linie vom Swing bis zur Kerze, die den Level bricht. Swings brauchen \"Swing-Länge\" Kerzen rechts, erscheinen also verzögert. Quelle: smart-money-concepts (smc.swing_highs_lows, smc.bos_choch).",
+    params: [
+      { key: "swing", label: "Swing-Länge", default: 5, min: 1, max: 50 },
+      { key: "closeBreak", label: "Bruch per Schlusskurs (0/1)", default: 1, min: 0, max: 1 },
+      { key: "bos", label: "BOS zeigen (0/1)", default: 1, min: 0, max: 1 },
+      { key: "count", label: "Letzte Brüche", default: 10, min: 1, max: 100 },
+    ],
+    outputs: [],
+    compute: () => ({}),
+    patterns: (b, p) => ({
+      candles: [],
+      formations: [],
+      structure: marketStructure(b, Math.round(p.swing), p.closeBreak >= 1)
+        .filter((s) => p.bos >= 1 || s.kind === "choch")
+        .slice(-p.count),
     }),
   },
   {
