@@ -3,6 +3,7 @@
 // validate tool inputs before touching the chart.
 import { z } from "zod";
 import { INDICATOR_IDS } from "./indicators.js";
+import { MAX_COMPARE } from "./compare.js";
 import { isValidInterval } from "./marketData.js";
 
 /** Preset time frames (menu); any other like 7m, 90s, 2d works too (see parseInterval). */
@@ -50,9 +51,12 @@ export const toolSchemas = {
     schema: z.object({ id: z.string() }),
   },
   set_chart: {
-    description: "Wechselt Symbol, Zeiteinheit oder Charttyp. Danach sind neue Kerzen geladen.",
+    description: "Wechselt Symbol, Zeiteinheit oder Charttyp, auch Spread-Charts und Symbolvergleich. Danach sind neue Kerzen geladen.",
     schema: z.object({
-      symbol: z.string().optional().describe("z. B. BTCUSDT, ETHUSDT (Binance) oder AAPL, ^GDAXI, EURUSD=X (Yahoo)."),
+      symbol: z
+        .string()
+        .optional()
+        .describe("z. B. BTCUSDT, ETHUSDT (Binance) oder AAPL, ^GDAXI, EURUSD=X (Yahoo). Spread-Chart aus zwei Symbolen: BTCUSDT/ETHUSDT (Verhältnis), BTCUSDT - ETHUSDT, A+B, A*B."),
       interval: z
         .string()
         .refine(isValidInterval, "Zeiteinheit wie 1m, 15m, 4h, 1d oder eigene wie 7m, 90s, 2d")
@@ -63,6 +67,11 @@ export const toolSchemas = {
             ". 1M = Monat, 3M = Quartal, 1y = Jahr, all = gesamte Historie (Wochenkerzen). Eigene Zeiteinheiten: Zahl + s/m/h/d bis 7 Tage (z. B. 7m, 90s, 2d). Sekunden nur für Binance-Spot-Krypto.",
         ),
       chart_type: z.enum(CHART_TYPES).optional(),
+      compare: z
+        .array(z.string())
+        .max(MAX_COMPARE)
+        .optional()
+        .describe("Ersetzt die Vergleichssymbole, die als Linien über den Chart gelegt werden (Preisachse dann in Prozent ab der ersten sichtbaren Kerze). [] entfernt alle."),
     }),
   },
   draw_trendline: {

@@ -3,13 +3,15 @@ import { displayBars, isPriceDriven } from "../../shared/chartTypes";
 import { indicatorLabel } from "../../shared/indicators";
 import { ChartEngine, type ComputedIndicator, type PointerEvent } from "../chart/ChartEngine";
 import { alertLinesFor, alertStore } from "../alerts";
+import { useCompareData } from "../compare";
+import { compareCloseAt } from "../../shared/compare";
 import { publishSync, subscribeSync } from "../chartSync";
 import { demo, dropLevel, replayPositionsOpen, tradeLinesFor, type LineDraft } from "../demoAccount";
 import { getSelectedExchanges, subscribeExchanges } from "../exchangeSelection";
 import { liquidationFeed } from "../market/liquidationFeed";
 import { DEFAULT_FIBEXT_LEVELS, DEFAULT_FIB_LEVELS, formatPrice } from "../chart/DrawingsPrimitive";
 import { placeOnSide } from "../../shared/position";
-import { activeChart, addDrawing, newId, pickReplayStart, removeIndicator, stepBackReplay, stepReplay, updateIndicator, updateSettings, useChart, workspace, type ChartStore, type Drawing, type Point } from "../store";
+import { activeChart, addDrawing, newId, pickReplayStart, removeIndicator, removeCompare, stepBackReplay, stepReplay, updateIndicator, updateSettings, useChart, workspace, type ChartStore, type Drawing, type Point } from "../store";
 import { cloneInPlace, copyDrawing, deleteDrawing, pasteDrawing, replaceDrawing, selectDrawing, selectedDrawing, trackHistory, undoDrawings, useSelectedDrawing } from "../drawingEdit";
 import { cloneDrawing, hasMovableAnchors, moveAnchor, shiftDrawing } from "../drawingOps";
 import { DrawingMenu, type MenuTarget } from "./DrawingMenu";
@@ -128,6 +130,7 @@ export function ChartArea({ chart, onEngine, magnet, onEditIndicator, onEditPosi
   const brickKey = isPriceDriven(chartType) ? `${chartType}|${settings.renkoBox}|${settings.renkoAtr}|${settings.lineBreakLines}` : "";
   const bars = useMemo(() => (brickKey ? displayBars(loaded, chartType, settings) : loaded), [loaded, brickKey]);
   const selected = useSelectedDrawing(chart.slot);
+  const compareLines = useCompareData(chart);
   const [menu, setMenu] = useState<MenuTarget | null>(null);
   /** "Parallel verschieben/kopieren" from the menu: the drawing follows the pointer until the next tap. */
   const moveRef = useRef<{ id: string; clone: boolean; from: PointerEvent } | null>(null);
@@ -507,6 +510,10 @@ export function ChartArea({ chart, onEngine, magnet, onEditIndicator, onEditPosi
     };
   }, [onEngine, chart]);
 
+  useEffect(() => {
+    engineRef.current?.setCompare(compareLines);
+  }, [compareLines, chart]);
+
   // Replay playback: one candle per tick at the chosen speed.
   const replayPlaying = useChart(chart, (s) => s.replay?.playing ?? false);
   const replaySpeed = useChart(chart, (s) => s.replay?.speed ?? 1);
@@ -585,6 +592,24 @@ export function ChartArea({ chart, onEngine, magnet, onEditIndicator, onEditPosi
               )}
             </div>
           )}
+          {i === 0 &&
+            compareLines.map((c) => {
+              const v = bar ? compareCloseAt(c.bars, bar.time) : null;
+              return (
+                <div className="legend-row indicator" key={c.symbol}>
+                  <span className="legend-name" style={{ color: c.color }}>
+                    {c.symbol}
+                    {c.source === "demo" && " · DEMO"}
+                  </span>
+                  {c.error ? <span className="down">{c.error}</span> : v !== null && <span style={{ color: c.color }}>{formatPrice(v)}</span>}
+                  <span className="legend-actions">
+                    <button data-tip="Vergleich entfernen" aria-label={`${c.symbol} entfernen`} onClick={() => removeCompare(c.symbol, chart)}>
+                      ✕
+                    </button>
+                  </span>
+                </div>
+              );
+            })}
           {legendFor(i)}
         </div>
       ))}
@@ -601,7 +626,7 @@ export function ChartArea({ chart, onEngine, magnet, onEditIndicator, onEditPosi
             log
           </button>
           <button
-            className={scaleMode === "percent" ? "active" : ""}
+            className={scaleMode === "percent" || (compareLines.length > 0 && scaleMode !== "indexed") ? "active" : ""}
             onClick={() => updateSettings({ scaleMode: scaleMode === "percent" ? "normal" : "percent" })}
             data-tip={"Prozent-Skala ein/aus\nVeränderung ab der ersten sichtbaren Kerze"}
           >

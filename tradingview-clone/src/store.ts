@@ -1,11 +1,13 @@
 import { useSyncExternalStore } from "react";
 import { binanceInterval, bucketTime, loadMarketData, loadOpenInterest, type MarketData, type OpenInterestPoint } from "../shared/marketData";
 import { findAsset } from "../shared/assets";
+import { withCompare } from "../shared/compare";
 import { applyPrice, type FeedSymbol } from "../shared/exchangeFeed";
 import { marketNow, referenceMarket, type LiveTick, type RestCheck } from "../shared/freshness";
 import type { Bar } from "../shared/math";
 import type { PositionInput } from "../shared/position";
 import { barIndexAt, carryReplay, randomStart } from "../shared/replay";
+import { loadSpreadData, parseSpread } from "../shared/spread";
 import type { CHART_TYPES, CustomInterval, INTERVALS } from "../shared/tools";
 import { DEFAULT_SETTINGS, type ChartSettings } from "./chartSettings";
 import { STANDALONE } from "./config";
@@ -101,6 +103,8 @@ export interface ChartState {
   tool: Tool;
   settings: ChartSettings;
   replay: ReplayState | null;
+  /** Symbols drawn over the chart for comparison (percent scale). */
+  compare: string[];
 }
 
 type Listener = () => void;
@@ -172,6 +176,7 @@ function createChartStore(slot: number): ChartStore {
     tool: "cursor",
     settings: { ...DEFAULT_SETTINGS, ...(saved.settings ?? first.settings) },
     replay: null,
+    compare: Array.isArray(saved.compare) ? saved.compare.filter((c) => typeof c === "string") : [],
   };
   const listeners = new Set<Listener>();
   let persistTimer: number | undefined;
@@ -246,8 +251,8 @@ function createChartStore(slot: number): ChartStore {
   const persist = () => {
     window.clearTimeout(persistTimer);
     persistTimer = window.setTimeout(() => {
-      const { symbol, interval, chartType, indicators, drawings, markers, settings } = state;
-      writeJson(storageKey(slot), { symbol, interval, chartType, indicators, drawings, markers, settings });
+      const { symbol, interval, chartType, indicators, drawings, markers, settings, compare } = state;
+      writeJson(storageKey(slot), { symbol, interval, chartType, indicators, drawings, markers, settings, compare });
     }, 300);
   };
 
@@ -507,6 +512,15 @@ export function clearDrawings(scope: "claude" | "all") {
  * Starts a replay on a chart: the next tap in the chart chooses the start candle. During a replay this
  * rewinds: the chart stays cut where it is, so only an earlier candle can be tapped. Only one chart replays at a time.
  */
+/** Draws another symbol (or a spread) over the chart; the price scale switches to percent. */
+export function addCompare(symbol: string, chart: ChartStore = activeChart()) {
+  chart.set((s) => ({ compare: withCompare(s.compare, symbol, s.symbol) }));
+}
+
+export function removeCompare(symbol: string, chart: ChartStore = activeChart()) {
+  chart.set((s) => ({ compare: s.compare.filter((c) => c !== symbol) }));
+}
+
 export function startReplay(chart: ChartStore = activeChart()) {
   const s = chart.get();
   const all = s.replay ? s.replay.all : s.bars;
@@ -584,6 +598,9 @@ export async function loadChart(symbol: string, interval: Interval): Promise<voi
 }
 
 export async function fetchMarketData(symbol: string, interval: string, limit = 1000): Promise<MarketData> {
+  // Spread charts (BTCUSDT/ETHUSDT): both symbols are loaded as usual and combined.
+  const spread = parseSpread(symbol);
+  if (spread) return loadSpreadData(spread, interval, limit, fetchMarketData);
   // Without the Node server the browser fetches directly (Binance allows it; Yahoo does not, so stocks
   // use Binance perpetuals where one exists, see shared/assets.ts, and otherwise fall back to demo data).
   // With the user's exchange-feed key, stocks, indices and forex come from the exchange; without it (or on errors) as before.

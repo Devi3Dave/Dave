@@ -4,6 +4,7 @@ import { refreshBinanceLists, symbolFor, toggleAssetFavorite, useAssets } from "
 import { useFeedSettings } from "../market/exchangeFeed";
 import { STANDALONE } from "../config";
 import { loadChart, useChartState } from "../store";
+import { formatSpread, parseSpread, SPREAD_OP_LABELS } from "../../shared/spread";
 import { Menu } from "./Menu";
 
 type Tab = "fav" | AssetCategory;
@@ -61,7 +62,8 @@ function useFavoriteHits(): SearchHit[] {
   });
 }
 
-function AssetRow({ hit, onPick }: { hit: SearchHit; onPick: () => void }) {
+/** `onSelect` replaces loading the chart (the comparison picks a symbol this way). */
+function AssetRow({ hit, onPick, onSelect }: { hit: SearchHit; onPick: () => void; onSelect?: (symbol: string) => void }) {
   const symbol = useChartState((s) => s.symbol);
   const interval = useChartState((s) => s.interval);
   const fav = useAssets((s) => s.favorites.includes(hit.symbol));
@@ -73,7 +75,8 @@ function AssetRow({ hit, onPick }: { hit: SearchHit; onPick: () => void }) {
       <button
         className={`asset-item ${target === symbol ? "active" : ""}`}
         onClick={() => {
-          if (target !== symbol) void loadChart(target, interval);
+          if (onSelect) onSelect(target);
+          else if (target !== symbol) void loadChart(target, interval);
           onPick();
         }}
       >
@@ -164,7 +167,7 @@ export function AssetMenu({ onOpenSearch }: { onOpenSearch: () => void }) {
 const SECTION_LIMIT = 60;
 
 /** Full-screen search over the catalog and every Binance pair, grouped by category, with favorites. */
-export function AssetSearchDialog({ onClose }: { onClose: () => void }) {
+export function AssetSearchDialog({ onClose, onSelect, title = "Assets suchen" }: { onClose: () => void; onSelect?: (symbol: string) => void; title?: string }) {
   const [query, setQuery] = useState("");
   const [tab, setTab] = useState<DialogTab>("all");
   const [loadingLists, setLoadingLists] = useState(true);
@@ -190,12 +193,14 @@ export function AssetSearchDialog({ onClose }: { onClose: () => void }) {
           ].filter(([, list]) => list.length > 0)
         : [[tab, hits.filter((h) => h.category === tab)]];
   const exact = hits.some((h) => h.symbol === q) || favHits.some((h) => h.symbol === q);
+  const spread = parseSpread(q);
+  const select = (target: string) => (onSelect ? onSelect(target) : void loadChart(target, interval));
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal asset-dialog" onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
-          <h2>Assets suchen</h2>
+          <h2>{title}</h2>
           <button onClick={onClose} data-tip="Schließen" aria-label="Schließen">
             ✕
           </button>
@@ -203,14 +208,14 @@ export function AssetSearchDialog({ onClose }: { onClose: () => void }) {
         <input
           autoFocus
           className="search"
-          placeholder="Name oder Symbol, z. B. Gold, Tesla, PEPE, ^GDAXI …"
+          placeholder="Name oder Symbol, z. B. Gold, Tesla, PEPE, ^GDAXI … oder Spread BTCUSDT/ETHUSDT"
           value={query}
           spellCheck={false}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => {
             if (e.key !== "Enter" || !q) return;
             const first = sections[0]?.[1][0];
-            void loadChart(first ? symbolFor(first.symbol, first.asset) : q, interval);
+            select(spread ? formatSpread(spread) : first ? symbolFor(first.symbol, first.asset) : q);
             onClose();
           }}
         />
@@ -228,10 +233,27 @@ export function AssetSearchDialog({ onClose }: { onClose: () => void }) {
           ))}
         </div>
         <div className="indicator-list">
-          {q && !exact && (
+          {spread && (
+            <section>
+              <h3>Spread-Chart</h3>
+              <div className="asset-row">
+                <button
+                  className="asset-item"
+                  onClick={() => {
+                    select(formatSpread(spread));
+                    onClose();
+                  }}
+                >
+                  <strong>{formatSpread(spread)}</strong>
+                  <span>{SPREAD_OP_LABELS[spread.op]} aus beiden Kursen, Kerze für Kerze</span>
+                </button>
+              </div>
+            </section>
+          )}
+          {q && !exact && !spread && (
             <section>
               <h3>Eigenes Symbol</h3>
-              <AssetRow hit={{ symbol: q, name: `„${q}“ direkt laden`, category: "Krypto" }} onPick={onClose} />
+              <AssetRow hit={{ symbol: q, name: `„${q}“ direkt laden`, category: "Krypto" }} onPick={onClose} onSelect={onSelect} />
             </section>
           )}
           {sections.map(([title, list]) => (
@@ -241,7 +263,7 @@ export function AssetSearchDialog({ onClose }: { onClose: () => void }) {
               </h3>
               {list.length === 0 && <div className="menu-empty">{title.includes("Favoriten") ? "Noch keine Favoriten. Mit ☆ speichern." : "Nichts gefunden."}</div>}
               {list.slice(0, SECTION_LIMIT).map((h) => (
-                <AssetRow key={h.symbol} hit={h} onPick={onClose} />
+                <AssetRow key={h.symbol} hit={h} onPick={onClose} onSelect={onSelect} />
               ))}
               {list.length > SECTION_LIMIT && <div className="menu-empty">… {list.length - SECTION_LIMIT} weitere, Suche verfeinern</div>}
             </section>
@@ -252,6 +274,7 @@ export function AssetSearchDialog({ onClose }: { onClose: () => void }) {
           {STANDALONE
             ? "iPad-Version: Krypto live von Binance. Gold, Silber, Öl und viele US-Aktien kommen von Binance-Perpetuals (Perp). Für Assets mit „Demo“ gibt es hier keine Datenquelle."
             : "Krypto live von Binance, Aktien, Indizes, Rohstoffe und Forex über Yahoo Finance."}
+          {" Spread-Charts: zwei Symbole mit / - + * verbinden, z. B. BTCUSDT/ETHUSDT oder GC=F / SI=F."}
           {" Mit einem eigenen Twelve-Data-Schlüssel (Aktualitäts-Nachweis → Börsenkurs einrichten) kommen Aktien, Indizes und Forex als Börsenkurs („Börse“)."}
         </p>
       </div>
