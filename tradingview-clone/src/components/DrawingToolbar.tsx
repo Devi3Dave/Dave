@@ -1,10 +1,11 @@
 import { autoFibonacci } from "../../shared/patterns";
 import type { ChartEngine } from "../chart/ChartEngine";
 import { DEFAULT_FIB_LEVELS } from "../chart/DrawingsPrimitive";
+import { shortcutLabel, useShortcutOverrides } from "../shortcuts";
 import { addDrawing, clearDrawings, newId, store, useChartState, type Tool } from "../store";
 
 const TOOLS: { id: Tool; icon: string; label: string }[] = [
-  { id: "cursor", icon: "↖", label: "Cursor (Esc)" },
+  { id: "cursor", icon: "↖", label: "Cursor\nEsc bricht das Zeichnen ab" },
   { id: "trendline", icon: "╱", label: "Trendlinie\nZwei Punkte antippen" },
   { id: "ray", icon: "⟋", label: "Strahl\nTrendlinie, nach rechts verlängert" },
   { id: "hline", icon: "―", label: "Horizontale Linie" },
@@ -37,10 +38,18 @@ function drawAutoFib(engine: ChartEngine | null) {
 
 export function DrawingToolbar({ magnet, onToggleMagnet, getEngine }: Props) {
   const tool = useChartState((s) => s.tool);
+  useShortcutOverrides();
+  /** "Trendlinie (⌥T)" in the first line of the tooltip. */
+  const tip = (t: (typeof TOOLS)[number]) => {
+    const keys = shortcutLabel(`tool.${t.id}`);
+    if (!keys) return t.label;
+    const [first, ...rest] = t.label.split("\n");
+    return [`${first} (${keys})`, ...rest].join("\n");
+  };
   return (
     <nav className="toolbar">
       {TOOLS.map((t) => (
-        <button key={t.id} data-tip={t.label} aria-label={t.label} className={`${tool === t.id ? "active" : ""} tool-${t.id}`} onClick={() => store.set({ tool: t.id })}>
+        <button key={t.id} data-tip={tip(t)} aria-label={t.label} className={`${tool === t.id ? "active" : ""} tool-${t.id}`} onClick={() => store.set({ tool: t.id })}>
           {t.icon}
         </button>
       ))}

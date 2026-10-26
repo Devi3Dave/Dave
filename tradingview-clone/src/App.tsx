@@ -14,12 +14,15 @@ import { LiqHeatmapView } from "./components/LiqHeatmapView";
 import { PositionDialog } from "./components/PositionDialog";
 import { SidePanel, type SideTab } from "./components/SidePanel";
 import { TooltipLayer } from "./components/Tooltip";
+import { ShortcutsDialog } from "./components/ShortcutsDialog";
 import { TopBar } from "./components/TopBar";
 import { isCryptoSymbol } from "../shared/marketData";
 import { OPEN_ALERTS_EVENT, startAlertFeed } from "./alerts";
 import { startDemoFeed } from "./demoAccount";
 import { liquidationFeed } from "./market/liquidationFeed";
-import { MAX_CHARTS, useChartState, workspace } from "./store";
+import { toggleAllDrawingsHidden } from "./drawingEdit";
+import { useShortcuts } from "./shortcuts";
+import { activeChart, exitReplay, loadChart, MAX_CHARTS, startReplay, store, updateSettings, useChartState, workspace, type ChartType, type Interval, type Tool } from "./store";
 
 export default function App() {
   const enginesRef = useRef<(ChartEngine | null)[]>(Array(MAX_CHARTS).fill(null));
@@ -35,6 +38,7 @@ export default function App() {
   const [journalOpen, setJournalOpen] = useState(false);
   const [exchangesOpen, setExchangesOpen] = useState(false);
   const [screenerOpen, setScreenerOpen] = useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const symbol = useChartState((s) => s.symbol);
   const liveLiquidations = useChartState((s) => s.settings.liveLiquidations);
 
@@ -61,22 +65,10 @@ export default function App() {
     setClaudeOpen(true);
     setSideTab("alerts");
   }, []);
-  // Drawing menu ("Alarm hinzufügen") and Alt + A, as in TradingView.
+  // Drawing menu ("Alarm hinzufügen") opens the alerts tab.
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const el = e.target as HTMLElement | null;
-      if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable)) return;
-      if (e.altKey && e.code === "KeyA") {
-        e.preventDefault();
-        openAlerts();
-      }
-    };
     window.addEventListener(OPEN_ALERTS_EVENT, openAlerts);
-    window.addEventListener("keydown", onKey);
-    return () => {
-      window.removeEventListener(OPEN_ALERTS_EVENT, openAlerts);
-      window.removeEventListener("keydown", onKey);
-    };
+    return () => window.removeEventListener(OPEN_ALERTS_EVENT, openAlerts);
   }, [openAlerts]);
 
   const onEngine = useCallback((slot: number, e: ChartEngine | null) => {
@@ -85,11 +77,58 @@ export default function App() {
   // Claude always works with the active chart.
   const getEngine = useCallback(() => enginesRef.current[workspace.get().active] ?? null, []);
 
+  // Keyboard shortcuts like TradingView; keys are listed and editable in the shortcut list (⌘/).
+  const togglePage = (open: boolean, setOpen: (v: boolean) => void) => {
+    closePages();
+    setOpen(!open);
+  };
+  const toggleScale = (mode: "log" | "percent") => updateSettings({ scaleMode: store.get().settings.scaleMode === mode ? "normal" : mode });
+  const shiftView = (bars: number, zoom = 1) => {
+    const ts = getEngine()?.chart.timeScale();
+    const r = ts?.getVisibleLogicalRange();
+    if (!ts || !r) return;
+    // Zoom keeps the right edge (newest candles) in place, like TradingView.
+    const width = (r.to - r.from) * zoom;
+    if (zoom !== 1 && (width < 5 || width > 5000)) return;
+    ts.setVisibleLogicalRange({ from: r.to + bars - width, to: r.to + bars });
+  };
+  const tool = (t: Tool) => () => store.set({ tool: store.get().tool === t && t !== "cursor" ? "cursor" : t });
+  useShortcuts({
+    ...Object.fromEntries((["cursor", "trendline", "ray", "hline", "vline", "zone", "fib", "fibext", "channel", "measure", "brush", "text", "long", "short", "erase"] as Tool[]).map((t) => [`tool.${t}`, tool(t)])),
+    "drawings.toggleHidden": () => toggleAllDrawingsHidden(activeChart()),
+    "chart.reset": () => getEngine()?.resetView(),
+    "chart.scrollLeft": () => shiftView(-1),
+    "chart.scrollRight": () => shiftView(1),
+    "chart.zoomIn": () => shiftView(0, 0.8),
+    "chart.zoomOut": () => shiftView(0, 1.25),
+    "scale.log": () => toggleScale("log"),
+    "scale.percent": () => toggleScale("percent"),
+    "scale.invert": () => updateSettings({ invertScale: !store.get().settings.invertScale }),
+    "panel.alerts": openAlerts,
+    "panel.claude": () => setClaudeOpen((o) => !o),
+    "panel.demo": () => {
+      closePages();
+      setClaudeOpen(true);
+      setSideTab("demo");
+    },
+    "dialog.indicators": () => setShowIndicators(true),
+    "dialog.settings": () => setShowSettings(true),
+    "dialog.shortcuts": () => setShortcutsOpen((o) => !o),
+    "page.heatmap": () => togglePage(heatmapOpen, setHeatmapOpen),
+    "page.calc": () => togglePage(calcOpen, setCalcOpen),
+    "page.journal": () => togglePage(journalOpen, setJournalOpen),
+    "page.exchanges": () => togglePage(exchangesOpen, setExchangesOpen),
+    "replay.toggle": () => (store.get().replay ? exitReplay() : startReplay()),
+    ...Object.fromEntries(["1m", "5m", "15m", "30m", "1h", "4h", "1d", "1w", "1M"].map((iv) => [`interval.${iv}`, () => void loadChart(store.get().symbol, iv as Interval)])),
+    ...Object.fromEntries((["candles", "hollow_candles", "bars", "heikin_ashi", "line", "area", "baseline"] as ChartType[]).map((t) => [`chartType.${t}`, () => store.set({ chartType: t })])),
+  });
+
   return (
     <div className={`app ${claudeOpen ? "with-claude" : ""}`}>
       <TopBar
         onOpenIndicators={() => setShowIndicators(true)}
         onOpenSettings={() => setShowSettings(true)}
+        onOpenShortcuts={() => setShortcutsOpen(true)}
         heatmapOpen={heatmapOpen}
         onToggleHeatmap={() => {
           setScreenerOpen(false);
@@ -168,6 +207,7 @@ export default function App() {
       {editing && <IndicatorSettings id={editing} onClose={() => setEditing(null)} />}
       {editingPosition && <PositionDialog id={editingPosition} onClose={() => setEditingPosition(null)} />}
       {showSettings && <ChartSettingsDialog onClose={() => setShowSettings(false)} />}
+      {shortcutsOpen && <ShortcutsDialog onClose={() => setShortcutsOpen(false)} />}
       <AlertToasts onOpen={() => {
         closePages();
         openAlerts();

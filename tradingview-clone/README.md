@@ -242,7 +242,7 @@ aktiven Charts, wie bei einem Futures-Konto mit isolierter Margin; das Konto lie
 - Historie mit Trefferquote und Gebühren; Trades einzeln, alle oder automatisch ins Journal (Setup „Demo“)
 - Gebühr pro Seite einstellbar (0 / 0,02 / 0,05 / 0,1 %), Konto jederzeit neu starten
 
-**Alarme (🔔 Alarme in der Kopfzeile, Alt + A)**
+**Alarme (🔔 Alarme in der Kopfzeile, ⌥A bzw. Alt + A)**
 Wie die Alarme von TradingView: ChartAI meldet sich mit Hinweis, Ton und optional einer Systemmitteilung,
 sobald eine Bedingung eintritt.
 - Bedingungen: kreuzt, kreuzt nach oben, kreuzt nach unten, größer als, kleiner als, tritt in Kanal ein,
@@ -258,6 +258,24 @@ sobald eine Bedingung eintritt.
   Nur bei geöffneter App (ohne eigenen Server kann bei geschlossener App nichts auslösen); Demo-Daten
   lösen keine Alarme aus
 - Claude kann Alarme anlegen, auflisten und löschen (`create_alert`, `list_alerts`, `delete_alert`)
+
+**Tastenkürzel (⌨ in der Kopfzeile, ⌘/ bzw. Strg + /)**
+Die gängigen Kürzel von TradingView, laut
+[TradingView-Dokumentation](https://www.tradingview.com/charting-library-docs/latest/getting_started/Shortcuts/);
+auf Mac und iPad mit Tastatur gelten ⌘ statt Strg und ⌥ statt Alt.
+- Zeichnen: ⌥T Trendlinie, ⌥H horizontale, ⌥V vertikale Linie, ⌥⇧R Rechteck, ⌥F Fibonacci,
+  ⌃⌥H alle Zeichnungen aus-/einblenden
+- Bearbeiten: ⌘Z rückgängig, ⌘⇧Z (Windows Strg + Y) wiederholen, ⌘C / ⌘V / ⌘D kopieren, einfügen,
+  klonen, ⌫ / Entf löschen
+- Chart: ⌥R zurücksetzen, ← / → eine Kerze scrollen, ⌘↑ / ⌘↓ zoomen, ⌥L log, ⌥P Prozent, ⌥I invertieren
+- Fenster: ⌥A Alarme, ⌘K Asset-Suche, / Indikatoren; Replay: ⇧→ / ⇧← Kerze vor/zurück
+- Wo die Mac-Übersetzung mit Safari oder macOS kollidiert, weicht sie ab (⌘Y öffnet den Safari-Verlauf,
+  ⌘⌥H blendet andere Apps aus)
+- Die Liste ist durchsuchbar (Aktion oder Taste). Jedes Kürzel lässt sich entfernen, neu aufnehmen
+  (+ antippen, Tasten drücken) und zurücksetzen; weitere Aktionen ohne Standard (Strahl, Kanal,
+  Zeiteinheiten, Charttypen, Rechner, Journal …) können belegt werden. Ist eine Taste schon vergeben,
+  fragt ChartAI, ob sie verschoben werden soll; von Safari/macOS belegte Tasten (⌘W, ⌘T, ⌘Q …) werden
+  abgelehnt. Gespeichert in `chartai.shortcuts.v1`
 
 **Bar-Replay (⏪ Replay in der Kopfzeile)**
 Wie das Bar Replay von TradingView: den Chart an einer Kerze in der Vergangenheit abschneiden und die

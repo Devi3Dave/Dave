@@ -3702,3 +3702,135 @@ select,
 .legend-source {
   color: var(--muted);
 }
+
+/* ---------- keyboard shortcuts ---------- */
+
+.shortcuts-modal {
+  width: min(680px, calc(100vw - 32px));
+}
+
+.shortcuts-modal > .sc-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  flex-shrink: 1;
+}
+
+.sc-hint {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.sc-error,
+.sc-conflict {
+  font-size: 13px;
+  padding: 6px 8px;
+  border-radius: 4px;
+}
+
+.sc-error {
+  color: var(--down);
+  border: 1px solid var(--down);
+}
+
+.sc-conflict {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--accent);
+}
+
+.sc-conflict span {
+  flex: 1 1 200px;
+}
+
+.sc-conflict .primary {
+  background: var(--accent);
+  color: #fff;
+}
+
+.sc-list h3 {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  margin: 12px 0 4px;
+}
+
+.sc-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  min-height: 34px;
+}
+
+.sc-row:hover,
+.sc-row.recording {
+  background: var(--panel-2);
+}
+
+.sc-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.sc-tv {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 0 4px;
+  border-radius: 3px;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+}
+
+.sc-keys {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 4px;
+}
+
+.shortcuts-modal kbd {
+  font-family: inherit;
+  font-size: 12px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  background: var(--bg);
+  white-space: nowrap;
+}
+
+.sc-chip {
+  display: inline-flex;
+  align-items: center;
+}
+
+.sc-chip button,
+.sc-reset {
+  color: var(--muted);
+  padding: 2px 4px;
+  font-size: 11px;
+}
+
+.sc-add {
+  min-width: 28px;
+  padding: 2px 8px;
+  border: 1px dashed var(--border);
+  border-radius: 4px;
+  color: var(--muted);
+}
+
+.sc-add.active {
+  border-color: var(--accent);
+  color: var(--accent);
+}
