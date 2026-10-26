@@ -8,6 +8,7 @@ import type { Bar } from "../shared/math";
 import type { PositionInput } from "../shared/position";
 import { barIndexAt, carryReplay, nextReplayStep, randomStart, replayFrame } from "../shared/replay";
 import { loadSpreadData, parseSpread } from "../shared/spread";
+import { parseVenueSymbol, type VenueSymbol } from "../shared/venues";
 import type { IndicatorSourceRef } from "../shared/indicators";
 import type { CHART_TYPES, CustomInterval, INTERVALS } from "../shared/tools";
 import { DEFAULT_SETTINGS, type ChartSettings } from "./chartSettings";
@@ -232,6 +233,10 @@ function createChartStore(slot: number): ChartStore {
       });
     } else if (json.source === "binance" || json.source === "binance_futures") {
       ws = connectLive(chart, json.symbol, interval, json.source === "binance_futures", current, onData);
+    } else if (json.source === "venue") {
+      const v = parseVenueSymbol(json.symbol);
+      if (!v) return;
+      ws = connectVenueLive(chart, v, interval, current, onData);
     } else return;
     ws.onclose = () => {
       if (socket === ws) socket = null;
@@ -340,7 +345,7 @@ function createChartStore(slot: number): ChartStore {
     watchdog() {
       // A replay shows the past on purpose; polling would only disturb it.
       if (!started || state.loading || state.replay || !state.source || state.source === "demo") return;
-      let live = state.source === "binance" || state.source === "binance_futures";
+      let live = state.source === "binance" || state.source === "binance_futures" || state.source === "venue";
       if (state.source === "twelvedata") {
         // Exchange prices only move while the exchange trades; reloading a closed market would only use up the plan's credits.
         if (!marketNow(referenceMarket(state.symbol, state.source), Math.floor(Date.now() / 1000)).open) return;
@@ -736,6 +741,42 @@ function connectLive(chart: ChartStore, symbol: string, interval: Interval, futu
       const bars = series.slice();
       if (last && last.time === bar.time) bars[bars.length - 1] = bar;
       else if (!last || bar.time > last.time) bars.push(bar);
+      if (!s.replay) return { bars, liveTick };
+      return s.replay.phase === "select" && !s.replay.shown ? { bars, liveTick, replay: { ...s.replay, all: bars } } : { liveTick, replay: { ...s.replay, all: bars } };
+    });
+  };
+  return ws;
+}
+
+/** Trades from another crypto exchange's WebSocket (shared/venues.ts), folded into the chart's candles. */
+function connectVenueLive(chart: ChartStore, { venue, pair }: VenueSymbol, interval: Interval, current: () => boolean, onData: () => void): WebSocket {
+  const ws = new WebSocket(venue.wsUrl);
+  let ping: number | undefined;
+  ws.onopen = () => {
+    ws.send(venue.subscribe(pair));
+    if (venue.ping) {
+      const { everyMs, message } = venue.ping;
+      ping = window.setInterval(() => (ws.readyState === WebSocket.OPEN ? ws.send(message) : window.clearInterval(ping)), everyMs);
+    }
+  };
+  ws.addEventListener("close", () => window.clearInterval(ping));
+  ws.onmessage = (ev) => {
+    if (!current()) return;
+    let msg: unknown;
+    try {
+      msg = JSON.parse(ev.data);
+    } catch {
+      return; // "pong" and other plain-text replies
+    }
+    const trades = venue.parseTrades(msg).filter((t) => Number.isFinite(t.price) && t.price > 0 && Number.isFinite(t.timeMs));
+    if (trades.length === 0) return;
+    onData();
+    const receivedAt = Date.now();
+    const liveTick: LiveTick = { eventTime: trades[trades.length - 1].timeMs, receivedAt };
+    chart.set((s) => {
+      const series = s.replay ? s.replay.all : s.bars;
+      let bars = series;
+      for (const t of trades) bars = applyPrice(bars, interval, t.price, t.timeMs, t.size);
       if (!s.replay) return { bars, liveTick };
       return s.replay.phase === "select" && !s.replay.shown ? { bars, liveTick, replay: { ...s.replay, all: bars } } : { liveTick, replay: { ...s.replay, all: bars } };
     });

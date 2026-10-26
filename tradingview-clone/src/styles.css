@@ -232,6 +232,20 @@ textarea {
   color: var(--up);
 }
 
+.asset-badge.venue {
+  color: #4fb3ff;
+}
+
+.venue-tabs {
+  align-items: center;
+}
+
+.venue-label {
+  font-size: 11px;
+  color: var(--muted);
+  margin-right: 2px;
+}
+
 .asset-badge.binance_futures {
   color: #f7c948;
 }

@@ -2,10 +2,22 @@ import { useSyncExternalStore } from "react";
 import { findAsset, parseFuturesInfo, parseSpotTickers, resolveAsset, type Asset, type FuturesSymbol } from "../shared/assets";
 import { STANDALONE } from "./config";
 import { feedSettings } from "./market/exchangeFeed";
+import { VENUES, venueSymbol, type VenueId } from "../shared/venues";
 
 const FAV_KEY = "chartai.assetFavorites.v1";
 const LISTS_KEY = "chartai.binanceSymbols.v1";
 const LISTS_MAX_AGE = 12 * 3600 * 1000;
+const VENUE_KEY = "chartai.cryptoVenue.v1";
+
+function loadVenue(): VenueId {
+  try {
+    const v = localStorage.getItem(VENUE_KEY);
+    if (VENUES.some((x) => x.id === v)) return v as VenueId;
+  } catch {
+    // default
+  }
+  return "BINANCE";
+}
 
 function loadFavorites(): string[] {
   try {
@@ -38,6 +50,8 @@ interface AssetState {
   futures: FuturesSymbol[];
   /** Listed perpetuals, null until Binance answered once. */
   futuresSet: Set<string> | null;
+  /** Exchange that crypto picked in the picker loads from (BINANCE: the plain Binance pair). */
+  venue: VenueId;
 }
 
 const cached = loadLists();
@@ -46,6 +60,7 @@ let state: AssetState = {
   spot: cached?.spot ?? [],
   futures: cached?.futures ?? [],
   futuresSet: cached?.futures.length ? new Set(cached.futures.map((f) => f.symbol)) : null,
+  venue: loadVenue(),
 };
 const listeners = new Set<() => void>();
 
@@ -72,6 +87,15 @@ export function toggleAssetFavorite(symbol: string) {
     // not remembered
   }
   set({ favorites });
+}
+
+export function setCryptoVenue(venue: VenueId) {
+  try {
+    localStorage.setItem(VENUE_KEY, venue);
+  } catch {
+    // not remembered
+  }
+  set({ venue });
 }
 
 async function getJson(urls: string[]): Promise<unknown> {
@@ -117,8 +141,14 @@ export function refreshBinanceLists(): Promise<void> {
   return refreshing;
 }
 
-/** Symbol to load for a picker entry: catalog assets may switch to their Binance perpetual. */
-export function symbolFor(symbol: string, asset?: Asset): string {
+/**
+ * Symbol to load for a picker entry: catalog assets may switch to their Binance perpetual, and crypto
+ * (`crypto`) loads from the exchange chosen in the picker (BTCUSDT → COINBASE:BTCUSD). Symbols that
+ * already name an exchange stay as they are.
+ */
+export function symbolFor(symbol: string, asset?: Asset, crypto = false): string {
+  if (symbol.includes(":")) return symbol;
+  if (crypto && state.venue !== "BINANCE") return venueSymbol(state.venue, symbol);
   const a = asset ?? findAsset(symbol);
   return a ? resolveAsset(a, STANDALONE, state.futuresSet, feedSettings.active()).symbol : symbol;
 }

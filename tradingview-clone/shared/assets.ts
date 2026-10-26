@@ -1,6 +1,7 @@
 /** Asset catalog for the symbol picker: popular assets by category and where their prices come from. */
 
 import { feedSymbol } from "./exchangeFeed.js";
+import { splitPair } from "./venues.js";
 
 export type AssetCategory = "Krypto" | "Aktien" | "Indizes & ETFs" | "Edelmetalle" | "Rohstoffe" | "Forex";
 
@@ -163,9 +164,14 @@ export function parseSpotTickers(json: unknown): string[] {
 const BY_ID = new Map(ASSETS.map((a) => [a.id, a]));
 const BY_PERP = new Map(ASSETS.filter((a) => a.perp).map((a) => [a.perp!, a]));
 
-/** Catalog entry for a loaded symbol (its id or its perpetual). */
+/** Catalog entry for a loaded symbol (its id, its perpetual, or the coin on another exchange such as COINBASE:BTCUSD). */
 export function findAsset(symbol: string): Asset | undefined {
-  return BY_ID.get(symbol) ?? BY_PERP.get(symbol);
+  const known = BY_ID.get(symbol) ?? BY_PERP.get(symbol);
+  const m = known ? null : /^[A-Z]+:(.+)$/.exec(symbol);
+  if (!m) return known;
+  const pair = splitPair(m[1]);
+  const coin = pair && ["USD", "USDT", "USDC"].includes(pair.quote) ? BY_ID.get(`${pair.base}USDT`) : undefined;
+  return coin?.category === "Krypto" ? coin : BY_ID.get(m[1]);
 }
 
 export function categoryOfFutures(f: FuturesSymbol): AssetCategory {
@@ -179,7 +185,7 @@ export function categoryOfFutures(f: FuturesSymbol): AssetCategory {
   return "Aktien";
 }
 
-export type DataSource = "binance" | "binance_futures" | "yahoo" | "twelvedata" | "demo";
+export type DataSource = "binance" | "binance_futures" | "yahoo" | "twelvedata" | "venue" | "demo";
 
 /**
  * Which symbol to load for an asset and where its prices come from.

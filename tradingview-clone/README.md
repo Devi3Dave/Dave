@@ -74,6 +74,12 @@ und zusammen mit der Fill & Sign-App auf GitHub Pages veröffentlicht.
 - Kursdaten: Krypto über Binance (inkl. Live-Updates per WebSocket), Aktien/Indizes/Forex über Yahoo
   Finance (z. B. `AAPL`, `^GDAXI`, `EURUSD=X`), Binance-Futures-Perpetuals wie `XAUUSDT` (Gold),
   `CLUSDT` (Öl) oder `TSLAUSDT`. Ohne Internet werden Demo-Daten erzeugt.
+- Krypto von mehreren Börsen wie bei TradingView: `COINBASE:BTCUSD`, `KRAKEN:ETHEUR`, `BYBIT:SOLUSDT`,
+  `OKX:BTCUSDT`, `BITSTAMP:BTCUSD`, `BITFINEX:BTCUSD` (öffentliche APIs ohne Schlüssel, Kerzen per REST
+  und Live-Trades per WebSocket, auch auf dem iPad). In der Asset-Auswahl wählt die Zeile „Börse“, woher
+  Krypto kommt; ohne Präfix oder mit `BINANCE:` bleibt es Binance. Ein Paar, das die Börse nicht listet,
+  zeigt einen Fehler statt fremder Kurse. Preisunterschied zweier Börsen als Spread:
+  `COINBASE:BTCUSD - BINANCE:BTCUSDT`. Orderbuch, Liquidationen und Footprint bleiben Binance-only.
 - Asset-Auswahl in der Kopfzeile: Drop-down mit gängigen Assets nach Rubriken (Krypto, Aktien,
   Indizes & ETFs, Edelmetalle, Rohstoffe, Forex) und Favoriten; 🔍 öffnet die Suche über alle
   Binance-Märkte, ebenfalls nach Rubriken, mit ☆ zum Speichern von Favoriten. Jede Zeile zeigt die
@@ -322,6 +328,7 @@ shared/   math.ts        Indikator-Mathematik (rein, getestet)
           tools.ts       Zod-Schemas der Claude-Tools (Quelle für API-Schema und Validierung)
           claudeTurn.ts  Ein gestreamter Claude-Turn (Server und Standalone-Build)
           marketData.ts  Binance / Yahoo / Demo-Daten
+          venues.ts      Weitere Krypto-Börsen (Coinbase, Kraken, Bybit, OKX, Bitstamp, Bitfinex)
           demoTrading.ts Demo-Konto: Positionen, Margin, SL/TP, Liquidation (rein, getestet)
           prompt.ts      Systemprompt inkl. Indikatorkatalog
 server/   index.ts       Express: /api/chat (SSE-Proxy zur Claude API), /api/klines
