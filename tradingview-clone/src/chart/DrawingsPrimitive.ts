@@ -45,6 +45,9 @@ export class DrawingsPrimitive implements ISeriesPrimitive<Time> {
   private drawings: Drawing[] = [];
   private bars: Bar[] = [];
   private preview: Drawing | null = null;
+  private selected: string | null = null;
+  /** Drawn in place of the stored drawing with the same id (while it is dragged), or on top if new. */
+  private override: Drawing | null = null;
   private readonly view: IPrimitivePaneView;
 
   constructor() {
@@ -78,6 +81,17 @@ export class DrawingsPrimitive implements ISeriesPrimitive<Time> {
 
   setPreview(preview: Drawing | null) {
     this.preview = preview;
+    this.requestUpdate?.();
+  }
+
+  setSelected(id: string | null) {
+    if (id === this.selected) return;
+    this.selected = id;
+    this.requestUpdate?.();
+  }
+
+  setOverride(d: Drawing | null) {
+    this.override = d;
     this.requestUpdate?.();
   }
 
@@ -233,16 +247,25 @@ export class DrawingsPrimitive implements ISeriesPrimitive<Time> {
     return g;
   }
 
-  /** Returns the id of the drawing under (x, y) in media coordinates, if any. */
-  findAt(x: number, y: number, width: number, height: number): string | null {
+  /** Returns the id of the visible drawing under (x, y) in media coordinates, if any. `tolerance`: wider for fingers. */
+  findAt(x: number, y: number, width: number, height: number, tolerance = 6): string | null {
     for (let i = this.drawings.length - 1; i >= 0; i--) {
       const d = this.drawings[i];
+      if (d.hidden) continue;
       const g = this.geometry(d, width, height);
-      if (g.segments.some((s) => distToSegment(x, y, s) < 6)) return d.id;
+      if (g.segments.some((s) => distToSegment(x, y, s) < tolerance)) return d.id;
       if (g.rects.some((r) => x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h)) return d.id;
       if (d.kind === "text" && g.anchors.some((a) => x >= a.x - 4 && x <= a.x + 8 * d.text.length && Math.abs(y - a.y) < 12)) return d.id;
     }
     return null;
+  }
+
+  /** Index of the anchor of drawing `id` under (x, y), as listed in its geometry. */
+  anchorAt(id: string, x: number, y: number, width: number, height: number, tolerance: number): number | null {
+    const d = this.drawings.find((x) => x.id === id);
+    if (!d) return null;
+    const i = this.geometry(d, width, height).anchors.findIndex((a) => Math.hypot(a.x - x, a.y - y) <= tolerance);
+    return i < 0 ? null : i;
   }
 
   // ---- rendering ----
@@ -253,7 +276,17 @@ export class DrawingsPrimitive implements ISeriesPrimitive<Time> {
       ctx.save();
       ctx.font = "11px -apple-system, BlinkMacSystemFont, 'Trebuchet MS', Roboto, sans-serif";
       ctx.textBaseline = "middle";
-      for (const d of this.drawings) this.drawOne(ctx, d, width, height, false);
+      const o = this.override;
+      for (const d of this.drawings) {
+        if (d.hidden) continue;
+        const shown = o && o.id === d.id ? o : d;
+        this.drawOne(ctx, shown, width, height, false);
+        if (d.id === this.selected) this.drawHandles(ctx, shown, width, height);
+      }
+      if (o && !this.drawings.some((d) => d.id === o.id)) {
+        this.drawOne(ctx, o, width, height, true);
+        this.drawHandles(ctx, o, width, height);
+      }
       if (this.preview) this.drawOne(ctx, this.preview, width, height, true);
       ctx.restore();
     });
@@ -269,8 +302,8 @@ export class DrawingsPrimitive implements ISeriesPrimitive<Time> {
       case "trendline":
       case "hline":
       case "vline": {
-        ctx.lineWidth = d.kind === "trendline" ? d.width : 1.5;
-        ctx.setLineDash(DASH["style" in d ? d.style : "solid"]);
+        ctx.lineWidth = d.width ?? 1.5;
+        ctx.setLineDash(DASH[d.style ?? "solid"]);
         for (const s of g.segments) line(ctx, s);
         ctx.setLineDash([]);
         if (d.kind === "hline" && g.segments[0]) {
@@ -421,6 +454,33 @@ export class DrawingsPrimitive implements ISeriesPrimitive<Time> {
       ctx.fill();
       ctx.stroke();
     }
+  }
+
+  /** Selection marks: the anchors (or the middle of a line / corners of a box), grey when locked. */
+  private drawHandles(ctx: CanvasRenderingContext2D, d: Drawing, width: number, height: number) {
+    const g = this.geometry(d, width, height);
+    let pts = d.kind === "position" ? [] : g.anchors;
+    if (!pts.length && g.rects[0]) {
+      const r = g.rects.reduce((a, b) => ({ x: Math.min(a.x, b.x), y: Math.min(a.y, b.y), w: Math.max(a.x + a.w, b.x + b.w) - Math.min(a.x, b.x), h: Math.max(a.y + a.h, b.y + b.h) - Math.min(a.y, b.y) }));
+      pts = [{ x: r.x, y: r.y }, { x: r.x + r.w, y: r.y }, { x: r.x, y: r.y + r.h }, { x: r.x + r.w, y: r.y + r.h }];
+    }
+    if (!pts.length && g.segments[0]) {
+      const s = g.segments[0];
+      const x = d.kind === "hline" ? Math.min(width / 2, s.x2 - 40) : (s.x1 + s.x2) / 2;
+      pts = [{ x, y: d.kind === "vline" ? height / 2 : (s.y1 + s.y2) / 2 }];
+    }
+    ctx.globalAlpha = 1;
+    ctx.setLineDash([]);
+    ctx.lineWidth = 1.5;
+    ctx.fillStyle = "#131722";
+    ctx.strokeStyle = d.locked ? "#787b86" : "#2962ff";
+    for (const a of pts) {
+      ctx.beginPath();
+      ctx.arc(a.x, a.y, 5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    }
+    if (d.locked && pts[0]) label(ctx, "🔒", pts[0].x + 8, pts[0].y - 12, "#d1d4dc");
   }
 
   private drawPosition(ctx: CanvasRenderingContext2D, d: Extract<Drawing, { kind: "position" }>, g: Geometry, preview: boolean) {

@@ -6,7 +6,10 @@ import { getSelectedExchanges, subscribeExchanges } from "../exchangeSelection";
 import { liquidationFeed } from "../market/liquidationFeed";
 import { DEFAULT_FIBEXT_LEVELS, DEFAULT_FIB_LEVELS, formatPrice } from "../chart/DrawingsPrimitive";
 import { placeOnSide } from "../../shared/position";
-import { addDrawing, newId, pickReplayStart, removeDrawing, removeIndicator, stepBackReplay, stepReplay, updateIndicator, updateSettings, useChart, type ChartStore, type Drawing, type Point } from "../store";
+import { activeChart, addDrawing, newId, pickReplayStart, removeIndicator, stepBackReplay, stepReplay, updateIndicator, updateSettings, useChart, type ChartStore, type Drawing, type Point } from "../store";
+import { cloneInPlace, copyDrawing, deleteDrawing, pasteDrawing, replaceDrawing, selectDrawing, selectedDrawing, trackHistory, undoDrawings, useSelectedDrawing } from "../drawingEdit";
+import { cloneDrawing, hasMovableAnchors, moveAnchor, shiftDrawing } from "../drawingOps";
+import { DrawingMenu, type MenuTarget } from "./DrawingMenu";
 import { lastPositionDefaults } from "./PositionDialog";
 import { ReplayBar } from "./ReplayBar";
 
@@ -117,6 +120,16 @@ export function ChartArea({ chart, onEngine, magnet, onEditIndicator, onEditPosi
   const [computed, setComputed] = useState<ComputedIndicator[]>([]);
 
   const { symbol, interval, bars, source, tool, loading, error } = useChart(chart, (s) => s);
+  const selected = useSelectedDrawing(chart.slot);
+  const [menu, setMenu] = useState<MenuTarget | null>(null);
+  /** "Parallel verschieben/kopieren" from the menu: the drawing follows the pointer until the next tap. */
+  const moveRef = useRef<{ id: string; clone: boolean; from: PointerEvent } | null>(null);
+  const [moving, setMoving] = useState(false);
+  const startMoveRef = useRef<(id: string, clone: boolean, from: PointerEvent) => void>(() => {});
+
+  useEffect(() => {
+    engineRef.current?.drawings.setSelected(selected);
+  }, [selected]);
 
   useEffect(() => {
     const engine = new ChartEngine(containerRef.current!);
@@ -138,8 +151,88 @@ export function ChartArea({ chart, onEngine, magnet, onEditIndicator, onEditPosi
       return { time, price };
     };
 
+    /** The drawing moved by the pointer travel from `from` to `to`, keeping its shape (parallel). */
+    const shifted = (d: Drawing, from: PointerEvent, to: PointerEvent): Drawing => {
+      const dLogical = Math.round(to.logical - from.logical);
+      const p0 = engine.priceAt(from.y);
+      const p1 = engine.priceAt(to.y);
+      const dPrice = p0 === null || p1 === null ? 0 : p1 - p0;
+      const shiftTime = (t: number) => {
+        const l = engine.drawings.timeToLogical(t);
+        return dLogical === 0 || l === null ? t : (engine.logicalToTime(l + dLogical) ?? t);
+      };
+      return shiftDrawing(d, shiftTime, dPrice);
+    };
+    const findDrawing = (id: string | null) => (id ? chart.get().drawings.find((d) => d.id === id) : undefined);
+    const tolerance = (touch: boolean) => (touch ? 14 : 6);
+
+    startMoveRef.current = (id, clone, from) => {
+      moveRef.current = { id, clone, from };
+      setMoving(true);
+      chart.set({ tool: "cursor" });
+    };
+    const endMove = () => {
+      moveRef.current = null;
+      setMoving(false);
+      engine.drawings.setOverride(null);
+    };
+
+    // Dragging a drawing (mouse: any; finger: the selected one) or one of its anchor points.
+    let drag: { original: Drawing; anchor: number | null; from: PointerEvent; draft: Drawing | null } | null = null;
+    engine.grabDrawing = (e, touch) => {
+      if (chart.get().tool !== "cursor" || chart.get().replay?.phase === "select" || moveRef.current) return false;
+      const { width, height } = engine.paneSize();
+      const sel = selectedDrawing(chart.slot);
+      const selD = findDrawing(sel);
+      const anchor = selD && !selD.locked && hasMovableAnchors(selD) ? engine.drawings.anchorAt(selD.id, e.x, e.y, width, height, touch ? 16 : 8) : null;
+      const id = anchor !== null ? sel : engine.drawings.findAt(e.x, e.y, width, height, tolerance(touch));
+      const d = findDrawing(id);
+      if (!d || d.locked || (touch && d.id !== sel)) return false;
+      drag = { original: d, anchor, from: e, draft: null };
+      return true;
+    };
+    engine.onDrawingDrag = (phase, e) => {
+      if (!drag) return;
+      if (phase === "move" && e) {
+        const p = drag.anchor !== null ? pointAt(e) : null;
+        drag.draft = drag.anchor !== null ? (p ? moveAnchor(drag.original, drag.anchor, p) : null) : shifted(drag.original, drag.from, e);
+        selectDrawing(chart.slot, drag.original.id);
+        engine.drawings.setOverride(drag.draft);
+        return;
+      }
+      if (phase === "end" && drag.draft) replaceDrawing(chart, drag.draft);
+      engine.drawings.setOverride(null);
+      drag = null;
+    };
+    engine.onContextMenu = (e, clientX, clientY) => {
+      if (chart.get().tool !== "cursor" || moveRef.current) {
+        // Like TradingView: a right click while drawing cancels the drawing.
+        pendingRef.current = [];
+        positionRef.current = null;
+        engine.drawings.setPreview(null);
+        endMove();
+        chart.set({ tool: "cursor" });
+        return;
+      }
+      if (chart.get().replay?.phase === "select") return;
+      const { width, height } = engine.paneSize();
+      const id = e && e.paneIndex === 0 ? engine.drawings.findAt(e.x, e.y, width, height, 14) : null;
+      selectDrawing(chart.slot, id);
+      setMenu({ id, clientX, clientY, at: e && e.paneIndex === 0 ? e : null });
+    };
+
     engine.onCrosshair = (logical, e) => {
       setHover(logical);
+      const move = moveRef.current;
+      if (move) {
+        const d = findDrawing(move.id);
+        if (d && e && e.paneIndex === 0) engine.drawings.setOverride({ ...shifted(d, move.from, e), ...(move.clone ? { id: "move-clone" } : {}) });
+        return;
+      }
+      if (e && e.paneIndex === 0 && chart.get().tool === "cursor") {
+        const { width, height } = engine.paneSize();
+        containerRef.current?.classList.toggle("drawing-hover", engine.drawings.findAt(e.x, e.y, width, height) !== null);
+      }
       // Choosing the replay start: a line marks where the chart will be cut off.
       if (chart.get().replay?.phase === "select") {
         const time = e && e.paneIndex === 0 ? engine.logicalToTime(e.logical) : null;
@@ -170,17 +263,29 @@ export function ChartArea({ chart, onEngine, magnet, onEditIndicator, onEditPosi
         }
         return;
       }
+      const move = moveRef.current;
+      if (move) {
+        const d = findDrawing(move.id);
+        endMove();
+        if (!d) return;
+        const placed = shifted(d, move.from, e);
+        const result = move.clone ? cloneDrawing(placed, newId("user")) : placed;
+        replaceDrawing(chart, result);
+        selectDrawing(chart.slot, result.id);
+        return;
+      }
       if (currentTool === "cursor") {
-        // Tapping a long/short position opens its settings.
+        // Tapping a drawing selects it; a long/short position also opens its settings.
         const { width, height } = engine.paneSize();
-        const id = engine.drawings.findAt(e.x, e.y, width, height);
-        if (id && chart.get().drawings.find((d) => d.id === id)?.kind === "position") editPositionRef.current(id);
+        const id = engine.drawings.findAt(e.x, e.y, width, height, 10);
+        selectDrawing(chart.slot, id);
+        if (id && findDrawing(id)?.kind === "position") editPositionRef.current(id);
         return;
       }
       if (currentTool === "erase") {
         const { width, height } = engine.paneSize();
-        const id = engine.drawings.findAt(e.x, e.y, width, height);
-        if (id) removeDrawing(id);
+        const id = engine.drawings.findAt(e.x, e.y, width, height, 10);
+        if (id && !findDrawing(id)?.locked) deleteDrawing(chart, id);
         return;
       }
       const p = pointAt(e);
@@ -261,7 +366,9 @@ export function ChartArea({ chart, onEngine, magnet, onEditIndicator, onEditPosi
     };
 
     engine.update(chart.get());
+    engine.drawings.setSelected(selectedDrawing(chart.slot));
     refreshLayout();
+    const unsubscribeHistory = trackHistory(chart);
     // Starting a replay at a candle, or leaving it, jumps the view to the newest visible candles.
     let replayKey = "";
     const unsubscribe = chart.subscribe(() => {
@@ -273,6 +380,10 @@ export function ChartArea({ chart, onEngine, magnet, onEditIndicator, onEditPosi
         engine.resetView();
       }
       const t = s.tool;
+      // A selected drawing that was removed (eraser, Claude, undo) is no longer selected.
+      const sel = selectedDrawing(chart.slot);
+      if (sel && !s.drawings.some((d) => d.id === sel && !d.hidden)) selectDrawing(chart.slot, null);
+      if (t !== "cursor" && sel) selectDrawing(chart.slot, null);
       engine.setDragMode(t === "brush");
       if (!POINT_COUNT[t]) pendingRef.current = [];
       if (!POSITION_TOOLS.has(t)) positionRef.current = null;
@@ -322,7 +433,31 @@ export function ChartArea({ chart, onEngine, magnet, onEditIndicator, onEditPosi
         pendingRef.current = [];
         positionRef.current = null;
         engine.drawings.setPreview(null);
+        endMove();
+        selectDrawing(chart.slot, null);
         chart.set({ tool: "cursor" });
+        return;
+      }
+      // Shortcuts like TradingView, not while typing (Claude panel, dialogs).
+      const el = ev.target as HTMLElement | null;
+      if (el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName))) return;
+      const sel = selectedDrawing(chart.slot);
+      const mod = ev.metaKey || ev.ctrlKey;
+      const key = ev.key.toLowerCase();
+      if (sel && (ev.key === "Delete" || ev.key === "Backspace") && !mod) {
+        ev.preventDefault();
+        deleteDrawing(chart, sel);
+      } else if (sel && mod && key === "c") {
+        copyDrawing(chart, sel);
+      } else if (sel && mod && key === "d") {
+        ev.preventDefault();
+        cloneInPlace(chart, sel);
+      } else if (mod && key === "v" && activeChart() === chart) {
+        ev.preventDefault();
+        pasteDrawing(chart);
+      } else if (mod && key === "z" && !ev.shiftKey && activeChart() === chart) {
+        ev.preventDefault();
+        undoDrawings(chart);
       }
     };
     window.addEventListener("keydown", onKey);
@@ -333,6 +468,7 @@ export function ChartArea({ chart, onEngine, magnet, onEditIndicator, onEditPosi
       window.removeEventListener("keydown", onKey);
       ro.disconnect();
       unsubscribe();
+      unsubscribeHistory();
       unsubscribeLiq();
       unsubscribeExchanges();
       unsubscribeDemo();
@@ -452,7 +588,17 @@ export function ChartArea({ chart, onEngine, magnet, onEditIndicator, onEditPosi
         </div>
       )}
       {replaying && <ReplayBar chart={chart} />}
-      {hint && <div className="draw-hint">{hint} · Esc bricht ab</div>}
+      {menu && (
+        <DrawingMenu
+          chart={chart}
+          target={menu}
+          onClose={() => setMenu(null)}
+          onMove={(id, clone, from) => startMoveRef.current(id, clone, from)}
+          onEditPosition={onEditPosition}
+        />
+      )}
+      {moving && <div className="draw-hint">Neue Position antippen · Esc bricht ab</div>}
+      {!moving && hint && <div className="draw-hint">{hint} · Esc bricht ab</div>}
       {lineError && !hint && <div className="draw-hint error">{lineError}</div>}
       {loading && <div className="chart-overlay">Lade {symbol} …</div>}
       {error && <div className="chart-overlay error">Fehler: {error}</div>}
