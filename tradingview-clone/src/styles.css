@@ -1479,10 +1479,18 @@ select,
 .side-tabs {
   display: flex;
   border-bottom: 1px solid var(--border);
+  /* More tabs than fit: they scroll sideways instead of being cut off. */
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.side-tabs::-webkit-scrollbar {
+  display: none;
 }
 
 .side-tabs button {
-  flex: 1;
+  flex: 1 0 auto;
+  white-space: nowrap;
   border-radius: 0;
   padding: 8px 6px;
   color: var(--muted);
@@ -3458,4 +3466,132 @@ select,
   padding: 0 4px 6px;
   color: var(--down);
   font-size: 12px;
+}
+
+/* ---------------- Watchlists ---------------- */
+
+.wl-actions {
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.wl-rename {
+  margin-top: 6px;
+}
+
+.wl-rename .calc-input {
+  flex: 1;
+}
+
+.wl-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto 72px auto;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.wl-item.active .wl-open strong {
+  color: var(--accent);
+}
+
+.wl-open {
+  text-align: left;
+  padding: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--text);
+}
+
+.wl-price,
+.wl-change {
+  text-align: right;
+}
+
+.wl .up {
+  color: var(--up);
+}
+
+.wl .down {
+  color: var(--down);
+}
+
+/* ---------------- Screener ---------------- */
+
+.sc-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.sc-filters select {
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px;
+}
+
+.sc-search {
+  width: 160px;
+}
+
+.sc-table th {
+  cursor: pointer;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.sc-table th.sorted {
+  color: var(--text);
+}
+
+.sc-table td,
+.sc-table th {
+  text-align: right;
+}
+
+.sc-table td:nth-child(2),
+.sc-table th:nth-child(2) {
+  text-align: left;
+}
+
+.sc-range {
+  position: relative;
+  display: inline-block;
+  width: 60px;
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--down), var(--up));
+  vertical-align: middle;
+  opacity: 0.7;
+}
+
+.sc-range span {
+  position: absolute;
+  top: -3px;
+  width: 2px;
+  height: 10px;
+  margin-left: -1px;
+  background: var(--text);
+}
+
+.sc-error {
+  position: static;
+  margin-bottom: 8px;
+}
+
+@media (max-width: 700px) {
+  .sc-table .tech {
+    display: none;
+  }
 }

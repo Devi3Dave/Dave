@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ChartEngine } from "./chart/ChartEngine";
 import { CalculatorView } from "./components/CalculatorView";
+import { ScreenerView } from "./components/ScreenerView";
 import { AlertToasts } from "./components/AlertsPanel";
 import { ChartGrid } from "./components/ChartGrid";
 import { ChartSettingsDialog } from "./components/ChartSettingsDialog";
@@ -33,6 +34,7 @@ export default function App() {
   const [calcOpen, setCalcOpen] = useState(false);
   const [journalOpen, setJournalOpen] = useState(false);
   const [exchangesOpen, setExchangesOpen] = useState(false);
+  const [screenerOpen, setScreenerOpen] = useState(false);
   const symbol = useChartState((s) => s.symbol);
   const liveLiquidations = useChartState((s) => s.settings.liveLiquidations);
 
@@ -49,6 +51,7 @@ export default function App() {
   useEffect(() => startAlertFeed(), []);
 
   const closePages = () => {
+    setScreenerOpen(false);
     setHeatmapOpen(false);
     setCalcOpen(false);
     setJournalOpen(false);
@@ -89,6 +92,7 @@ export default function App() {
         onOpenSettings={() => setShowSettings(true)}
         heatmapOpen={heatmapOpen}
         onToggleHeatmap={() => {
+          setScreenerOpen(false);
           setCalcOpen(false);
           setJournalOpen(false);
           setExchangesOpen(false);
@@ -96,6 +100,7 @@ export default function App() {
         }}
         calcOpen={calcOpen}
         onToggleCalc={() => {
+          setScreenerOpen(false);
           setHeatmapOpen(false);
           setJournalOpen(false);
           setExchangesOpen(false);
@@ -103,6 +108,7 @@ export default function App() {
         }}
         journalOpen={journalOpen}
         onToggleJournal={() => {
+          setScreenerOpen(false);
           setHeatmapOpen(false);
           setCalcOpen(false);
           setExchangesOpen(false);
@@ -110,6 +116,7 @@ export default function App() {
         }}
         exchangesOpen={exchangesOpen}
         onToggleExchanges={() => {
+          setScreenerOpen(false);
           setHeatmapOpen(false);
           setCalcOpen(false);
           setJournalOpen(false);
@@ -117,8 +124,9 @@ export default function App() {
         }}
         demoOpen={claudeOpen && sideTab === "demo"}
         onToggleDemo={() => {
-          if (claudeOpen && sideTab === "demo" && !(heatmapOpen || calcOpen || journalOpen || exchangesOpen)) return setSideTab("claude");
+          if (claudeOpen && sideTab === "demo" && !(heatmapOpen || calcOpen || journalOpen || exchangesOpen || screenerOpen)) return setSideTab("claude");
           // Trading needs the chart, so full-screen pages close.
+          setScreenerOpen(false);
           setHeatmapOpen(false);
           setCalcOpen(false);
           setJournalOpen(false);
@@ -137,16 +145,24 @@ export default function App() {
       {/* Drawn over the chart (same grid cell) so the chart engine stays alive for Claude. */}
       {heatmapOpen && <LiqHeatmapView onClose={() => setHeatmapOpen(false)} />}
       {calcOpen && <CalculatorView onClose={() => setCalcOpen(false)} />}
+      {screenerOpen && <ScreenerView onClose={() => setScreenerOpen(false)} />}
       {journalOpen && <JournalView onClose={() => setJournalOpen(false)} />}
       {exchangesOpen && <ExchangesView onClose={() => setExchangesOpen(false)} />}
       {/* Kept mounted while hidden so the conversation survives toggling. */}
       <div className="claude-slot" hidden={!claudeOpen}>
-        <SidePanel tab={sideTab} onTab={setSideTab} getEngine={getEngine} onOpenHeatmap={() => {
-          setCalcOpen(false);
-          setJournalOpen(false);
-          setExchangesOpen(false);
-          setHeatmapOpen(true);
-        }} />
+        <SidePanel
+          tab={sideTab}
+          onTab={setSideTab}
+          getEngine={getEngine}
+          onOpenHeatmap={() => {
+            closePages();
+            setHeatmapOpen(true);
+          }}
+          onOpenScreener={() => {
+            closePages();
+            setScreenerOpen(true);
+          }}
+        />
       </div>
       {showIndicators && <IndicatorDialog onClose={() => setShowIndicators(false)} />}
       {editing && <IndicatorSettings id={editing} onClose={() => setEditing(null)} />}
