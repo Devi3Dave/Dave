@@ -2484,6 +2484,34 @@ select,
   min-height: 30px;
 }
 
+.jr-checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin: 8px 0;
+  font-size: 13px;
+}
+.jr-checks label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.jr-checklist {
+  width: 100%;
+  margin-top: 10px;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.jr-checklist th,
+.jr-checklist td {
+  padding: 4px 6px;
+  text-align: left;
+  border-bottom: 1px solid var(--border, #2a2e39);
+}
+.jr-checklist th {
+  font-weight: 500;
+  opacity: 0.7;
+}
 .jr-actions {
   display: flex;
   align-items: center;

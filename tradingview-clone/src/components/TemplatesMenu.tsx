@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { activeChart, layoutCount, useWorkspace } from "../store";
-import { BUILTIN_TEMPLATES, applyTemplate, deleteTemplate, describeTemplate, saveTemplate, saveWorkspace, snapshotOf, useSavedTemplates, type Template } from "../templates";
+import { BUILTIN_TEMPLATES, BUILTIN_WORKSPACES, applyTemplate, deleteTemplate, describeTemplate, saveTemplate, saveWorkspace, snapshotOf, useSavedTemplates, type Template } from "../templates";
 import { Menu } from "./Menu";
 
 function TemplateItem({ t, close }: { t: Template; close: () => void }) {
@@ -104,8 +104,7 @@ export function TemplatesMenu() {
               <TemplateItem key={t.id} t={t} close={close} />
             ))}
             <div className="menu-title">Arbeitsbereiche</div>
-            {workspaces.length === 0 && <div className="menu-empty">Noch keine gespeichert.</div>}
-            {workspaces.map((t) => (
+            {[...BUILTIN_WORKSPACES, ...workspaces].map((t) => (
               <TemplateItem key={t.id} t={t} close={close} />
             ))}
             <div className="menu-actions">

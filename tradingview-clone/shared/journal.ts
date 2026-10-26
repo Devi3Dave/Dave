@@ -20,6 +20,45 @@ export interface JournalTrade {
   pnl?: number;
   setup?: string;
   note?: string;
+  /** Ticked points of the entry checklist (keys of CHECKLIST). */
+  checks?: string[];
+}
+
+/**
+ * Entry checklist after Craig Percoco's 15m/1m FVG model ("My Trading Strategy is Boring But Made Me
+ * $18,565", youtube.com/watch?v=c5ATdFHneJo): reaction at a 15m fair value gap, then a change of character
+ * and a fair value gap on the 1-minute chart.
+ */
+export const CHECKLIST = [
+  { key: "htfFvg", label: "Reaktion an 15m-FVG" },
+  { key: "choch", label: "CHoCH auf 1m" },
+  { key: "ltfFvg", label: "FVG auf 1m" },
+] as const;
+
+export interface ChecklistRow {
+  key: string;
+  label: string;
+  with: { count: number; winRate: number; avgR: number | null };
+  without: { count: number; winRate: number; avgR: number | null };
+}
+
+/** Win rate and average R of the trades with and without each checklist point (only trades that use the checklist). */
+export function checklistStats(trades: JournalTrade[]): ChecklistRow[] {
+  const used = trades.filter((t) => t.checks !== undefined);
+  const summary = (ts: JournalTrade[]) => {
+    const rs = ts.map(tradeR).filter((r): r is number => r !== null);
+    return {
+      count: ts.length,
+      winRate: ts.length ? ts.filter((t) => tradePnl(t) > 0).length / ts.length : 0,
+      avgR: rs.length ? rs.reduce((a, b) => a + b, 0) / rs.length : null,
+    };
+  };
+  return CHECKLIST.map((c) => ({
+    key: c.key,
+    label: c.label,
+    with: summary(used.filter((t) => t.checks!.includes(c.key))),
+    without: summary(used.filter((t) => !t.checks!.includes(c.key))),
+  }));
 }
 
 /** Result in $ after fees (manual value if one was entered). */
@@ -127,7 +166,7 @@ export function journalStats(trades: JournalTrade[]): JournalStats {
   };
 }
 
-const CSV_COLUMNS = ["date", "symbol", "side", "entry", "stop", "exit", "qty", "fees", "pnl", "r", "setup", "note"] as const;
+const CSV_COLUMNS = ["date", "symbol", "side", "entry", "stop", "exit", "qty", "fees", "pnl", "r", "setup", "note", "checks"] as const;
 
 /** CSV for spreadsheets (semicolon separated, decimal comma, as German Excel expects). */
 export function toCsv(trades: JournalTrade[]): string {
@@ -137,7 +176,7 @@ export function toCsv(trades: JournalTrade[]): string {
     return /[;"\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
   const rows = sortTrades(trades).map((t) =>
-    [t.date, t.symbol, t.side, t.entry, t.stop, t.exit, t.qty, t.fees, tradePnl(t), tradeR(t), t.setup, t.note].map(cell).join(";"),
+    [t.date, t.symbol, t.side, t.entry, t.stop, t.exit, t.qty, t.fees, tradePnl(t), tradeR(t), t.setup, t.note, t.checks?.join(",")].map(cell).join(";"),
   );
   return [CSV_COLUMNS.join(";"), ...rows].join("\n");
 }
@@ -163,6 +202,7 @@ export function parseBackup(json: unknown): JournalTrade[] {
       pnl: r.pnl === undefined || r.pnl === null || r.pnl === "" ? undefined : n(r.pnl),
       setup: typeof r.setup === "string" ? r.setup : undefined,
       note: typeof r.note === "string" ? r.note : undefined,
+      ...(Array.isArray(r.checks) ? { checks: r.checks.filter((c): c is string => CHECKLIST.some((x) => x.key === c)) } : {}),
     };
     if (t.stop !== undefined && !Number.isFinite(t.stop)) t.stop = undefined;
     const pricesOk = [t.entry, t.exit, t.qty].every(Number.isFinite);

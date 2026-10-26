@@ -343,6 +343,7 @@ async function run(name: ToolName, input: unknown, engine: ChartEngine | null): 
         to,
         account: i.account_size ?? defaults.account,
         risk: i.risk_percent ?? defaults.risk,
+        riskCash: i.risk_amount ?? (i.risk_percent !== undefined ? 0 : defaults.riskCash),
         leverage: i.leverage ?? defaults.leverage,
       };
       addDrawing(d);

@@ -25,6 +25,11 @@ export interface StructureBreak {
   /** First candle that closed (or traded) through the level. */
   brokenIndex: number;
   brokenTime: number;
+  /**
+   * First candle at which the break is known in real time: the break has closed and the newest swing of the
+   * four is confirmed (`swing` candles after it). Used for alerts; the smc port itself looks ahead.
+   */
+  knownIndex: number;
 }
 
 /** 1 = swing high, -1 = swing low, 0 = none (smc `HighLow`). */
@@ -62,6 +67,13 @@ export function swingHighsLows(bars: Bar[], swing: number): number[] {
   return hl;
 }
 
+/** +1 / -1 on the candle where a bullish / bearish break of that kind becomes known, else 0 (alert source). */
+export function structureEvents(bars: Bar[], breaks: StructureBreak[], kind: StructureBreak["kind"]): number[] {
+  const out = new Array<number>(bars.length).fill(0);
+  for (const s of breaks) if (s.kind === kind && s.knownIndex < bars.length) out[s.knownIndex] = s.side === "bull" ? 1 : -1;
+  return out;
+}
+
 export function marketStructure(bars: Bar[], swing: number, closeBreak = true): StructureBreak[] {
   const n = bars.length;
   if (n < 2 * swing + 1) return [];
@@ -69,6 +81,7 @@ export function marketStructure(bars: Bar[], swing: number, closeBreak = true): 
   const bos = new Array<number>(n).fill(0);
   const choch = new Array<number>(n).fill(0);
   const level = new Array<number>(n).fill(0);
+  const confirmed = new Array<number>(n).fill(0);
   const levels: number[] = [];
   const types: number[] = [];
   const positions: number[] = [];
@@ -86,6 +99,7 @@ export function marketStructure(bars: Bar[], swing: number, closeBreak = true): 
       bos[p] = bull && l4 < l2 && l2 < l3 && l3 < l1 ? 1 : bear && l4 > l2 && l2 > l3 && l3 > l1 ? -1 : 0;
       choch[p] = bull && l1 > l3 && l3 > l4 && l4 > l2 ? 1 : bear && l1 < l3 && l3 < l4 && l4 < l2 ? -1 : 0;
       level[p] = bos[p] !== 0 || choch[p] !== 0 ? l3 : 0;
+      confirmed[p] = i + swing;
     }
     positions.push(i);
   }
@@ -119,6 +133,7 @@ export function marketStructure(bars: Bar[], swing: number, closeBreak = true): 
         time: bars[i].time,
         brokenIndex: broken[i],
         brokenTime: bars[broken[i]].time,
+        knownIndex: Math.max(broken[i], confirmed[i]),
       };
     });
 }

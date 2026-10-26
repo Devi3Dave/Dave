@@ -33,7 +33,13 @@ export const FREQUENCY_LABELS: Record<AlertFrequency, string> = {
 export const isChannelCondition = (c: AlertCondition) => c === "entering" || c === "exiting";
 
 /** What is watched: the closing price or one output of an indicator. */
-export type AlertSource = { kind: "price" } | { kind: "indicator"; type: string; params: Record<string, number>; output: string; label: string };
+/**
+ * `event` marks an event output (+1 / -1 / 0 per candle, e.g. a new CHoCH): such an alert fires when the
+ * value is above 0.5 (up) or below -0.5 (down).
+ */
+export type AlertSource =
+  | { kind: "price" }
+  | { kind: "indicator"; type: string; params: Record<string, number>; output: string; label: string; event?: "up" | "down" };
 
 /** What it is compared with. A line is extended in both directions; a channel needs entering/exiting. */
 export type AlertTarget =
@@ -107,6 +113,11 @@ export function conditionMet(condition: AlertCondition, prev: number | null, cur
  * the closes). `lastClosed` says whether the last bar is finished. Returns the hit or null; an alert that
  * already fired on that bar does not fire again.
  */
+/** Condition and level of an event alert ("neuer bullischer CHoCH": value > 0.5). */
+export function eventAlertRule(event: "up" | "down"): { condition: AlertCondition; target: AlertTarget } {
+  return event === "up" ? { condition: "greater", target: { kind: "value", value: 0.5 } } : { condition: "less", target: { kind: "value", value: -0.5 } };
+}
+
 export function evaluateAlert(alert: Alert, bars: Bar[], values: Series | null = null, lastClosed = false): AlertHit | null {
   if (!alert.active || bars.length === 0) return null;
   const series = values ?? bars.map((b) => b.close);
@@ -156,6 +167,7 @@ export function targetText(target: AlertTarget): string {
 
 /** "BTCUSDT Kurs kreuzt nach oben 70.000" */
 export function describeAlert(alert: Alert): string {
+  if (alert.source.kind === "indicator" && alert.source.event) return `${alert.symbol} ${alert.source.label}`;
   const src = alert.source.kind === "price" ? "Kurs" : alert.source.label;
   return `${alert.symbol} ${src} ${CONDITION_LABELS[alert.condition]} ${targetText(alert.target)}`;
 }
@@ -180,7 +192,8 @@ function parseSource(s: unknown): AlertSource | null {
   if (o.kind === "price") return { kind: "price" };
   if (o.kind === "indicator" && typeof o.type === "string" && typeof o.output === "string" && o.params && typeof o.params === "object") {
     const params = Object.fromEntries(Object.entries(o.params as Record<string, unknown>).filter((e): e is [string, number] => finite(e[1])));
-    return { kind: "indicator", type: o.type, params, output: o.output, label: typeof o.label === "string" ? o.label : o.type };
+    const event = o.event === "up" || o.event === "down" ? { event: o.event as "up" | "down" } : {};
+    return { kind: "indicator", type: o.type, params, output: o.output, label: typeof o.label === "string" ? o.label : o.type, ...event };
   }
   return null;
 }

@@ -32,7 +32,7 @@ export interface Template {
   builtin?: boolean;
   description?: string;
   chart?: ChartSnapshot;
-  workspace?: { layout: LayoutId; syncInterval: boolean; charts: ChartSnapshot[] };
+  workspace?: { layout: LayoutId; syncInterval: boolean; syncSymbol?: boolean; charts: ChartSnapshot[] };
   savedAt?: number;
 }
 
@@ -119,6 +119,28 @@ export const BUILTIN_TEMPLATES: Template[] = [
   },
 ];
 
+/** Built-in workspaces; charts without a symbol take the symbol of the active chart. */
+export const BUILTIN_WORKSPACES: Template[] = [
+  {
+    // Percocos Ablauf (Video c5ATdFHneJo, s. o.): 15m-FVGs vor dem NY-Open markieren, Einstieg auf 1m nach
+    // CHoCH + FVG. Links der Überblick, rechts der Einstieg mit den 15m-FVGs eingeblendet.
+    id: "builtin-ws-percoco",
+    name: "Percoco 15m + 1m",
+    kind: "workspace",
+    builtin: true,
+    description: "Zwei Charts, gleiches Symbol: 15m-Vorlage links, 1m mit 15m-FVGs, CHoCH und Sessions rechts",
+    workspace: {
+      layout: "2h",
+      syncInterval: false,
+      syncSymbol: true,
+      charts: [
+        BUILTIN_TEMPLATES.find((t) => t.id === "builtin-percoco")!.chart!,
+        { interval: "1m", chartType: "candles", indicators: [ind("volume"), ind("sessions"), ind("fvg", { ce: 1, tf2: 15 }), ind("structure", { bos: 0 })] },
+      ],
+    },
+  },
+];
+
 const KEY = "chartai.templates.v1";
 
 function load(): Template[] {
@@ -192,9 +214,10 @@ export async function applyTemplate(t: Template, target: ChartStore) {
   if (t.kind === "chart" && t.chart) return applySnapshot(target, t.chart);
   if (t.kind === "workspace" && t.workspace) {
     const w = t.workspace;
+    const symbol = target.get().symbol;
     setLayout(w.layout);
-    workspace.set({ syncInterval: w.syncInterval, active: 0 });
-    await Promise.all(w.charts.slice(0, layoutCount(w.layout)).map((snap, i) => applySnapshot(charts[i], snap)));
+    workspace.set({ syncInterval: w.syncInterval, ...(w.syncSymbol !== undefined ? { syncSymbol: w.syncSymbol } : {}), active: 0 });
+    await Promise.all(w.charts.slice(0, layoutCount(w.layout)).map((snap, i) => applySnapshot(charts[i], { ...snap, symbol: snap.symbol ?? symbol })));
   }
 }
 

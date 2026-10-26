@@ -5,15 +5,15 @@ import { removeDrawing, updateDrawing, useChartState } from "../store";
 
 const DEFAULTS_KEY = "chartai.position.v1";
 
-type Defaults = Pick<PositionInput, "account" | "risk" | "leverage">;
+type Defaults = Pick<PositionInput, "account" | "risk" | "leverage" | "riskCash">;
 
 /** Account size, risk and leverage of the last edited position, used for new ones. */
 export function lastPositionDefaults(): Defaults {
   try {
     const saved = JSON.parse(localStorage.getItem(DEFAULTS_KEY) ?? "{}") as Partial<Defaults>;
-    return { account: saved.account ?? 10000, risk: saved.risk ?? 1, leverage: saved.leverage ?? 1 };
+    return { account: saved.account ?? 10000, risk: saved.risk ?? 1, leverage: saved.leverage ?? 1, riskCash: saved.riskCash ?? 0 };
   } catch {
-    return { account: 10000, risk: 1, leverage: 1 };
+    return { account: 10000, risk: 1, leverage: 1, riskCash: 0 };
   }
 }
 
@@ -67,8 +67,8 @@ export function PositionDialog({ id, onClose }: { id: string; onClose: () => voi
   const stats = positionStats(d, bars);
   const patch = (p: Partial<PositionInput>) => {
     updateDrawing(id, { ...p, ...(p.side ? { color: p.side === "long" ? "#089981" : "#f23645" } : {}) });
-    if (p.account !== undefined || p.risk !== undefined || p.leverage !== undefined) {
-      saveDefaults({ account: p.account ?? d.account, risk: p.risk ?? d.risk, leverage: p.leverage ?? d.leverage });
+    if (p.account !== undefined || p.risk !== undefined || p.leverage !== undefined || p.riskCash !== undefined) {
+      saveDefaults({ account: p.account ?? d.account, risk: p.risk ?? d.risk, leverage: p.leverage ?? d.leverage, riskCash: p.riskCash ?? d.riskCash ?? 0 });
     }
   };
   const flip = (side: "long" | "short") => {
@@ -100,7 +100,9 @@ export function PositionDialog({ id, onClose }: { id: string; onClose: () => voi
           <NumField label="Take-Profit" value={d.target} onChange={(target) => patch({ target })} min={0} />
           <NumField label="Hebel ×" value={d.leverage} onChange={(leverage) => patch({ leverage: Math.max(1, leverage) })} step={1} min={1} />
           <NumField label="Kontogröße" value={d.account} onChange={(account) => patch({ account })} min={0} />
-          <NumField label="Risiko %" value={d.risk} onChange={(risk) => patch({ risk })} step={0.1} min={0} />
+          {/* Either sets the risk: a percentage of the account, or a fixed amount (0 = use the percentage). */}
+          <NumField label="Risiko %" value={d.riskCash ? (d.riskCash / Math.max(d.account, 1e-9)) * 100 : d.risk} onChange={(risk) => patch({ risk, riskCash: 0 })} step={0.1} min={0} />
+          <NumField label="Risiko fest (Betrag)" value={d.riskCash ?? 0} onChange={(riskCash) => patch({ riskCash })} step={10} min={0} />
         </div>
         <dl className={`position-stats ${isValidPosition(d) ? "" : "invalid"}`}>
           <dt>Chance/Risiko</dt>
@@ -145,7 +147,7 @@ export function PositionDialog({ id, onClose }: { id: string; onClose: () => voi
             )}
           </dd>
         </dl>
-        <p className="hint">Menge = Kontogröße × Risiko % ÷ Abstand zum Stop. Gebühren und Funding sind nicht berücksichtigt; die Liquidation ist eine Schätzung (Isolated, 0,5 % Wartungsmarge).</p>
+        <p className="hint">Menge = Risiko ÷ Abstand zum Stop; Risiko = fester Betrag oder Kontogröße × Risiko %. Gebühren und Funding sind nicht berücksichtigt; die Liquidation ist eine Schätzung (Isolated, 0,5 % Wartungsmarge).</p>
         <div className="dialog-actions">
           <button
             className="danger"

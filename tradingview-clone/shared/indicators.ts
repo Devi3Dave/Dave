@@ -1,9 +1,9 @@
-import { FVG_MITIGATION, fairValueGaps } from "./fvg.js";
+import { FVG_MITIGATION, fairValueGaps, fvgEvents, type FvgOptions } from "./fvg.js";
 import { liquidationHeatmap, strongestLevels, type Heatmap } from "./liquidations.js";
 import * as m from "./math.js";
 import { orderBlocks, type OrderBlock, type OrderBlockSignal } from "./orderblocks.js";
 import { detectCandlePatterns, detectFormations, type CandlePattern, type Formation } from "./patterns.js";
-import { marketStructure, type StructureBreak } from "./structure.js";
+import { marketStructure, structureEvents, type StructureBreak } from "./structure.js";
 import { divergenceLine, divergences } from "./divergence.js";
 import { SESSION_EXCHANGES, newYorkOpens, sessionBoxes, type SessionBox, type TimeLine } from "./sessions.js";
 import type { Bar, Series } from "./math.js";
@@ -35,6 +35,8 @@ export interface OutputDef {
   // Per-point color (histogram bars, dots, line segments); `base` is the configured color.
   // Only feeds a fill (e.g. the clamp line of a cloud): no line, no legend value, no color picker.
   helper?: boolean;
+  // Event series (+1 bullish / -1 bearish / 0) offered as an alert ("neuer CHoCH"); implies helper.
+  event?: { up: string; down: string };
   // Only set where an event occurs (divergence lines); may be empty.
   sparse?: boolean;
   pointColor?: (ctx: { values: Series; i: number; bar: Bar; outputs: Record<string, Series>; base: string }) => string;
@@ -80,6 +82,15 @@ export interface PatternResult {
 }
 
 const MINUTES = 60;
+
+const fvgOptions = (p: Record<string, number>): FvgOptions => ({
+  minPct: p.minPct,
+  mitigation: FVG_MITIGATION[Math.round(p.mitigation)] ?? "touch",
+  maxZones: p.zones,
+  showMitigated: p.mitigated >= 1,
+  ce: p.ce >= 1,
+  higher: p.tf2 > 0 ? [p.tf2 * MINUTES] : [],
+});
 
 // Rising/falling coloring shared by momentum histograms.
 const prevOf = (values: Series, i: number) => (i > 0 ? values[i - 1] : null);
@@ -141,20 +152,21 @@ export const INDICATORS: IndicatorDef[] = [
     category: "Muster",
     overlay: true,
     description:
-      "Drei-Kerzen-Imbalance (ICT): bullisch, wenn das Tief von Kerze 3 über dem Hoch von Kerze 1 liegt (Kerze 2 grün), bärisch spiegelbildlich. Die Lücke bleibt als Zone stehen, bis der Kurs zurückkommt (Mitigation: 0 = Berührung, 1 = 50 %, 2 = ganz gefüllt). Optional die 50-%-Linie (Consequential Encroachment, ICT). Quelle: smart-money-concepts (smc.fvg) / Fair Value Gap [LuxAlgo].",
+      "Drei-Kerzen-Imbalance (ICT): bullisch, wenn das Tief von Kerze 3 über dem Hoch von Kerze 1 liegt (Kerze 2 grün), bärisch spiegelbildlich. Die Lücke bleibt als Zone stehen, bis der Kurs zurückkommt (Mitigation: 0 = Berührung, 1 = 50 %, 2 = ganz gefüllt). Optional die 50-%-Linie (Consequential Encroachment, ICT) und die Lücken eines höheren Zeitrahmens (z. B. 15 für die 15m-FVGs im 1m-Chart; nur abgeschlossene Kerzen). Quelle: smart-money-concepts (smc.fvg) / Fair Value Gap [LuxAlgo].",
     params: [
       { key: "minPct", label: "Mindestgröße %", default: 0, min: 0, max: 10, step: 0.05 },
       { key: "mitigation", label: "Mitigation (0/1/2)", default: 0, min: 0, max: 2, step: 1 },
       { key: "zones", label: "Zonen je Richtung", default: 5, min: 1, max: 30 },
       { key: "mitigated", label: "Mitigierte zeigen (0/1)", default: 0, min: 0, max: 1 },
       { key: "ce", label: "50-%-Linie (CE) (0/1)", default: 0, min: 0, max: 1 },
+      { key: "tf2", label: "Höherer Zeitrahmen (Min., 0 = aus)", default: 0, min: 0, max: 43200 },
     ],
-    outputs: [],
-    compute: () => ({}),
+    outputs: [{ key: "fvgEvent", label: "FVG", color: "#787b86", helper: true, noAutoscale: true, event: { up: "neue bullische FVG", down: "neue bärische FVG" } }],
+    compute: (b, p) => ({ fvgEvent: fvgEvents(b, fvgOptions(p)) }),
     patterns: (b, p) => ({
       candles: [],
       formations: [],
-      zones: fairValueGaps(b, { minPct: p.minPct, mitigation: FVG_MITIGATION[Math.round(p.mitigation)] ?? "touch", maxZones: p.zones, showMitigated: p.mitigated >= 1, ce: p.ce >= 1 }),
+      zones: fairValueGaps(b, fvgOptions(p)),
     }),
   },
   {
@@ -199,8 +211,14 @@ export const INDICATORS: IndicatorDef[] = [
       { key: "bos", label: "BOS zeigen (0/1)", default: 1, min: 0, max: 1 },
       { key: "count", label: "Letzte Brüche", default: 10, min: 1, max: 100 },
     ],
-    outputs: [],
-    compute: () => ({}),
+    outputs: [
+      { key: "chochEvent", label: "CHoCH", color: "#787b86", helper: true, noAutoscale: true, event: { up: "neuer bullischer CHoCH", down: "neuer bärischer CHoCH" } },
+      { key: "bosEvent", label: "BOS", color: "#787b86", helper: true, noAutoscale: true, event: { up: "neuer bullischer BOS", down: "neuer bärischer BOS" } },
+    ],
+    compute: (b, p) => {
+      const breaks = marketStructure(b, Math.round(p.swing), p.closeBreak >= 1);
+      return { chochEvent: structureEvents(b, breaks, "choch"), bosEvent: structureEvents(b, breaks, "bos") };
+    },
     patterns: (b, p) => ({
       candles: [],
       formations: [],

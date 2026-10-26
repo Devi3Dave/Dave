@@ -133,6 +133,7 @@ export const toolSchemas = {
       end_time: time.optional().describe("Ende des Handelsfensters, Standard: 20 Kerzen nach dem Einstieg"),
       account_size: z.number().positive().optional().describe("Standard: letzte Einstellung des Nutzers"),
       risk_percent: z.number().positive().max(100).optional(),
+      risk_amount: z.number().positive().optional().describe("Fester Risikobetrag pro Trade (z. B. 500); ersetzt risk_percent"),
       leverage: z.number().min(1).max(125).optional(),
       label: z.string().optional(),
     }),
