@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from "react";
 import { afterFire, armAlert, describeAlert, evaluateAlert, parseAlerts, type Alert, type AlertHit } from "../shared/alerts";
 import { getIndicator, resolveParams } from "../shared/indicators";
-import { INTERVAL_SECONDS } from "../shared/marketData";
+import { intervalSeconds } from "../shared/marketData";
 import type { Bar, Series } from "../shared/math";
 import type { TradeLine } from "./chart/ChartEngine";
 import { formatPrice } from "./chart/DrawingsPrimitive";
@@ -93,7 +93,7 @@ function sourceValues(alert: Alert, bars: Bar[]): Series | null {
 
 const lastClosed = (bars: Bar[], interval: string) => {
   const last = bars[bars.length - 1];
-  return !!last && Date.now() / 1000 >= last.time + (INTERVAL_SECONDS[interval] ?? 3600);
+  return !!last && Date.now() / 1000 >= last.time + intervalSeconds(interval);
 };
 
 const newId = () => `alert-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;

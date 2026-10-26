@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { INDICATORS, getIndicator, resolveParams } from "../../shared/indicators";
-import { CHART_TYPES, INTERVALS } from "../../shared/tools";
+import { intervalSeconds, isValidInterval, normalizeInterval } from "../../shared/marketData";
+import { CHART_TYPES, INTERVALS, MAIN_INTERVALS } from "../../shared/tools";
 import { formatPrice } from "../chart/DrawingsPrimitive";
 import { toggleFavorite, useFavorites } from "../favorites";
-import { LAYOUTS, addIndicator, exitReplay, loadChart, setLayout, startReplay, store, useChartState, useWorkspace, workspace, type ChartType } from "../store";
+import { LAYOUTS, addIndicator, exitReplay, loadChart, setLayout, startReplay, store, useChartState, useWorkspace, workspace, type ChartType, type Interval } from "../store";
 import { APP_VERSION, BUILD_SHA, BUILD_TIME, formatBuildTime, reloadToLatest, useUpdateCheck } from "../version";
 import { AssetMenu, AssetSearchDialog } from "./AssetPicker";
 import { useAlerts } from "../alerts";
@@ -25,23 +26,121 @@ const CHART_TYPE_LABELS: Record<ChartType, string> = {
   line_break: "Line Break",
 };
 
-const INTERVAL_LABELS: Record<string, string> = {
-  "1m": "1 Minute",
-  "5m": "5 Minuten",
-  "15m": "15 Minuten",
-  "30m": "30 Minuten",
-  "1h": "1 Stunde",
-  "4h": "4 Stunden",
-  "1d": "1 Tag",
-  "1w": "1 Woche",
+const SPECIAL_LABELS: Record<string, string> = {
   "1M": "1 Monat",
   "3M": "1 Quartal",
   "1y": "1 Jahr",
   all: "Alles (gesamte Historie in Wochenkerzen)",
 };
+const UNIT_NAMES: Record<string, [string, string]> = { s: ["Sekunde", "Sekunden"], m: ["Minute", "Minuten"], h: ["Stunde", "Stunden"], d: ["Tag", "Tage"], w: ["Woche", "Wochen"] };
+
+/** "7 Minuten", "1 Stunde", "1 Quartal" … */
+function intervalLabel(iv: string): string {
+  if (SPECIAL_LABELS[iv]) return SPECIAL_LABELS[iv];
+  const m = /^(\d+)([smhdw])$/.exec(iv);
+  if (!m) return iv;
+  const [one, many] = UNIT_NAMES[m[2]];
+  return `${m[1]} ${m[1] === "1" ? one : many}`;
+}
 
 /** Button text where the key would be ambiguous (1m minute vs. 1M month). */
 const INTERVAL_SHORT: Record<string, string> = { "1M": "1Mo", "3M": "1Q", "1y": "1J", all: "Alles" };
+const shortLabel = (iv: string) => INTERVAL_SHORT[iv] ?? iv.replace(/d$/, "D");
+
+const INTERVAL_GROUPS: { title: string; items: string[] }[] = [
+  { title: "Sekunden (nur Binance-Krypto)", items: INTERVALS.filter((i) => i.endsWith("s")) },
+  { title: "Minuten", items: INTERVALS.filter((i) => i.endsWith("m")) },
+  { title: "Stunden", items: INTERVALS.filter((i) => i.endsWith("h")) },
+  { title: "Tage und länger", items: INTERVALS.filter((i) => !/[smh]$/.test(i)) },
+];
+
+const CUSTOM_KEY = "chartai.customIntervals.v1";
+
+function readCustom(): string[] {
+  try {
+    const v = JSON.parse(localStorage.getItem(CUSTOM_KEY) ?? "[]");
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string" && isValidInterval(x)) : [];
+  } catch {
+    return [];
+  }
+}
+
+/** All time frames in groups, the user's own ones and a field for a new one (like TradingView's custom intervals). */
+function IntervalPanel({ close }: { close: () => void }) {
+  const symbol = useChartState((s) => s.symbol);
+  const interval = useChartState((s) => s.interval);
+  const [custom, setCustom] = useState(readCustom);
+  const [text, setText] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const pick = (iv: string) => {
+    void loadChart(symbol, iv as Interval);
+    close();
+  };
+  const addCustom = () => {
+    const iv = normalizeInterval(text);
+    if (!iv) return setError("z. B. 7m, 90s, 3h oder 2d (bis 7 Tage)");
+    if (!(INTERVALS as readonly string[]).includes(iv) && !custom.includes(iv)) {
+      const next = [...custom, iv].sort((a, b) => intervalSeconds(a) - intervalSeconds(b));
+      setCustom(next);
+      try {
+        localStorage.setItem(CUSTOM_KEY, JSON.stringify(next));
+      } catch {
+        // not remembered
+      }
+    }
+    pick(iv);
+  };
+  const chip = (iv: string, removable = false) => (
+    <span key={iv} className="iv-chip-wrap">
+      <button className={`iv-chip ${iv === interval ? "active" : ""}`} onClick={() => pick(iv)} data-tip={intervalLabel(iv)}>
+        {shortLabel(iv)}
+      </button>
+      {removable && (
+        <button
+          className="iv-remove"
+          aria-label={`${iv} entfernen`}
+          onClick={() => {
+            const next = custom.filter((x) => x !== iv);
+            setCustom(next);
+            try {
+              localStorage.setItem(CUSTOM_KEY, JSON.stringify(next));
+            } catch {
+              // not remembered
+            }
+          }}
+        >
+          ×
+        </button>
+      )}
+    </span>
+  );
+  return (
+    <>
+      {INTERVAL_GROUPS.map((g) => (
+        <div key={g.title}>
+          <div className="menu-title">{g.title}</div>
+          <div className="iv-chips">{g.items.map((iv) => chip(iv))}</div>
+        </div>
+      ))}
+      <div className="menu-title">Eigene Zeiteinheiten</div>
+      {custom.length > 0 && <div className="iv-chips">{custom.map((iv) => chip(iv, true))}</div>}
+      <div className="iv-custom">
+        <input
+          value={text}
+          placeholder="z. B. 7m, 90s, 3h, 2d"
+          onChange={(e) => {
+            setText(e.target.value);
+            setError(null);
+          }}
+          onKeyDown={(e) => e.key === "Enter" && addCustom()}
+          aria-label="Eigene Zeiteinheit"
+        />
+        <button onClick={addCustom}>Öffnen</button>
+      </div>
+      {error && <div className="iv-error">{error}</div>}
+    </>
+  );
+}
 
 interface Props {
   onOpenIndicators: () => void;
@@ -175,29 +274,16 @@ function FavoritesMenu() {
 }
 
 /** Time frames as one drop-down; replaces the button row when the top bar gets narrow. */
-function IntervalMenu() {
-  const symbol = useChartState((s) => s.symbol);
+function IntervalMenu({ className, label }: { className: string; label?: string }) {
   const interval = useChartState((s) => s.interval);
   return (
-    <Menu label={<>{INTERVAL_SHORT[interval] ?? interval} <span className="caret">▾</span></>} className="intervals-compact" ariaLabel="Zeiteinheit" tip={`Zeiteinheit: ${INTERVAL_LABELS[interval] ?? interval}`}>
-      {(close) => (
-        <>
-          <div className="menu-title">Zeiteinheit</div>
-          {INTERVALS.map((iv) => (
-            <button
-              key={iv}
-              className={`menu-item ${iv === interval ? "active" : ""}`}
-              onClick={() => {
-                loadChart(symbol, iv);
-                close();
-              }}
-            >
-              <span className="menu-icon interval-key">{INTERVAL_SHORT[iv] ?? iv}</span>
-              {INTERVAL_LABELS[iv]}
-            </button>
-          ))}
-        </>
-      )}
+    <Menu
+      label={label ?? <>{shortLabel(interval)} <span className="caret">▾</span></>}
+      className={className}
+      ariaLabel="Zeiteinheit"
+      tip={`Zeiteinheit: ${intervalLabel(interval)}\nAuch Sekunden und eigene wie 7m, 90s, 2D`}
+    >
+      {(close) => <IntervalPanel close={close} />}
     </Menu>
   );
 }
@@ -236,13 +322,19 @@ export function TopBar({ onOpenIndicators, onOpenSettings, heatmapOpen, onToggle
         </div>
       )}
       <div className="group intervals-full">
-        {INTERVALS.map((iv) => (
-          <button key={iv} className={iv === interval ? "active" : ""} onClick={() => loadChart(symbol, iv)} data-tip={`Zeiteinheit: ${INTERVAL_LABELS[iv]}`}>
-            {INTERVAL_SHORT[iv] ?? iv}
+        {MAIN_INTERVALS.map((iv) => (
+          <button key={iv} className={iv === interval ? "active" : ""} onClick={() => loadChart(symbol, iv)} data-tip={`Zeiteinheit: ${intervalLabel(iv)}`}>
+            {shortLabel(iv)}
           </button>
         ))}
+        {!(MAIN_INTERVALS as readonly string[]).includes(interval) && (
+          <button className="active" data-tip={`Zeiteinheit: ${intervalLabel(interval)}`}>
+            {shortLabel(interval)}
+          </button>
+        )}
+        <IntervalMenu className="intervals-more" label="▾" />
       </div>
-      <IntervalMenu />
+      <IntervalMenu className="intervals-compact" />
       <select value={chartType} onChange={(e) => store.set({ chartType: e.target.value as ChartType })} aria-label="Charttyp" data-tip="Charttyp">
         {CHART_TYPES.map((t) => (
           <option key={t} value={t}>

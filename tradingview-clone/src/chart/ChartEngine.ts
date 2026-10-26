@@ -28,7 +28,7 @@ import { displayBars, hollowStyle, isPriceDriven } from "../../shared/chartTypes
 import { getIndicator, resolveParams, type IndicatorDef, type OutputDef } from "../../shared/indicators";
 import { heikinAshi, type Bar, type Series } from "../../shared/math";
 import { getExchange, tradingDays } from "../../shared/exchanges";
-import { INTERVAL_SECONDS, isCalendarInterval } from "../../shared/marketData";
+import { intervalSeconds, isCalendarInterval } from "../../shared/marketData";
 import type { OrderBlock, OrderBlockSignal } from "../../shared/orderblocks";
 import type { CandlePattern, Formation } from "../../shared/patterns";
 import type { SessionBox, TimeLine } from "../../shared/sessions";
@@ -355,7 +355,7 @@ export class ChartEngine {
       this.side = s.settings.scalePosition;
       this.createMainSeries(s.chartType);
     }
-    this.intervalSeconds = INTERVAL_SECONDS[s.interval] ?? 3600;
+    this.intervalSeconds = intervalSeconds(s.interval);
     this.interval = s.interval;
 
     const symbolKey = `${s.symbol}|${s.interval}`;

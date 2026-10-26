@@ -4,7 +4,7 @@
 // Everything here is pure; the browser side lives in src/market/exchangeFeed.ts.
 
 import type { Bar } from "./math.js";
-import { aggregate, bucketTime, INTERVAL_SECONDS, isCalendarInterval } from "./marketData.js";
+import { aggregate, baseInterval, bucketTime, intervalSeconds, isCalendarInterval } from "./marketData.js";
 
 export const TWELVE_DATA_REST = "https://api.twelvedata.com";
 export const TWELVE_DATA_WS = "wss://ws.twelvedata.com/v1/quotes/price";
@@ -50,10 +50,13 @@ export function streamSymbol(s: FeedSymbol): string {
 
 /** Twelve Data interval to request and whether the candles are merged into the chart's interval afterwards. */
 export function feedInterval(interval: string): { interval: string; aggregate: boolean } {
-  const direct: Record<string, string> = { "1m": "1min", "5m": "5min", "15m": "15min", "30m": "30min", "1h": "1h", "2h": "2h", "4h": "4h", "1d": "1day", "1w": "1week", "1M": "1month", all: "1week" };
+  const direct: Record<string, string> = { "1m": "1min", "5m": "5min", "15m": "15min", "30m": "30min", "45m": "45min", "1h": "1h", "2h": "2h", "4h": "4h", "1d": "1day", "1w": "1week", "1M": "1month", all: "1week" };
   if (direct[interval]) return { interval: direct[interval], aggregate: false };
-  if (interval === "6h" || interval === "12h") return { interval: "1h", aggregate: true };
   if (isCalendarInterval(interval)) return { interval: "1month", aggregate: true };
+  // Other time frames (6h, 12h, 3m, 3d, custom ones) are merged from the largest fitting minute, hour or day candles
+  // (not 2h/4h: those start at the session open, which would not line up with UTC buckets).
+  const base = baseInterval(interval, ["1m", "5m", "15m", "30m", "1h", "1d"]);
+  if (base) return { interval: direct[base], aggregate: true };
   throw new Error(`Twelve Data unterstützt ${interval} nicht`);
 }
 
@@ -130,7 +133,7 @@ export function parseStreamMessage(raw: string): StreamEvent {
 
 /** Start of the candle a live price belongs to, continuing the grid of the loaded candles (US hours start at :30). */
 export function tickBucket(interval: string, time: number, last: Bar | undefined): number {
-  const step = INTERVAL_SECONDS[interval] ?? 3600;
+  const step = intervalSeconds(interval);
   if (isCalendarInterval(interval)) return bucketTime(interval, time);
   if (interval === "1w" || interval === "all") {
     const monday = 4 * 86400;

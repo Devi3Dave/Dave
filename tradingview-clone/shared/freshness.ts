@@ -6,7 +6,7 @@
 
 import { findAsset } from "./assets";
 import { getExchange, holidayName, marketStatus, tradingDays, wallTime, zoneOffset, zonedToUtc, type Exchange } from "./exchanges";
-import { INTERVAL_SECONDS, bucketTime, isCalendarInterval, type MarketData } from "./marketData";
+import { intervalSeconds, bucketTime, isCalendarInterval, type MarketData } from "./marketData";
 
 export type Level = "ok" | "warn" | "bad" | "info";
 
@@ -150,7 +150,7 @@ export function candlesBetween(interval: string, from: number, to: number): numb
     const per = interval === "1M" ? 1 : interval === "3M" ? 3 : 12;
     return Math.max(1, Math.round(months / per));
   }
-  return Math.max(1, Math.round((to - from) / (INTERVAL_SECONDS[interval] ?? 3600)));
+  return Math.max(1, Math.round((to - from) / intervalSeconds(interval)));
 }
 
 // ---------------- Assessment ----------------
@@ -274,7 +274,7 @@ export function assessFreshness(input: FreshnessInput, formatTime: (sec: number)
   if (replay) {
     checks.push({ id: "candle", label: "Letzte Kerze", level: "info", detail: "Replay läuft: der Chart zeigt absichtlich die Vergangenheit" });
   } else if (lastBarTime !== null && source && source !== "demo") {
-    const step = INTERVAL_SECONDS[interval] ?? 3600;
+    const step = intervalSeconds(interval);
     // Daily and longer candles of an exchange belong to its local date, whatever UTC hour the source stamps them with.
     const local = market.kind === "exchange" && step >= 86400 ? (t: number) => t + zoneOffset(t * 1000, market.exchange.timeZone) * 60 : (t: number) => t;
     const expected = candleStart(interval, mNow.lastTrade);

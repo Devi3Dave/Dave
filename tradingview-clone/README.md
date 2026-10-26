@@ -64,6 +64,11 @@ und zusammen mit der Fill & Sign-App auf GitHub Pages veröffentlicht.
   wenn der Schluss die letzten 3 Linien durchbricht) nach Steve Nison, „Beyond Candlesticks“, bzw. der
   Referenz `stocktrends`; Boxgröße ATR 14 oder fest und Linienzahl in den Chart-Einstellungen.
   Indikatoren und Zeichnungen rechnen dort auf den Steinen/Linien, Claude und Alarme auf den Kerzen
+- Zeiteinheiten wie bei TradingView Ultimate: Sekunden (1s, 5s, 15s, 30s – nur Binance-Spot-Krypto, live
+  über den 1-s-Stream), Minuten bis 45m, Stunden bis 12h, 1D, 3D, Woche, Monat, Quartal, Jahr, und eigene
+  Zeiteinheiten bis 7 Tage im Menü (z. B. 7m, 90s, 3h, 2D; werden gemerkt). Was die Datenquelle nicht direkt
+  liefert, wird aus der größten passenden Kerze zusammengesetzt (z. B. 45m aus 15m, bei Binance bis zu
+  5 Abrufe zurück); Zeiteinheiten, die keinen Tag glatt teilen, beginnen um 00:00 UTC neu.
 - Zeiteinheiten 1m – 1w, Monat (1Mo), Quartal (1Q),
   Jahr (1J) und „Alles“ (gesamte Historie in Wochenkerzen, komplett eingepasst)
 - Kursdaten: Krypto über Binance (inkl. Live-Updates per WebSocket), Aktien/Indizes/Forex über Yahoo
