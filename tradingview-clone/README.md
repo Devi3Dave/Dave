@@ -57,7 +57,14 @@ und zusammen mit der Fill & Sign-App auf GitHub Pages veröffentlicht.
 ## Funktionen
 
 **Chart**
-- Kerzen, Balken, Heikin Ashi, Linie, Fläche · Zeiteinheiten 1m – 1w, Monat (1Mo), Quartal (1Q),
+- Charttypen: Kerzen, hohle Kerzen, Balken, Heikin Ashi, Linie, Stufenlinie, Fläche, Baseline, Renko und
+  Line Break. Hohle Kerzen: Farbe nach dem vorherigen Schluss, hohl wenn Schluss über Eröffnung (wie
+  mplfinance `hollow_and_filled`). Baseline: grün über, rot unter dem Kurs von vor ~160 Kerzen.
+  Renko (Steine nur bei Bewegung um eine Box, Umkehr erst nach zwei Boxen) und Line Break (Umkehr erst,
+  wenn der Schluss die letzten 3 Linien durchbricht) nach Steve Nison, „Beyond Candlesticks“, bzw. der
+  Referenz `stocktrends`; Boxgröße ATR 14 oder fest und Linienzahl in den Chart-Einstellungen.
+  Indikatoren und Zeichnungen rechnen dort auf den Steinen/Linien, Claude und Alarme auf den Kerzen
+- Zeiteinheiten 1m – 1w, Monat (1Mo), Quartal (1Q),
   Jahr (1J) und „Alles“ (gesamte Historie in Wochenkerzen, komplett eingepasst)
 - Kursdaten: Krypto über Binance (inkl. Live-Updates per WebSocket), Aktien/Indizes/Forex über Yahoo
   Finance (z. B. `AAPL`, `^GDAXI`, `EURUSD=X`), Binance-Futures-Perpetuals wie `XAUUSDT` (Gold),

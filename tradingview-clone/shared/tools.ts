@@ -5,7 +5,7 @@ import { z } from "zod";
 import { INDICATOR_IDS } from "./indicators.js";
 
 export const INTERVALS = ["1m", "5m", "15m", "30m", "1h", "4h", "1d", "1w", "1M", "3M", "1y", "all"] as const;
-export const CHART_TYPES = ["candles", "bars", "heikin_ashi", "line", "area"] as const;
+export const CHART_TYPES = ["candles", "hollow_candles", "bars", "heikin_ashi", "line", "step_line", "area", "baseline", "renko", "line_break"] as const;
 
 const time = z
   .union([z.number(), z.string()])

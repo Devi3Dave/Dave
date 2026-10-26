@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { displayBars, isPriceDriven } from "../../shared/chartTypes";
 import { indicatorLabel } from "../../shared/indicators";
 import { ChartEngine, type ComputedIndicator, type PointerEvent } from "../chart/ChartEngine";
 import { alertLinesFor, alertStore } from "../alerts";
@@ -121,7 +122,10 @@ export function ChartArea({ chart, onEngine, magnet, onEditIndicator, onEditPosi
   const scaleMode = useChart(chart, (s) => s.settings.scaleMode);
   const [computed, setComputed] = useState<ComputedIndicator[]>([]);
 
-  const { symbol, interval, bars, source, tool, loading, error } = useChart(chart, (s) => s);
+  const { symbol, interval, bars: loaded, chartType, settings, source, tool, loading, error } = useChart(chart, (s) => s);
+  // The legend reads the candles as drawn (Renko bricks, Line Break lines).
+  const brickKey = isPriceDriven(chartType) ? `${chartType}|${settings.renkoBox}|${settings.renkoAtr}|${settings.lineBreakLines}` : "";
+  const bars = useMemo(() => (brickKey ? displayBars(loaded, chartType, settings) : loaded), [loaded, brickKey]);
   const selected = useSelectedDrawing(chart.slot);
   const [menu, setMenu] = useState<MenuTarget | null>(null);
   /** "Parallel verschieben/kopieren" from the menu: the drawing follows the pointer until the next tap. */

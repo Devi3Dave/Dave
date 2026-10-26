@@ -1,12 +1,14 @@
 import {
   AreaSeries,
   BarSeries,
+  BaselineSeries,
   CandlestickSeries,
   ColorType,
   CrosshairMode,
   HistogramSeries,
   LineSeries,
   LineStyle,
+  LineType,
   PriceScaleMode,
   TickMarkType,
   createChart,
@@ -22,6 +24,7 @@ import {
   type Time,
   type UTCTimestamp,
 } from "lightweight-charts";
+import { displayBars, hollowStyle, isPriceDriven } from "../../shared/chartTypes";
 import { getIndicator, resolveParams, type IndicatorDef, type OutputDef } from "../../shared/indicators";
 import { heikinAshi, type Bar, type Series } from "../../shared/math";
 import { getExchange, tradingDays } from "../../shared/exchanges";
@@ -91,7 +94,10 @@ export class ChartEngine {
   private main: ISeriesApi<SeriesType> | null = null;
   private markersApi: ISeriesMarkersPluginApi<Time> | null = null;
   private chartType: ChartType | null = null;
+  /** Candles as shown: Renko bricks or Line Break lines for those chart types, else the loaded candles. */
   private bars: Bar[] = [];
+  private rawBars: Bar[] = [];
+  private brickKey = "";
   private symbolKey = "";
   private indicatorKey = "";
   private built: BuiltIndicator[] = [];
@@ -353,21 +359,28 @@ export class ChartEngine {
     this.interval = s.interval;
 
     const symbolKey = `${s.symbol}|${s.interval}`;
-    const prev = this.bars;
-    const barsChanged = s.bars !== prev || typeChanged;
+    const prev = this.rawBars;
+    const brickKey = isPriceDriven(s.chartType) ? `${s.settings.renkoBox}|${s.settings.renkoAtr}|${s.settings.lineBreakLines}` : "";
+    const barsChanged = s.bars !== prev || typeChanged || brickKey !== this.brickKey;
+    // Bricks and lines can change anywhere on a new price, so they are always redrawn.
     const isTick =
       !typeChanged &&
+      !brickKey &&
       symbolKey === this.symbolKey &&
       prev.length > 0 &&
       s.bars.length - prev.length <= 1 &&
       s.bars.length >= prev.length &&
       s.bars[0]?.time === prev[0]?.time;
-    this.bars = s.bars;
+    if (barsChanged) {
+      this.rawBars = s.bars;
+      this.brickKey = brickKey;
+      this.bars = displayBars(s.bars, s.chartType, s.settings);
+    }
 
     if (barsChanged) {
       if (isTick) this.tickMain();
       else this.setMainData();
-      if (symbolKey !== this.symbolKey && s.bars.length > 0) {
+      if ((symbolKey !== this.symbolKey || typeChanged) && this.bars.length > 0) {
         this.symbolKey = symbolKey;
         this.showDefaultRange();
       }
@@ -386,9 +399,9 @@ export class ChartEngine {
       this.settingsKey = settingsKey;
       this.applySettings(s.settings);
     }
-    this.axisLabels.setData(s.bars, {
-      // Months have no fixed length, so the countdown would be wrong there.
-      countdown: s.settings.countdown && !isCalendarInterval(s.interval) && !s.replay,
+    this.axisLabels.setData(this.bars, {
+      // Months have no fixed length, so the countdown would be wrong there; bricks do not close on time.
+      countdown: s.settings.countdown && !isCalendarInterval(s.interval) && !s.replay && !brickKey,
       highLow: s.settings.highLowLabels,
       lastPriceLabel: s.settings.lastPriceLabel,
       intervalSeconds: this.intervalSeconds,
@@ -396,9 +409,9 @@ export class ChartEngine {
       downColor: THEME.down,
     });
 
-    this.drawings.setData(s.drawings, s.bars);
+    this.drawings.setData(s.drawings, this.bars);
     this.refreshSessions();
-    this.liquidationBubbles.setData(s.settings.liveLiquidations ? this.liquidations : [], s.bars);
+    this.liquidationBubbles.setData(s.settings.liveLiquidations ? this.liquidations : [], this.bars);
     if (s.markers !== this.markers || barsChanged) {
       this.markers = s.markers;
       this.applyMarkers();
@@ -422,6 +435,22 @@ export class ChartEngine {
         break;
       case "line":
         this.main = this.chart.addSeries(LineSeries, { ...common, color: "#2962ff", lineWidth: 2 });
+        break;
+      case "step_line":
+        this.main = this.chart.addSeries(LineSeries, { ...common, color: "#2962ff", lineWidth: 2, lineType: LineType.WithSteps });
+        break;
+      case "baseline":
+        // Green above, red below the base level (set from the data in setMainData).
+        this.main = this.chart.addSeries(BaselineSeries, {
+          ...common,
+          topLineColor: THEME.up,
+          topFillColor1: "rgba(38,166,154,0.28)",
+          topFillColor2: "rgba(38,166,154,0.05)",
+          bottomLineColor: THEME.down,
+          bottomFillColor1: "rgba(239,83,80,0.05)",
+          bottomFillColor2: "rgba(239,83,80,0.28)",
+          lineWidth: 2,
+        });
         break;
       case "area":
         this.main = this.chart.addSeries(AreaSeries, {
@@ -552,7 +581,8 @@ export class ChartEngine {
   private refreshSessions() {
     const bars = this.bars;
     // Daily and weekly candles already are whole sessions.
-    const intraday = this.intervalSeconds < 86400 && bars.length > 1;
+    // Renko and Line Break have no regular time axis to lay sessions on.
+    const intraday = this.intervalSeconds < 86400 && bars.length > 1 && !this.brickKey;
     const from = intraday ? bars[0].time : 0;
     // A bit beyond the last candle so the next open is visible in the right margin.
     const to = intraday ? bars[bars.length - 1].time + Math.max(86400, 40 * this.intervalSeconds) : 0;
@@ -624,20 +654,26 @@ export class ChartEngine {
     return this.chartType === "heikin_ashi" ? heikinAshi(this.bars) : this.bars;
   }
 
-  private toMainPoint(b: Bar) {
-    return this.chartType === "line" || this.chartType === "area"
-      ? { time: ts(b.time), value: b.close }
-      : { time: ts(b.time), open: b.open, high: b.high, low: b.low, close: b.close };
+  private toMainPoint(bars: Bar[], i: number) {
+    const b = bars[i];
+    const t = this.chartType;
+    if (t === "line" || t === "area" || t === "step_line" || t === "baseline") return { time: ts(b.time), value: b.close };
+    const ohlc = { time: ts(b.time), open: b.open, high: b.high, low: b.low, close: b.close };
+    return t === "hollow_candles" ? { ...ohlc, ...hollowStyle(bars, i, THEME.up, THEME.down) } : ohlc;
   }
 
   private setMainData() {
-    this.main?.setData(this.displayBars().map((b) => this.toMainPoint(b)));
+    const bars = this.displayBars();
+    if (this.chartType === "baseline" && bars.length) {
+      // Like TradingView's default base level: the price at the start of the view, here ~160 candles back.
+      this.main?.applyOptions({ baseValue: { type: "price", price: bars[Math.max(0, bars.length - 160)].close } });
+    }
+    this.main?.setData(bars.map((_, i) => this.toMainPoint(bars, i)));
   }
 
   private tickMain() {
     const bars = this.displayBars();
-    const last = bars[bars.length - 1];
-    if (last) this.main?.update(this.toMainPoint(last));
+    if (bars.length) this.main?.update(this.toMainPoint(bars, bars.length - 1));
   }
 
   // ---------------- indicators ----------------

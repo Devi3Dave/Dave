@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { renkoBoxSize } from "../../shared/chartTypes";
 import { DEFAULT_SETTINGS, TIME_ZONES, type ChartSettings } from "../chartSettings";
 import { updateSettings, useChartState } from "../store";
 
@@ -35,8 +36,32 @@ function Toggle({ settingKey, label, tip }: { settingKey: keyof ChartSettings; l
   );
 }
 
+
+/** Number field that only saves valid values (comma or dot as decimal separator). */
+function NumberInput({ value, min, max, step, onChange }: { value: number; min: number; max?: number; step?: number; onChange: (v: number) => void }) {
+  return (
+    <input
+      className="settings-number"
+      inputMode="decimal"
+      defaultValue={String(value).replace(".", ",")}
+      key={value}
+      onBlur={(e) => {
+        let v = Number(e.target.value.trim().replace(",", "."));
+        if (!Number.isFinite(v) || v < min) return (e.target.value = String(value).replace(".", ","));
+        if (max !== undefined) v = Math.min(max, v);
+        if (step === 1) v = Math.round(v);
+        onChange(v);
+      }}
+      onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
+    />
+  );
+}
+
 export function ChartSettingsDialog({ onClose }: { onClose: () => void }) {
   const st = useChartState((s) => s.settings);
+  const bars = useChartState((s) => s.bars);
+  // Switching to a fixed box starts from the current ATR, rounded to two digits.
+  const atrBox = () => +renkoBoxSize(bars, 0, st.renkoAtr).toPrecision(2) || 1;
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -102,6 +127,32 @@ export function ChartSettingsDialog({ onClose }: { onClose: () => void }) {
               </select>
             </Row>
             <Toggle settingKey="showSeconds" label="Sekunden anzeigen" tip="Sekunden in Zeitachse und Fadenkreuz-Label" />
+          </section>
+
+          <section>
+            <h3>Renko & Line Break</h3>
+            <Row label="Renko-Boxgröße" tip={"Kursbewegung je Stein\nATR: Average True Range der letzten Kerzen (wie TradingView-Standard)"}>
+              <Segmented
+                value={st.renkoBox > 0 ? "fixed" : "atr"}
+                onChange={(v) => updateSettings({ renkoBox: v === "atr" ? 0 : st.renkoBox || atrBox() })}
+                options={[
+                  { value: "atr", label: "ATR" },
+                  { value: "fixed", label: "Fest" },
+                ]}
+              />
+            </Row>
+            {st.renkoBox > 0 ? (
+              <Row label="Box (Preis)" tip="Feste Boxgröße in Preiseinheiten, z. B. 100 für BTC">
+                <NumberInput value={st.renkoBox} min={0.00000001} onChange={(renkoBox) => updateSettings({ renkoBox })} />
+              </Row>
+            ) : (
+              <Row label="ATR-Länge" tip="Kerzen für die ATR, Standard 14">
+                <NumberInput value={st.renkoAtr} min={1} max={500} step={1} onChange={(renkoAtr) => updateSettings({ renkoAtr })} />
+              </Row>
+            )}
+            <Row label="Line Break: Linien" tip={"Linien, die eine Umkehr durchbrechen muss\nNison: 3 (Three Line Break)"}>
+              <NumberInput value={st.lineBreakLines} min={1} max={10} step={1} onChange={(lineBreakLines) => updateSettings({ lineBreakLines })} />
+            </Row>
           </section>
 
           <section>
