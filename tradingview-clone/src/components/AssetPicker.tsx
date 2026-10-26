@@ -76,7 +76,8 @@ function AssetRow({ hit, onPick }: { hit: SearchHit; onPick: () => void }) {
       >
         <strong>{hit.name}</strong>
         <span>{target === hit.symbol ? hit.symbol : `${hit.symbol} · ${target}`}</span>
-        <em className={`asset-badge ${source}`} data-tip={badge.tip}>
+        {/* Hints open to the left so they never cover the stars of the rows below. */}
+        <em className={`asset-badge ${source}`} data-tip={badge.tip} data-tip-placement="left">
           {badge.label}
         </em>
       </button>
@@ -84,6 +85,7 @@ function AssetRow({ hit, onPick }: { hit: SearchHit; onPick: () => void }) {
         className={`fav-star ${fav ? "on" : ""}`}
         onClick={() => toggleAssetFavorite(hit.symbol)}
         data-tip={fav ? "Aus Favoriten entfernen" : "Als Favorit speichern"}
+        data-tip-placement="left"
         aria-label={fav ? "Aus Favoriten entfernen" : "Als Favorit speichern"}
         aria-pressed={fav}
       >
