@@ -14,6 +14,16 @@ export interface Release {
  */
 export const CHANGELOG: Release[] = [
   {
+    version: "0.51.2",
+    date: "2026-10-27",
+    title: "Fadenkreuz-Sync mit dem Finger",
+    changes: [
+      "Fadenkreuz-Sync folgt jetzt dem Chart, in dem du zuletzt mit Finger oder Maus warst, statt dem „Hover“-Zustand",
+      "Auf dem iPad blieb dieser am zuletzt angetippten Chart hängen: Bewegungen im anderen Chart kamen nicht an, und bei Live-Kursen sprang das Fadenkreuz zwischen beiden Zeitpunkten hin und her",
+      "Nach dem Loslassen des Fingers bleibt das Fadenkreuz in allen Charts stehen, wie im berührten Chart",
+    ],
+  },
+  {
     version: "0.51.1",
     date: "2026-10-27",
     title: "Versionshistorie passt aufs iPad",
