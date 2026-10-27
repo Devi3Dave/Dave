@@ -9,6 +9,7 @@ import { getExchange, holidayName, marketStatus, tradingDays, wallTime, zoneOffs
 import { venueName } from "./venues";
 import { intervalSeconds, bucketTime, isCalendarInterval, isCryptoSymbol, type MarketData } from "./marketData";
 import { parseSpread, spreadSymbols } from "./spread";
+import { isTradeInterval } from "./tickBars";
 
 export type Level = "ok" | "warn" | "bad" | "info";
 
@@ -288,6 +289,9 @@ export function assessFreshness(input: FreshnessInput, formatTime: (sec: number)
   // Last candle against the candle that should be forming now.
   if (replay) {
     checks.push({ id: "candle", label: "Letzte Kerze", level: "info", detail: "Replay läuft: der Chart zeigt absichtlich die Vergangenheit" });
+  } else if (lastBarTime !== null && source && source !== "demo" && isTradeInterval(interval)) {
+    // Tick and range bars close after trades or a price move, not after a time: the live tick below shows how current they are.
+    checks.push({ id: "candle", label: "Letzter Balken", level: "info", detail: `${formatTime(Math.floor(lastBarTime))} · neuer Balken nach Trades bzw. Kursbereich, nicht nach Zeit` });
   } else if (lastBarTime !== null && source && source !== "demo") {
     const step = intervalSeconds(interval);
     // Daily and longer candles of an exchange belong to its local date, whatever UTC hour the source stamps them with.
