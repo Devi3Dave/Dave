@@ -14,6 +14,8 @@ import { autoFibonacci, detectCandlePatterns, detectFormations } from "../../sha
 import { isValidPosition, positionStats } from "../../shared/position";
 import { toolSchemas, type ToolInput, type ToolName } from "../../shared/tools";
 import { alertStore, createAlert, deleteAlert } from "../alerts";
+import { filterNotes, noteTitle } from "../../shared/notes";
+import { createNote, getNotes } from "../notes";
 import type { ChartEngine } from "../chart/ChartEngine";
 import { DEFAULT_FIBEXT_LEVELS, DEFAULT_FIB_LEVELS } from "../chart/DrawingsPrimitive";
 import { lastPositionDefaults } from "../components/PositionDialog";
@@ -529,6 +531,19 @@ async function run(name: ToolName, input: unknown, engine: ChartEngine | null): 
       if (!alertStore.get().alerts.some((a) => a.id === id)) return fail(`Kein Alarm mit id=${id}`);
       deleteAlert(id);
       return ok("Alarm gelöscht", "ok");
+    }
+
+    case "add_note": {
+      const i = input as ToolInput<"add_note">;
+      const n = createNote(i.text, i.general ? null : s.symbol);
+      if (!n) return fail("Leere Notiz");
+      return ok(`Notiz: ${noteTitle(n)}`, { id: n.id, symbol: n.symbol ?? "allgemein" });
+    }
+
+    case "list_notes": {
+      const i = input as ToolInput<"list_notes">;
+      const notes = filterNotes(getNotes(), i.all_symbols ? "all" : "symbol", s.symbol, i.query);
+      return ok(`${notes.length} Notizen`, notes.slice(0, 30).map((n) => ({ symbol: n.symbol ?? "allgemein", pinned: n.pinned || undefined, updated: iso(Math.floor(n.updatedAt / 1000)), text: n.text })));
     }
 
     case "take_screenshot": {

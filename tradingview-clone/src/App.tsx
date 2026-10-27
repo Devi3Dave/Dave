@@ -132,6 +132,11 @@ export default function App() {
       setClaudeOpen(true);
       setSideTab("objects");
     },
+    "panel.notes": () => {
+      closePages();
+      setClaudeOpen(true);
+      setSideTab("notes");
+    },
     "panel.strategy": () => {
       closePages();
       setClaudeOpen(true);

@@ -83,6 +83,7 @@ export const SHORTCUT_ACTIONS: ShortcutAction[] = [
   { id: "panel.claude", label: "Seitenleiste ein/aus", group: "Fenster", defaults: [] },
   { id: "panel.demo", label: "Demo-Trading", group: "Fenster", defaults: [] },
   { id: "panel.strategy", label: "Strategietester", group: "Fenster", defaults: [] },
+  { id: "panel.notes", label: "Notizen", group: "Fenster", defaults: [] },
   { id: "panel.objects", label: "Objektbaum und Datenfenster", group: "Fenster", defaults: [] },
   { id: "page.heatmap", label: "Heatmap", group: "Fenster", defaults: [] },
   { id: "page.calc", label: "Rechner", group: "Fenster", defaults: [] },
