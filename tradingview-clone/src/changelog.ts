@@ -14,6 +14,16 @@ export interface Release {
  */
 export const CHANGELOG: Release[] = [
   {
+    version: "0.49.0",
+    date: "2026-10-27",
+    title: "Notizen",
+    changes: [
+      "Notizen-Panel in der Seitenleiste: Ideen und Setups pro Symbol oder allgemein festhalten",
+      "Anheften, bearbeiten, löschen und durchsuchen; Tipp auf ein anderes Symbol öffnet es im Chart",
+      "Claude kann Notizen speichern und lesen (add_note, list_notes)",
+    ],
+  },
+  {
     version: "0.48.0",
     date: "2026-10-27",
     title: "Strategietester und Limit-/Stop-Orders",

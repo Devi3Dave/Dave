@@ -251,6 +251,13 @@ Angezeigt werden Equity-Kurve, die Übersicht (Nettogewinn, Brutto, Profit-Fakto
 Trefferquote, Ø Trade, Ø Gewinn/Verlust, größter Gewinn/Verlust, Ø Kerzen, offener Gewinn, Kommission), die
 Trade-Liste und Ein-/Ausstiegspfeile im Chart. Claude testet mit `backtest_strategy`.
 
+**Notizen (📝 Notizen in der Seitenleiste)**
+Wie das Notizen-Panel von TradingView: Ideen, Setups oder Termine festhalten. Eine Notiz gehört zum Symbol
+des aktiven Charts oder ist „Allgemein“ und erscheint dann bei jedem Chart. Die erste Zeile ist der Titel,
+Tipp darauf zeigt den Rest. Notizen lassen sich anheften (oben), bearbeiten, löschen und durchsuchen;
+„Alle“ zeigt die Notizen aller Symbole, ein Tipp auf das Symbol öffnet es im Chart. ⌘/Strg + Enter speichert.
+Die Notizen liegen nur im Browser. Claude speichert und liest sie mit `add_note` und `list_notes`.
+
 **Gehe zu Datum (📅 unten am Chart oder `Alt+G`)**
 Springt zur Kerze, die das Datum (bei Intraday auch die Uhrzeit, in der Zeitzone des Charts) enthält, und
 zeigt dort das Fadenkreuz. Liegt das Datum vor den geladenen Kerzen, sagt der Dialog, ab wann Daten da sind.
@@ -399,6 +406,7 @@ Zeitzone des Geräts.
 | `get_orderbook` | Live-Orderbuch mit Wänden und Kauf-/Verkaufsverhältnis |
 | `get_liquidations` | Geschätzte Liquidations-Cluster und Live-Liquidationen |
 | `create_alert`, `list_alerts`, `delete_alert` | Alarme auf Kurs oder Indikator anlegen, auflisten, löschen |
+| `add_note`, `list_notes` | Notizen speichern und lesen |
 | `take_screenshot` | Chart als Bild prüfen |
 
 Von Claude erstellte Objekte sind mit ✦ markiert und lassen sich über „Zeichnungen ✕“ im Panel
