@@ -16,7 +16,8 @@ export interface FootprintData {
 
 /** Lower-time-frame candles for the footprint of a chart (the newest 1000), or null when it is off or not possible. */
 export function useFootprintData(chart: ChartStore): FootprintData | null {
-  const on = useChart(chart, (s) => s.settings.footprint);
+  // TradingView's "Volumen-Fußabdruck" chart type is the same footprint over the candles.
+  const on = useChart(chart, (s) => s.settings.footprint || s.chartType === "volume_footprint");
   const symbol = useChart(chart, (s) => s.symbol);
   const interval = useChart(chart, (s) => s.interval);
   const source = useChart(chart, (s) => s.source);

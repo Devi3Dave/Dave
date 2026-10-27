@@ -63,6 +63,26 @@ export function ChartSettingsDialog({ onClose }: { onClose: () => void }) {
   const bars = useChartState((s) => s.bars);
   // Switching to a fixed box starts from the current ATR, rounded to two digits.
   const atrBox = () => +renkoBoxSize(bars, 0, st.renkoAtr).toPrecision(2) || 1;
+  /** ATR or a fixed price for one size; 0 in the settings means ATR. */
+  const sizeRows = (key: "renkoBox" | "kagiReversal" | "pnfBox" | "rangeSize", label: string, tip: string) => (
+    <>
+      <Row label={label} tip={`${tip}\nATR: Average True Range der letzten Kerzen (wie TradingView-Standard)`}>
+        <Segmented
+          value={st[key] > 0 ? "fixed" : "atr"}
+          onChange={(v) => updateSettings({ [key]: v === "atr" ? 0 : st[key] || atrBox() })}
+          options={[
+            { value: "atr", label: "ATR" },
+            { value: "fixed", label: "Fest" },
+          ]}
+        />
+      </Row>
+      {st[key] > 0 && (
+        <Row label="Größe (Preis)" tip="Feste Größe in Preiseinheiten, z. B. 100 für BTC">
+          <NumberInput value={st[key]} min={0.00000001} onChange={(v) => updateSettings({ [key]: v })} />
+        </Row>
+      )}
+    </>
+  );
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -136,26 +156,27 @@ export function ChartSettingsDialog({ onClose }: { onClose: () => void }) {
           </section>
 
           <section>
-            <h3>Renko & Line Break</h3>
-            <Row label="Renko-Boxgröße" tip={"Kursbewegung je Stein\nATR: Average True Range der letzten Kerzen (wie TradingView-Standard)"}>
+            <h3>Preisbasierte Charttypen</h3>
+            {sizeRows("renkoBox", "Renko-Boxgröße", "Kursbewegung je Stein")}
+            {sizeRows("kagiReversal", "Kagi-Umkehrbetrag", "Gegenbewegung, ab der die Kagi-Linie dreht (Nison)")}
+            {sizeRows("pnfBox", "P&F-Boxgröße", "Preis je X oder O")}
+            <Row label="P&F-Umkehr (Boxen)" tip={"Boxen, die eine neue Spalte braucht\nDorsey, du Plessis: 3"}>
+              <NumberInput value={st.pnfReversal} min={1} max={10} step={1} onChange={(pnfReversal) => updateSettings({ pnfReversal })} />
+            </Row>
+            <Row label="P&F-Quelle" tip={"Hoch/Tief: Hochs füllen X, Tiefs füllen O (du Plessis)\nSchluss: nur Schlusskurse"}>
               <Segmented
-                value={st.renkoBox > 0 ? "fixed" : "atr"}
-                onChange={(v) => updateSettings({ renkoBox: v === "atr" ? 0 : st.renkoBox || atrBox() })}
+                value={st.pnfSource}
+                onChange={(pnfSource) => updateSettings({ pnfSource })}
                 options={[
-                  { value: "atr", label: "ATR" },
-                  { value: "fixed", label: "Fest" },
+                  { value: "hl", label: "Hoch/Tief" },
+                  { value: "close", label: "Schluss" },
                 ]}
               />
             </Row>
-            {st.renkoBox > 0 ? (
-              <Row label="Box (Preis)" tip="Feste Boxgröße in Preiseinheiten, z. B. 100 für BTC">
-                <NumberInput value={st.renkoBox} min={0.00000001} onChange={(renkoBox) => updateSettings({ renkoBox })} />
-              </Row>
-            ) : (
-              <Row label="ATR-Länge" tip="Kerzen für die ATR, Standard 14">
-                <NumberInput value={st.renkoAtr} min={1} max={500} step={1} onChange={(renkoAtr) => updateSettings({ renkoAtr })} />
-              </Row>
-            )}
+            {sizeRows("rangeSize", "Range-Größe", "Hoch bis Tief jeder Range-Kerze")}
+            <Row label="ATR-Länge" tip="Kerzen für die ATR aller Größen auf „ATR“, Standard 14 (wie TradingView)">
+              <NumberInput value={st.renkoAtr} min={1} max={500} step={1} onChange={(renkoAtr) => updateSettings({ renkoAtr })} />
+            </Row>
             <Row label="Line Break: Linien" tip={"Linien, die eine Umkehr durchbrechen muss\nNison: 3 (Three Line Break)"}>
               <NumberInput value={st.lineBreakLines} min={1} max={10} step={1} onChange={(lineBreakLines) => updateSettings({ lineBreakLines })} />
             </Row>

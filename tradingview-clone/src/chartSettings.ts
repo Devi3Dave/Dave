@@ -1,3 +1,4 @@
+import type { PnfSource } from "../shared/chartTypes";
 // Chart display settings (scales, labels, time axis), persisted with the layout.
 
 export type ScaleMode = "normal" | "log" | "percent" | "indexed";
@@ -20,9 +21,19 @@ export interface ChartSettings {
   liveLiquidations: boolean;
   /** Renko box size in price units; 0 = ATR. */
   renkoBox: number;
+  /** ATR length for every size set to ATR (Renko, Kagi, Point & Figure, Range). */
   renkoAtr: number;
   /** Lines a Line Break reversal has to break (Nison: 3). */
   lineBreakLines: number;
+  /** Kagi reversal amount in price units; 0 = ATR. */
+  kagiReversal: number;
+  /** Point & Figure box size in price units; 0 = ATR. */
+  pnfBox: number;
+  /** Boxes a Point & Figure reversal needs (Dorsey, du Plessis: 3). */
+  pnfReversal: number;
+  pnfSource: PnfSource;
+  /** Range bar size in price units; 0 = ATR. */
+  rangeSize: number;
   /** Footprint cells (bought/sold volume per price row) over the candles. */
   footprint: boolean;
 }
@@ -44,6 +55,11 @@ export const DEFAULT_SETTINGS: ChartSettings = {
   renkoBox: 0,
   renkoAtr: 14,
   lineBreakLines: 3,
+  kagiReversal: 0,
+  pnfBox: 0,
+  pnfReversal: 3,
+  pnfSource: "hl",
+  rangeSize: 0,
   footprint: false,
 };
 

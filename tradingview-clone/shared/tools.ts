@@ -11,7 +11,42 @@ export const INTERVALS = ["1s", "5s", "15s", "30s", "1m", "3m", "5m", "15m", "30
 /** Time frames shown as buttons in the top bar. */
 export const MAIN_INTERVALS = ["1m", "5m", "15m", "30m", "1h", "4h", "1d", "1w", "1M", "3M", "1y", "all"] as const;
 export type CustomInterval = `${number}${"s" | "m" | "h" | "d"}`;
-export const CHART_TYPES = ["candles", "hollow_candles", "bars", "heikin_ashi", "line", "step_line", "area", "baseline", "renko", "line_break"] as const;
+/** In the order of TradingView's chart type menu. */
+export const CHART_TYPES = [
+  "bars",
+  "candles",
+  "hollow_candles",
+  "volume_candles",
+  "line",
+  "line_markers",
+  "step_line",
+  "area",
+  "hlc_area",
+  "baseline",
+  "columns",
+  "high_low",
+  "volume_footprint",
+  "tpo",
+  "session_vp",
+  "heikin_ashi",
+  "renko",
+  "line_break",
+  "kagi",
+  "point_figure",
+  "range",
+] as const;
+
+/** TradingView's German names, grouped like its menu (the groups are separated by lines there). */
+export const CHART_TYPE_GROUPS: [string, [(typeof CHART_TYPES)[number], string][]][] = [
+  ["Balken & Kerzen", [["bars", "Balken"], ["candles", "Kerzen"], ["hollow_candles", "Hohlkerzen"], ["volume_candles", "Volumenkerzen"]]],
+  ["Linien", [["line", "Linie"], ["line_markers", "Linie mit Markierungen"], ["step_line", "Step-Line"]]],
+  ["Flächen", [["area", "Bereich"], ["hlc_area", "HLC-Bereich"], ["baseline", "Baseline"]]],
+  ["Säulen", [["columns", "Säulen"], ["high_low", "Hoch-Tief"]]],
+  ["Volumen", [["volume_footprint", "Volumen-Fußabdruck"], ["tpo", "Time Price Opportunity"], ["session_vp", "Session-Volumenprofil"]]],
+  ["Preisbasiert", [["heikin_ashi", "Heikin Ashi"], ["renko", "Renko"], ["line_break", "Line-Break"], ["kagi", "Kagi"], ["point_figure", "Point & Figure"], ["range", "Range"]]],
+];
+
+export const CHART_TYPE_LABELS = Object.fromEntries(CHART_TYPE_GROUPS.flatMap(([, types]) => types)) as Record<(typeof CHART_TYPES)[number], string>;
 
 const time = z
   .union([z.number(), z.string()])
