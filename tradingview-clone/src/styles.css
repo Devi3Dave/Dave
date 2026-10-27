@@ -1145,8 +1145,46 @@ textarea {
   font-size: 12px;
 }
 
+.indicator-source {
+  grid-column: 1;
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  margin-top: 2px;
+}
+
+.indicator-source b {
+  display: inline-block;
+  font-weight: 600;
+  font-size: 10px;
+  padding: 0 5px;
+  margin-right: 4px;
+  border-radius: 3px;
+  border: 1px solid currentColor;
+}
+
+.indicator-source .ref-talib {
+  color: #089981;
+}
+
+.indicator-source .ref-formula {
+  color: #2962ff;
+}
+
+.indicator-source .ref-data {
+  color: #00bcd4;
+}
+
+.indicator-source .ref-approx {
+  color: #f7a600;
+}
+
+.indicator-source .ref-estimate {
+  color: #f23645;
+}
+
 .indicator-item em {
-  grid-row: 1 / span 2;
+  grid-row: 1 / span 3;
   grid-column: 2;
   align-self: center;
   font-style: normal;

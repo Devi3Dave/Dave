@@ -152,7 +152,7 @@ export const INDICATORS: IndicatorDef[] = [
     category: "Muster",
     overlay: true,
     description:
-      "Drei-Kerzen-Imbalance (ICT): bullisch, wenn das Tief von Kerze 3 über dem Hoch von Kerze 1 liegt (Kerze 2 grün), bärisch spiegelbildlich. Die Lücke bleibt als Zone stehen, bis der Kurs zurückkommt (Mitigation: 0 = Berührung, 1 = 50 %, 2 = ganz gefüllt). Optional die 50-%-Linie (Consequential Encroachment, ICT) und die Lücken eines höheren Zeitrahmens (z. B. 15 für die 15m-FVGs im 1m-Chart; nur abgeschlossene Kerzen). Quelle: smart-money-concepts (smc.fvg) / Fair Value Gap [LuxAlgo].",
+      "Drei-Kerzen-Imbalance (ICT): bullisch, wenn das Tief von Kerze 3 über dem Hoch von Kerze 1 liegt (Kerze 2 grün), bärisch spiegelbildlich. Die Lücke bleibt als Zone stehen, bis der Kurs zurückkommt (Mitigation: 0 = Berührung, 1 = 50 %, 2 = ganz gefüllt). Optional die 50-%-Linie (Consequential Encroachment, ICT) und die Lücken eines höheren Zeitrahmens (z. B. 15 für die 15m-FVGs im 1m-Chart; nur abgeschlossene Kerzen).",
     params: [
       { key: "minPct", label: "Mindestgröße %", default: 0, min: 0, max: 10, step: 0.05 },
       { key: "mitigation", label: "Mitigation (0/1/2)", default: 0, min: 0, max: 2, step: 1 },
@@ -204,7 +204,7 @@ export const INDICATORS: IndicatorDef[] = [
     category: "Muster",
     overlay: true,
     description:
-      "Change of Character (Trendwechsel: erst tieferes Tief, dann Bruch des letzten Hochs; gestrichelt) und Break of Structure (Trendfortsetzung; durchgezogen) an Swing-Hochs/-Tiefs. Linie vom Swing bis zur Kerze, die den Level bricht. Swings brauchen \"Swing-Länge\" Kerzen rechts, erscheinen also verzögert. Quelle: smart-money-concepts (smc.swing_highs_lows, smc.bos_choch).",
+      "Change of Character (Trendwechsel: erst tieferes Tief, dann Bruch des letzten Hochs; gestrichelt) und Break of Structure (Trendfortsetzung; durchgezogen) an Swing-Hochs/-Tiefs. Linie vom Swing bis zur Kerze, die den Level bricht. Swings brauchen \"Swing-Länge\" Kerzen rechts, erscheinen also verzögert.",
     params: [
       { key: "swing", label: "Swing-Länge", default: 5, min: 1, max: 50 },
       { key: "closeBreak", label: "Bruch per Schlusskurs (0/1)", default: 1, min: 0, max: 1 },
