@@ -14,6 +14,15 @@ export interface Release {
  */
 export const CHANGELOG: Release[] = [
   {
+    version: "0.50.2",
+    date: "2026-10-27",
+    title: "Fadenkreuz-Sync bei mehreren Charts",
+    changes: [
+      "Liegt der Zeitpunkt in einem anderen Chart außerhalb des sichtbaren Bereichs, verschwindet dort das Fadenkreuz, statt am Rand zu kleben und eine falsche Zeit anzuzeigen",
+      "Zeigt der Cursor in den leeren Bereich rechts von der letzten Kerze, bleibt das Fadenkreuz in den anderen Charts nicht mehr auf deren letzter Kerze stehen",
+    ],
+  },
+  {
     version: "0.50.1",
     date: "2026-10-27",
     title: "Ruhiges Fadenkreuz in Nachbarcharts",
