@@ -9,6 +9,8 @@ import {
   losingStreakProbability,
   positionSize,
   requiredMargin,
+  riskAmount,
+  lossesUntilDrawdown,
   simulateTrades,
   targetPrice,
 } from "../../shared/calculators";
@@ -21,6 +23,8 @@ const HELP_KEY = "chartai.calculators.help";
 
 // Start values are the examples from the strategy notes.
 const DEFAULTS = {
+  budget: 10000,
+  riskPct: 1,
   risk: 100,
   entry: 135.5,
   stop: 130,
@@ -41,6 +45,8 @@ type Values = typeof DEFAULTS;
 
 const SIM_PATHS = 30;
 const R_STEPS = [1, 2, 3, 4, 5, 8, 10, 15];
+const RISK_STEPS = [0.5, 1, 2, 3, 5, 10];
+const LOSS_STREAK = 20;
 
 const UP = "#26a69a";
 const DOWN = "#ef5350";
@@ -264,6 +270,18 @@ export function CalculatorView({ onClose }: { onClose: () => void }) {
     }
   }, [v]);
 
+  // 0. Risk budget
+  const budgetRisk = riskAmount(v.budget, v.riskPct);
+  const riskSynced = Math.abs(budgetRisk - v.risk) < 0.005;
+  const budgetCurves: Series[] = useMemo(() => {
+    const curve = (p: number) => Array.from({ length: LOSS_STREAK + 1 }, (_, i) => [i, Math.max(0, v.budget - i * riskAmount(v.budget, p))] as [number, number]);
+    const refs = [1, 2, 5].filter((p) => Math.abs(p - v.riskPct) > 0.01);
+    return [
+      ...refs.map((p) => ({ id: `p${p}`, points: curve(p), color: MUTED, width: 1, opacity: 0.6, endLabel: `${p} %` })),
+      { id: "cur", points: curve(v.riskPct), color: ACCENT, width: 2.5, label: `${num(v.riskPct, 2)} % Risiko`, endLabel: `${num(v.riskPct, 2)} %` },
+    ];
+  }, [v.budget, v.riskPct]);
+
   // 1. Position size
   const dist = Math.abs(v.entry - v.stop);
   const side = v.entry >= v.stop ? "long" : "short";
@@ -325,7 +343,7 @@ export function CalculatorView({ onClose }: { onClose: () => void }) {
     <div className="heatmap-view calc-view">
       <div className="heatmap-head">
         <strong>Trading-Rechner</strong>
-        <span className="heatmap-symbol">Positionsgröße · Erwartungswert · R-Multiple · Fibonacci · Hebel</span>
+        <span className="heatmap-symbol">Risiko · Positionsgröße · Erwartungswert · R-Multiple · Fibonacci · Hebel</span>
         <div className="spacer" />
         <button className={helpOpen ? "active" : ""} onClick={toggleHelp} data-tip="Alle Erklärungen ein- oder ausklappen">
           💡 Erklärungen {helpOpen ? "aus" : "ein"}
@@ -348,6 +366,64 @@ export function CalculatorView({ onClose }: { onClose: () => void }) {
         </div>
 
         <div className="calc-grid-cards">
+          <Card n={0} title="Risiko-Rechner" help={HELP.budget} helpOpen={helpOpen} formula={<>Risiko pro Trade = Trading-Budget × Risiko % ÷ 100</>}>
+            <div className="calc-inputs">
+              <NumInput label="Trading-Budget" value={v.budget} onChange={set("budget")} unit="$" min={0} />
+              <NumInput label="Risiko pro Trade" value={v.riskPct} onChange={set("riskPct")} unit="%" min={0} max={10} step={0.25} hint={"Üblich: 0,5 bis 2 %\nMehr als 2 % gilt als hohes Risiko"} />
+            </div>
+            <div className="calc-examples">
+              <span>Schnellwahl:</span>
+              {RISK_STEPS.map((p) => (
+                <button key={p} className={Math.abs(p - v.riskPct) < 0.001 ? "active" : ""} onClick={() => set("riskPct")(p)}>
+                  {num(p, p % 1 ? 1 : 0)} %
+                </button>
+              ))}
+            </div>
+            <div className="calc-calc">
+              {num(v.budget, 0)} $ × {num(v.riskPct, 2)} % ÷ 100 = <strong className="down">{usd(budgetRisk)}</strong>
+            </div>
+            <div className="calc-stats">
+              <Stat big label="Möglicher Verlust pro Trade (1 R)" value={usd(budgetRisk)} tone="down" />
+              <Stat label="Verluste in Folge bis −50 %" value={`${lossesUntilDrawdown(v.riskPct)} Trades`} />
+              <Stat label="Nach 10 Verlusten in Folge" value={usd(Math.max(0, v.budget - 10 * budgetRisk), 0)} />
+            </div>
+            {v.riskPct > 2 && <div className="calc-warn">⚠ Mehr als 2 % pro Trade ist ein hohes Risiko. Schon wenige Verluste in Folge kosten einen großen Teil des Budgets.</div>}
+            <div className="calc-examples">
+              <button className={riskSynced ? "" : "pill active"} onClick={() => set("risk")(+budgetRisk.toFixed(2))} disabled={riskSynced}>
+                {riskSynced ? `✓ Wird als 1 R verwendet (${usd(v.risk, 2)})` : `Als 1 R übernehmen (aktuell ${usd(v.risk, 2)})`}
+              </button>
+            </div>
+            <table className="calc-table">
+              <thead>
+                <tr>
+                  <th>Risiko</th>
+                  <th>Verlust pro Trade</th>
+                  <th>Verluste bis −50 %</th>
+                </tr>
+              </thead>
+              <tbody>
+                {RISK_STEPS.map((p) => (
+                  <tr key={p} className={Math.abs(p - v.riskPct) < 0.001 ? "gold" : undefined}>
+                    <td>{num(p, p % 1 ? 1 : 0)} %</td>
+                    <td>{usd(riskAmount(v.budget, p))}</td>
+                    <td>{lossesUntilDrawdown(p)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div className="calc-chart-title">Kontostand nach Verlusten in Folge</div>
+            <LineChart
+              series={budgetCurves}
+              xDomain={[0, LOSS_STREAK]}
+              yDomain={[0, Math.max(1, v.budget)]}
+              xFmt={(x) => `${num(x, 0)} Verluste`}
+              yFmt={(y) => num(y, 0)}
+              xTitle="Verluste in Folge"
+              hLines={[{ value: v.budget / 2, label: "−50 %", color: DOWN }]}
+              integerX
+            />
+          </Card>
+
           <Card n={1} title="Positionsgröße" help={HELP.position} helpOpen={helpOpen} formula={<>Positionsgröße = Risiko ÷ |Einstieg − Stop-Loss|</>}>
             <div className="calc-examples">
               <span>Beispiele:</span>

@@ -2310,6 +2310,11 @@ select,
   font-size: 12px;
 }
 
+.calc-examples button.active {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 .calc-stats {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));

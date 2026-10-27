@@ -14,6 +14,16 @@ export interface Release {
  */
 export const CHANGELOG: Release[] = [
   {
+    version: "0.50.0",
+    date: "2026-10-27",
+    title: "Risiko-Rechner",
+    changes: [
+      "Neuer Risiko-Rechner im Rechner: Trading-Budget und Risiko in % eintragen, ergibt den möglichen Verlust pro Trade",
+      "Betrag lässt sich mit einem Tipp als 1 R für alle anderen Rechner übernehmen",
+      "Tabelle 0,5–10 % mit Verlust pro Trade und Verlusten in Folge bis −50 %, Grafik Kontostand nach Verlustserien",
+    ],
+  },
+  {
     version: "0.49.1",
     date: "2026-10-27",
     title: "Rechner: Fib-Extension nachvollziehbarer",

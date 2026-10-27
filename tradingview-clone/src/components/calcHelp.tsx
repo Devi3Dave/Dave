@@ -17,7 +17,7 @@ export const BASICS: Help = {
     </>
   ),
   steps: [
-    <>Lege einmal fest, wie viel du pro Trade höchstens verlieren willst (z. B. 100 $ oder 1 % deines Kontos). Das ist dein 1 R.</>,
+    <>Lege einmal fest, wie viel du pro Trade höchstens verlieren willst (z. B. 1 % deines Budgets). Das rechnet dir der Risiko-Rechner (0) aus. Das ist dein 1 R.</>,
     <>Trage den Betrag oben bei „Risiko pro Trade (1 R)“ ein. Alle Rechner auf dieser Seite rechnen damit.</>,
     <>Vor jedem Trade: Positionsgröße ausrechnen (1), Ziel festlegen (3), Hebel prüfen (5).</>,
   ],
@@ -26,6 +26,27 @@ export const BASICS: Help = {
 };
 
 export const HELP: Record<string, Help> = {
+  budget: {
+    what: (
+      <>
+        Hier legst du fest, <strong>wie viel du pro Trade höchstens verlieren darfst</strong>. Du trägst dein gesamtes Trading-Budget ein und
+        wählst einen Prozentsatz. Das Ergebnis ist dein Risiko pro Trade, also dein 1 R.
+      </>
+    ),
+    steps: [
+      <>Trading-Budget eintragen: das Geld, das du insgesamt fürs Trading verwendest.</>,
+      <>Risiko in Prozent wählen. Üblich sind 0,5 bis 2 %. Mehr als 2 % gilt als hohes Risiko.</>,
+      <>Rechnung: Budget × Prozent ÷ 100. Das ist der Betrag, den du verlierst, wenn der Stop-Loss getroffen wird.</>,
+      <>Mit „Als 1 R übernehmen“ rechnen alle anderen Rechner mit diesem Betrag.</>,
+    ],
+    example: (
+      <>
+        Budget 10.000 $, Risiko 1 %: 10.000 × 1 ÷ 100 = <strong>100 $</strong> pro Trade. Selbst nach 10 Verlusten in Folge hast du noch 9.000 $.
+        Bei 5 % wären es 500 $ pro Trade, und nach 10 Verlusten wäre die Hälfte weg.
+      </>
+    ),
+    tip: <>Die Tabelle zeigt, wie viele Verluste in Folge du aushältst, bis die Hälfte deines Budgets weg ist. Je kleiner das Risiko, desto länger hältst du durch.</>,
+  },
   position: {
     what: (
       <>
