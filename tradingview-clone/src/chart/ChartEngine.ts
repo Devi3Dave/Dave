@@ -1083,13 +1083,20 @@ export class ChartEngine {
     if (this.destroyed || !this.main) return;
     this.syncing = true;
     try {
-      const i = time === null ? -1 : barIndexAt(this.bars, time);
-      if (i < 0) this.chart.clearCrosshairPosition();
+      const bars = this.bars;
+      let i = time === null ? -1 : barIndexAt(bars, time);
+      // A time after the last candle (empty space on the right of the other chart) has no candle here.
+      const n = bars.length;
+      if (i === n - 1 && n > 1 && time! >= bars[i].time + (bars[i].time - bars[i - 1].time)) i = -1;
+      // A candle scrolled out of view is hidden: the library would pin the crosshair to the
+      // chart's edge, showing a different time than the other chart.
+      const r = this.chart.timeScale().getVisibleLogicalRange();
+      if (i < 0 || !r || i < r.from || i > r.to) this.chart.clearCrosshairPosition();
       else {
         // Without the horizontal line: placed at each candle's close it jumped up and down while
         // the pointer moved straight across the other chart.
         this.setForeignCrosshair(true);
-        this.chart.setCrosshairPosition(this.bars[i].close, this.bars[i].time as UTCTimestamp, this.main);
+        this.chart.setCrosshairPosition(bars[i].close, bars[i].time as UTCTimestamp, this.main);
       }
     } finally {
       this.syncing = false;
