@@ -13,6 +13,8 @@ import { DemoButton } from "./DemoToasts";
 import { RefreshButton } from "./FreshnessBadge";
 import { MAX_COMPARE } from "../../shared/compare";
 import { Menu } from "./Menu";
+import { VersionHistoryDialog } from "./VersionHistoryDialog";
+import { CHANGELOG } from "../changelog";
 import { shortcutLabel, useShortcutOverrides, useShortcuts } from "../shortcuts";
 import { TemplatesMenu } from "./TemplatesMenu";
 import { SavedLayoutMenu } from "./LayoutMenu";
@@ -187,28 +189,67 @@ function useHeaderPrice() {
   return { last, change };
 }
 
-function VersionBadge() {
+/** Version badge next to the logo; opens a menu with build info, update check and the version history. */
+function VersionMenu() {
   const { state, latest, check } = useUpdateCheck();
   const [flash, setFlash] = useState<string | null>(null);
-  const tip = [
-    `ChartAI Version ${APP_VERSION}`,
-    `Build ${BUILD_SHA} vom ${formatBuildTime(BUILD_TIME)}`,
-    state === "available" && latest ? `Neu online: ${latest.version} (${latest.sha}) – antippen zum Aktualisieren` : "Antippen: nach Updates suchen",
-  ].join("\n");
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const current = CHANGELOG.find((r) => r.version === APP_VERSION);
+  const update = state === "available" ? latest : null;
+  const openHistory = (close: () => void) => {
+    close();
+    setHistoryOpen(true);
+  };
   return (
-    <button
-      className={`version-badge ${state === "available" ? "update" : ""}`}
-      data-tip={tip}
-      aria-label={`Version ${APP_VERSION}`}
-      onClick={async () => {
-        if (state === "available" || (await check())) return void reloadToLatest();
-        setFlash(import.meta.env.PROD ? "aktuell ✓" : "dev");
-        window.setTimeout(() => setFlash(null), 2000);
-      }}
-    >
-      {flash ?? `v${APP_VERSION}`}
-      {state === "available" && !flash && <span className="update-dot">Update</span>}
-    </button>
+    <>
+      <Menu
+        label={
+          <>
+            v{APP_VERSION}
+            {update && <span className="update-dot">Update</span>}
+          </>
+        }
+        className={`version-badge ${update ? "update" : ""}`}
+        ariaLabel={`Version ${APP_VERSION}`}
+        tip={`ChartAI Version ${APP_VERSION}${update ? `\nNeu online: ${update.version}` : ""}\nAntippen: Versionen und Änderungen`}
+      >
+        {(close) => (
+          <>
+            <div className="menu-title">Version</div>
+            <div className="version-info">
+              <strong>ChartAI {APP_VERSION}</strong>
+              {current && <span>{current.title}</span>}
+              <span className="muted">
+                Build {BUILD_SHA} vom {formatBuildTime(BUILD_TIME)}
+              </span>
+            </div>
+            <button
+              className={`menu-item ${update ? "active" : ""}`}
+              onClick={async () => {
+                if (update || (await check())) return void reloadToLatest();
+                setFlash(import.meta.env.PROD ? "Aktuell ✓ – keine neuere Version online" : "Entwicklungsversion – keine Update-Suche");
+                window.setTimeout(() => setFlash(null), 2500);
+              }}
+            >
+              <span className="menu-icon">⟳</span>
+              {update ? `Update auf ${update.version} laden` : (flash ?? (state === "checking" ? "Suche …" : "Nach Updates suchen"))}
+            </button>
+            <button className="menu-item" onClick={() => openHistory(close)}>
+              <span className="menu-icon">📜</span>
+              Versionshistorie ({CHANGELOG.length} Versionen)
+            </button>
+            <div className="menu-title">Letzte Versionen</div>
+            {CHANGELOG.slice(0, 5).map((r) => (
+              <button key={r.version} className={`menu-item version-row ${r.version === APP_VERSION ? "active" : ""}`} onClick={() => openHistory(close)}>
+                <span className="vh-version">{r.version}</span>
+                <span className="version-row-title">{r.title}</span>
+              </button>
+            ))}
+          </>
+        )}
+      </Menu>
+      {historyOpen && <VersionHistoryDialog onClose={() => setHistoryOpen(false)} />}
+    </>
   );
 }
 
@@ -326,7 +367,7 @@ export function TopBar({ onOpenIndicators, onOpenSettings, onOpenShortcuts, heat
     <header className="topbar">
       <div className="brand">
         <span className="logo">◢</span> <span className="brand-name">ChartAI</span>
-        <VersionBadge />
+        <VersionMenu />
       </div>
       <div className="symbol-picker">
         <AssetMenu onOpenSearch={() => setSearchOpen(true)} />
