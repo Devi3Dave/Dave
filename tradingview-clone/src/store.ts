@@ -10,14 +10,15 @@ import { barIndexAt, carryReplay, nextReplayStep, randomStart, replayFrame } fro
 import { loadSpreadData, parseSpread } from "../shared/spread";
 import { parseVenueSymbol, type VenueSymbol } from "../shared/venues";
 import type { IndicatorSourceRef } from "../shared/indicators";
-import type { CHART_TYPES, CustomInterval, INTERVALS } from "../shared/tools";
+import { addTrades, isTradeInterval, MAX_TRADE_BARS, parseTradeInterval } from "../shared/tickBars";
+import type { CHART_TYPES, CustomInterval, INTERVALS, TradeIntervalCode } from "../shared/tools";
 import type { ShapeKind } from "../shared/drawingShapes";
 import { DEFAULT_SETTINGS, type ChartSettings } from "./chartSettings";
 import { STANDALONE } from "./config";
 import { measureClock } from "./market/clockSync";
 import { connectFeedLive, feedFor, loadFeedData } from "./market/exchangeFeed";
 
-export type Interval = (typeof INTERVALS)[number] | CustomInterval;
+export type Interval = (typeof INTERVALS)[number] | CustomInterval | TradeIntervalCode;
 export type ChartType = (typeof CHART_TYPES)[number];
 export type Author = "user" | "claude";
 export type LineStyleName = "solid" | "dashed" | "dotted";
@@ -236,6 +237,8 @@ function createChartStore(slot: number): ChartStore {
         streamRefused = true;
         if (socket === ws) closeSocket();
       });
+    } else if ((json.source === "binance" || json.source === "binance_futures") && isTradeInterval(interval)) {
+      ws = connectTradeLive(chart, json, current, onData);
     } else if (json.source === "binance" || json.source === "binance_futures") {
       ws = connectLive(chart, json.symbol, interval, json.source === "binance_futures", current, onData);
     } else if (json.source === "venue") {
@@ -682,11 +685,13 @@ export async function loadChart(symbol: string, interval: Interval): Promise<voi
 export async function fetchMarketData(symbol: string, interval: string, limit = 1000, endTime?: number): Promise<MarketData> {
   // Spread charts (BTCUSDT/ETHUSDT): both symbols are loaded as usual and combined.
   const spread = parseSpread(symbol);
+  if (spread && isTradeInterval(interval)) throw new Error("Spread-Charts gibt es nicht mit Ticks oder Bereichen");
   if (spread) return loadSpreadData(spread, interval, limit, (s, i, l) => fetchMarketData(s, i, l, endTime));
   // Without the Node server the browser fetches directly (Binance allows it; Yahoo does not, so stocks
   // use Binance perpetuals where one exists, see shared/assets.ts, and otherwise fall back to demo data).
   // With the user's exchange-feed key, stocks, indices and forex come from the exchange; without it (or on errors) as before.
-  const feed = endTime ? null : feedFor(symbol);
+  // Tick and range bars come from Binance trades only.
+  const feed = endTime || isTradeInterval(interval) ? null : feedFor(symbol);
   if (feed) {
     try {
       return await loadFeedData(feed.id, feed.feed, interval, limit);
@@ -746,6 +751,33 @@ function connectLive(chart: ChartStore, symbol: string, interval: Interval, futu
       const bars = series.slice();
       if (last && last.time === bar.time) bars[bars.length - 1] = bar;
       else if (!last || bar.time > last.time) bars.push(bar);
+      if (!s.replay) return { bars, liveTick };
+      return s.replay.phase === "select" && !s.replay.shown ? { bars, liveTick, replay: { ...s.replay, all: bars } } : { liveTick, replay: { ...s.replay, all: bars } };
+    });
+  };
+  return ws;
+}
+
+/** Binance aggregate trades (@aggTrade) folded into tick or range bars (shared/tickBars.ts). */
+function connectTradeLive(chart: ChartStore, json: MarketData, current: () => boolean, onData: () => void): WebSocket {
+  const spec = parseTradeInterval(json.interval)!;
+  const tickSize = json.tickSize ?? 0.01;
+  // Trades already in the loaded bars are skipped.
+  let lastId = json.lastTradeId ?? -1;
+  const host = json.source === "binance_futures" ? "wss://fstream.binance.com" : "wss://stream.binance.com:9443";
+  const ws = new WebSocket(`${host}/ws/${json.symbol.toLowerCase()}@aggTrade`);
+  ws.onmessage = (ev) => {
+    if (!current()) return;
+    const msg = JSON.parse(ev.data);
+    if (msg.e !== "aggTrade" || !(msg.a > lastId)) return;
+    lastId = msg.a;
+    onData();
+    const liveTick: LiveTick = { eventTime: Number(msg.E) || Number(msg.T) || Date.now(), receivedAt: Date.now() };
+    const trade = { timeMs: Number(msg.T), price: +msg.p, qty: +msg.q, count: msg.l - msg.f + 1, buy: !msg.m };
+    chart.set((s) => {
+      const series = s.replay ? s.replay.all : s.bars;
+      let bars = addTrades(series, spec, tickSize, [trade]);
+      if (bars.length > MAX_TRADE_BARS && !s.replay) bars = bars.slice(-MAX_TRADE_BARS);
       if (!s.replay) return { bars, liveTick };
       return s.replay.phase === "select" && !s.replay.shown ? { bars, liveTick, replay: { ...s.replay, all: bars } } : { liveTick, replay: { ...s.replay, all: bars } };
     });

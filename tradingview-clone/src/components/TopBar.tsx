@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { INDICATORS, getIndicator, resolveParams } from "../../shared/indicators";
 import { intervalSeconds, isValidInterval, normalizeInterval } from "../../shared/marketData";
-import { CHART_TYPE_GROUPS, INTERVALS, MAIN_INTERVALS } from "../../shared/tools";
+import { normalizeTradeInterval } from "../../shared/tickBars";
+import { CHART_TYPE_GROUPS, INTERVALS, MAIN_INTERVALS, RANGE_INTERVALS, TICK_INTERVALS } from "../../shared/tools";
 import { formatPrice } from "../chart/DrawingsPrimitive";
 import { toggleFavorite, useFavorites } from "../favorites";
 import { LAYOUTS, addCompare, addIndicator, exitReplay, loadChart, setLayout, startReplay, store, useChartState, useWorkspace, workspace, type ChartType, type Interval } from "../store";
@@ -21,12 +22,20 @@ const SPECIAL_LABELS: Record<string, string> = {
   "1y": "1 Jahr",
   all: "Alles (gesamte Historie in Wochenkerzen)",
 };
-const UNIT_NAMES: Record<string, [string, string]> = { s: ["Sekunde", "Sekunden"], m: ["Minute", "Minuten"], h: ["Stunde", "Stunden"], d: ["Tag", "Tage"], w: ["Woche", "Wochen"] };
+const UNIT_NAMES: Record<string, [string, string]> = {
+  s: ["Sekunde", "Sekunden"],
+  m: ["Minute", "Minuten"],
+  h: ["Stunde", "Stunden"],
+  d: ["Tag", "Tage"],
+  w: ["Woche", "Wochen"],
+  T: ["Tick", "Ticks"],
+  R: ["Bereich", "Bereiche"],
+};
 
 /** "7 Minuten", "1 Stunde", "1 Quartal" … */
 function intervalLabel(iv: string): string {
   if (SPECIAL_LABELS[iv]) return SPECIAL_LABELS[iv];
-  const m = /^(\d+)([smhdw])$/.exec(iv);
+  const m = /^(\d+)([smhdwTR])$/.exec(iv);
   if (!m) return iv;
   const [one, many] = UNIT_NAMES[m[2]];
   return `${m[1]} ${m[1] === "1" ? one : many}`;
@@ -36,11 +45,14 @@ function intervalLabel(iv: string): string {
 const INTERVAL_SHORT: Record<string, string> = { "1M": "1Mo", "3M": "1Q", "1y": "1J", all: "Alles" };
 const shortLabel = (iv: string) => INTERVAL_SHORT[iv] ?? iv.replace(/d$/, "D");
 
-const INTERVAL_GROUPS: { title: string; items: string[] }[] = [
+/** In the order of TradingView's interval menu: ticks, seconds, minutes, hours, days, ranges. */
+const INTERVAL_GROUPS: { title: string; items: string[]; tip?: string }[] = [
+  { title: "Ticks (nur Binance-Krypto)", items: [...TICK_INTERVALS], tip: "Neuer Balken nach so vielen Trades (Binance-Tradestrom)" },
   { title: "Sekunden (nur Binance-Krypto)", items: INTERVALS.filter((i) => i.endsWith("s")) },
   { title: "Minuten", items: INTERVALS.filter((i) => i.endsWith("m")) },
   { title: "Stunden", items: INTERVALS.filter((i) => i.endsWith("h")) },
   { title: "Tage und länger", items: INTERVALS.filter((i) => !/[smh]$/.test(i)) },
+  { title: "Bereiche (nur Binance-Krypto)", items: [...RANGE_INTERVALS], tip: "Jeder Balken spannt so viele kleinste Kursschritte von Tief bis Hoch (1 Bereich = 1 Tick-Größe, wie bei TradingView)" },
 ];
 
 const CUSTOM_KEY = "chartai.customIntervals.v1";
@@ -66,9 +78,9 @@ function IntervalPanel({ close }: { close: () => void }) {
     close();
   };
   const addCustom = () => {
-    const iv = normalizeInterval(text);
-    if (!iv) return setError("z. B. 7m, 90s, 3h oder 2d (bis 7 Tage)");
-    if (!(INTERVALS as readonly string[]).includes(iv) && !custom.includes(iv)) {
+    const iv = normalizeTradeInterval(text) ?? normalizeInterval(text);
+    if (!iv) return setError("z. B. 7m, 90s, 3h, 2d (bis 7 Tage), 50T (Ticks) oder 25R (Bereiche)");
+    if (![...INTERVALS, ...TICK_INTERVALS, ...RANGE_INTERVALS].includes(iv as never) && !custom.includes(iv)) {
       const next = [...custom, iv].sort((a, b) => intervalSeconds(a) - intervalSeconds(b));
       setCustom(next);
       try {
@@ -107,7 +119,9 @@ function IntervalPanel({ close }: { close: () => void }) {
     <>
       {INTERVAL_GROUPS.map((g) => (
         <div key={g.title}>
-          <div className="menu-title">{g.title}</div>
+          <div className="menu-title" data-tip={g.tip}>
+            {g.title}
+          </div>
           <div className="iv-chips">{g.items.map((iv) => chip(iv))}</div>
         </div>
       ))}
@@ -116,7 +130,7 @@ function IntervalPanel({ close }: { close: () => void }) {
       <div className="iv-custom">
         <input
           value={text}
-          placeholder="z. B. 7m, 90s, 3h, 2d"
+          placeholder="z. B. 7m, 90s, 2d, 50T, 25R"
           onChange={(e) => {
             setText(e.target.value);
             setError(null);
@@ -281,7 +295,7 @@ function IntervalMenu({ className, label }: { className: string; label?: string 
       label={label ?? <>{shortLabel(interval)} <span className="caret">▾</span></>}
       className={className}
       ariaLabel="Zeiteinheit"
-      tip={`Zeiteinheit: ${intervalLabel(interval)}\nAuch Sekunden und eigene wie 7m, 90s, 2D`}
+      tip={`Zeiteinheit: ${intervalLabel(interval)}\nAuch Ticks, Sekunden, Bereiche und eigene wie 7m, 90s, 2D, 50T`}
     >
       {(close) => <IntervalPanel close={close} />}
     </Menu>

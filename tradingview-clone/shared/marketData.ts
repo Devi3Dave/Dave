@@ -1,4 +1,5 @@
 import type { Bar } from "./math.js";
+import { addTrades, demoTrades, isTradeInterval, parseTradeInterval, tickSizeFromPrices, type Trade, type TradeInterval } from "./tickBars.js";
 import { parseVenueSymbol, stripBinance, type Venue, type VenuePair } from "./venues.js";
 
 export interface MarketData {
@@ -9,6 +10,9 @@ export interface MarketData {
   /** venue: another crypto exchange, the symbol names it (COINBASE:BTCUSD, shared/venues.ts). */
   source: "binance" | "binance_futures" | "yahoo" | "twelvedata" | "spread" | "venue" | "demo";
   bars: Bar[];
+  /** Tick and range charts (shared/tickBars.ts): the minimum price change and the last aggregate trade id, so the live stream continues them. */
+  tickSize?: number;
+  lastTradeId?: number;
 }
 
 export const INTERVAL_SECONDS: Record<string, number> = {
@@ -60,10 +64,11 @@ export function parseInterval(interval: string): number | null {
   return seconds <= 7 * 86400 ? seconds : null;
 }
 
-export const isValidInterval = (interval: string) => parseInterval(interval) !== null;
+/** Time frames and tick or range intervals (100T, 10R). */
+export const isValidInterval = (interval: string) => parseInterval(interval) !== null || isTradeInterval(interval);
 
-/** Seconds per candle (average length for calendar candles); 1 h for unknown time frames. */
-export const intervalSeconds = (interval: string): number => parseInterval(interval) ?? 3600;
+/** Seconds per candle (average length for calendar candles); 1 for tick and range bars (axis with seconds); 1 h for unknown time frames. */
+export const intervalSeconds = (interval: string): number => parseInterval(interval) ?? (isTradeInterval(interval) ? 1 : 3600);
 
 /** The smallest unit that writes a time frame without fractions: 120m → 2h, 90s stays 90s. */
 export function normalizeInterval(raw: string): string | null {
@@ -336,10 +341,80 @@ export function demoBars(symbol: string, interval: string, limit: number): Bar[]
   return bars;
 }
 
+// Aggregate trades for tick and range bars (sources in shared/tickBars.ts).
+const SPOT_TRADES = ["https://api.binance.com/api/v3/aggTrades", "https://data-api.binance.vision/api/v3/aggTrades"];
+const FUTURES_TRADES = ["https://fapi.binance.com/fapi/v1/aggTrades"];
+const SPOT_INFO = ["https://api.binance.com/api/v3/exchangeInfo", "https://data-api.binance.vision/api/v3/exchangeInfo"];
+/** Most aggTrades requests (1000 each) for one tick or range chart. */
+const MAX_TRADE_PAGES = 10;
+
+interface AggTrade {
+  a: number;
+  p: string;
+  q: string;
+  f: number;
+  l: number;
+  T: number;
+  m: boolean;
+}
+
+export const aggTradeToTrade = (t: AggTrade): Trade => ({ timeMs: t.T, price: +t.p, qty: +t.q, count: t.l - t.f + 1, buy: !t.m });
+
+/** The newest aggregate trades, paged back by id until `pages` requests are done; oldest first. */
+async function binanceAggTrades(urls: string[], symbol: string, pages: number): Promise<AggTrade[]> {
+  let lastError: unknown;
+  for (const url of urls) {
+    try {
+      let rows: AggTrade[] = [];
+      for (let page = 0; page < pages; page++) {
+        const from = rows.length ? rows[0].a - 1000 : null;
+        if (from !== null && from < 0) break;
+        const chunk = (await fetchJson(`${url}?symbol=${encodeURIComponent(symbol)}&limit=1000${from !== null ? `&fromId=${from}` : ""}`)) as AggTrade[];
+        const older = rows.length ? chunk.filter((t) => t.a < rows[0].a) : chunk;
+        rows = [...older, ...rows];
+        if (chunk.length < 1000) break;
+      }
+      return rows;
+    } catch (err) {
+      lastError = err;
+    }
+  }
+  throw lastError;
+}
+
+/** Minimum price change from Binance spot (PRICE_FILTER.tickSize), or null. */
+async function binanceTickSize(symbol: string): Promise<number | null> {
+  for (const url of SPOT_INFO) {
+    try {
+      const info = (await fetchJson(`${url}?symbol=${encodeURIComponent(symbol)}`)) as { symbols?: { filters?: { filterType: string; tickSize?: string }[] }[] };
+      const size = Number(info.symbols?.[0]?.filters?.find((f) => f.filterType === "PRICE_FILTER")?.tickSize);
+      if (size > 0) return size;
+    } catch {
+      // next mirror
+    }
+  }
+  return null;
+}
+
+/** Trade requests for about `limit` bars: ticks need limit × count trades, ranges as many as allowed. */
+function tradePages(spec: TradeInterval, limit: number): number {
+  return spec.kind === "ticks" ? Math.min(MAX_TRADE_PAGES, Math.max(1, Math.ceil((limit * spec.count) / 1000))) : MAX_TRADE_PAGES;
+}
+
+async function loadTradeBars(symbol: string, spec: TradeInterval, limit: number, futures: boolean): Promise<Omit<MarketData, "symbol" | "interval" | "source">> {
+  const rows = await binanceAggTrades(futures ? FUTURES_TRADES : SPOT_TRADES, symbol, tradePages(spec, limit));
+  const trades = rows.map(aggTradeToTrade);
+  const tickSize = (!futures && spec.kind === "range" ? await binanceTickSize(symbol) : null) ?? tickSizeFromPrices(trades.map((t) => t.price));
+  const bars = addTrades([], spec, tickSize, trades).slice(-limit);
+  return { bars, tickSize, lastTradeId: rows.length ? rows[rows.length - 1].a : undefined };
+}
+
 /** `endTime` (unix seconds) loads older candles up to that moment; only Binance and other crypto exchanges support it, other sources return the newest. */
 export async function loadMarketData(rawSymbol: string, interval: string, limit = 1000, endTime?: number): Promise<MarketData> {
   const symbol = stripBinance(rawSymbol.trim().toUpperCase());
   if (!isValidInterval(interval)) throw new Error(`Unbekannte Zeiteinheit: ${interval}`);
+  const trade = parseTradeInterval(interval);
+  if (trade) return loadTradeData(symbol, interval, trade, limit);
   // Another exchange is asked on its own: a pair it does not list is an error, not Binance's or demo prices.
   const venue = parseVenueSymbol(symbol);
   if (venue) {
@@ -364,6 +439,24 @@ export async function loadMarketData(rawSymbol: string, interval: string, limit 
     }
   }
   return { symbol, interval, source: "demo", bars: demoBars(symbol, interval, Math.min(limit, 600)) };
+}
+
+/** Tick and range bars from Binance trades (spot, then USDⓈ-M futures); other symbols show demo trades. */
+async function loadTradeData(symbol: string, interval: string, spec: TradeInterval, limit: number): Promise<MarketData> {
+  if (parseVenueSymbol(symbol)) throw new Error("Ticks und Bereiche gibt es nur mit Binance-Kursen");
+  if (isCryptoSymbol(symbol)) {
+    for (const futures of [false, true]) {
+      const source = futures ? "binance_futures" : "binance";
+      try {
+        const data = await loadTradeBars(symbol, spec, limit, futures);
+        if (data.bars.length > 0) return { symbol, interval, source, ...data };
+      } catch (err) {
+        console.warn(`[market] ${source} ${symbol} ${interval}: ${(err as Error).message}`);
+      }
+    }
+  }
+  const trades = demoTrades(symbol, Math.min(20_000, spec.kind === "ticks" ? spec.count * 400 : 20_000));
+  return { symbol, interval, source: "demo", tickSize: 0.01, bars: addTrades([], spec, 0.01, trades).slice(-Math.min(limit, 600)) };
 }
 
 export interface OpenInterestPoint {
