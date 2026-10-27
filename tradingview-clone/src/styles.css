@@ -4678,3 +4678,145 @@ select,
 .note-tag.link {
   color: var(--accent);
 }
+
+/* ---------------- Krypto-Rankings ---------------- */
+
+.rk-global {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.rk-global > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 120px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel);
+  font-variant-numeric: tabular-nums;
+}
+
+.rk-global span {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.rk-global strong {
+  font-size: 14px;
+}
+
+.rk-global em {
+  font-style: normal;
+  font-size: 11px;
+}
+
+.rk-key span {
+  flex-basis: 100%;
+}
+
+.rk-table td:nth-child(2),
+.rk-table th:nth-child(2) {
+  text-align: right;
+  color: var(--muted);
+}
+
+.rk-table td:nth-child(3),
+.rk-table th:nth-child(3) {
+  text-align: left;
+}
+
+.rk-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.rk-name img {
+  border-radius: 50%;
+}
+
+.rk-coin {
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rk-sym {
+  color: var(--muted);
+}
+
+.rk-spark {
+  width: 70px;
+  height: 26px;
+  vertical-align: middle;
+}
+
+.rk-spark polyline {
+  fill: none;
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+}
+
+.rk-spark.up polyline {
+  stroke: var(--up);
+}
+
+.rk-spark.down polyline {
+  stroke: var(--down);
+}
+
+.rk-table tr.rk-open td {
+  background: var(--panel-2);
+}
+
+.rk-detail {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 6px 16px;
+  padding: 6px 4px 10px;
+  text-align: left;
+}
+
+.rk-detail div {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.rk-detail span {
+  color: var(--muted);
+}
+
+.rk-table tr.rk-detail-row td {
+  text-align: left;
+}
+
+.rk-table td {
+  white-space: nowrap;
+}
+
+.rk-table tr.rk-detail-row td {
+  white-space: normal;
+}
+
+/* Wide table: scrolls sideways on the iPad instead of running under the side panel. */
+.rk-view .calc-body {
+  overflow-x: auto;
+}
+
+/* Error line above a page's table: in the flow, not centred over the chart. */
+.calc-body > .sc-error {
+  transform: none;
+}

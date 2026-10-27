@@ -14,6 +14,20 @@ export interface Release {
  */
 export const CHANGELOG: Release[] = [
   {
+    version: "0.51.0",
+    date: "2026-10-27",
+    title: "Krypto-Rankings wie CoinMarketCap",
+    changes: [
+      "Neue Vollbild-Seite 🏆 Rankings: alle Coins nach Marktkapitalisierung mit Rang, Kurs, 1 h, 24 h, 7 T, 30 T, Marktkapitalisierung, Volumen, Volumen/Marktkap., Umlauf und 7-Tage-Verlauf",
+      "Oben der Gesamtmarkt: Marktkapitalisierung mit 24-h-Veränderung, Volumen, BTC- und ETH-Dominanz, Anzahl Coins",
+      "Gewinner und Verlierer (ohne Stablecoins und Kleinst-Volumen), Suche, Sortieren per Spaltenkopf, Watchlist-Stern, USD oder EUR, Top 250 bis 1000",
+      "Klick auf den Namen zeigt Umlauf, Maximalmenge, FDV, 24-h-Hoch/-Tief und Allzeithoch, Klick aufs Kürzel öffnet das Binance-USDT-Paar im Chart",
+      "Quelle: CoinGecko API ohne Schlüssel (optional eigener Demo-Schlüssel), bei Ausfall CoinPaprika; CoinMarketCap selbst erlaubt keine Abfragen aus dem Browser",
+      "Ohne erreichbare Quelle zeigt die Seite deutlich markierte Beispieldaten",
+      "Fehlerzeile im Krypto-Screener steht wieder ganz lesbar über der Tabelle",
+    ],
+  },
+  {
     version: "0.50.3",
     date: "2026-10-27",
     title: "Vollbild bleibt bei Esc",
