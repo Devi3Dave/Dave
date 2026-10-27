@@ -14,6 +14,16 @@ export interface Release {
  */
 export const CHANGELOG: Release[] = [
   {
+    version: "0.51.1",
+    date: "2026-10-27",
+    title: "Versionshistorie passt aufs iPad",
+    changes: [
+      "Das Fenster der Versionshistorie wird nicht mehr abgeschnitten und liegt sauber über allen anderen Inhalten (auch über Hinweisen und Werkzeug-Menüs)",
+      "Titel und Suche bleiben stehen, nur die Liste der Versionen scrollt",
+      "Auf dem iPad und in kleinen Fenstern nutzt das Fenster die sichtbare Höhe und hält Abstand zu Home-Leiste und Rand",
+    ],
+  },
+  {
     version: "0.51.0",
     date: "2026-10-27",
     title: "Krypto-Rankings wie CoinMarketCap",
