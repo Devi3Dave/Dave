@@ -160,6 +160,8 @@ interface Props {
   onToggleJournal: () => void;
   exchangesOpen: boolean;
   onToggleExchanges: () => void;
+  rankingsOpen: boolean;
+  onToggleRankings: () => void;
   demoOpen: boolean;
   onToggleDemo: () => void;
   alertsOpen: boolean;
@@ -344,7 +346,7 @@ function IntervalMenu({ className, label }: { className: string; label?: string 
   );
 }
 
-export function TopBar({ onOpenIndicators, onOpenSettings, onOpenShortcuts, heatmapOpen, onToggleHeatmap, calcOpen, onToggleCalc, journalOpen, onToggleJournal, exchangesOpen, onToggleExchanges, demoOpen, onToggleDemo, alertsOpen, onToggleAlerts, claudeOpen, onToggleClaude }: Props) {
+export function TopBar({ onOpenIndicators, onOpenSettings, onOpenShortcuts, heatmapOpen, onToggleHeatmap, calcOpen, onToggleCalc, journalOpen, onToggleJournal, exchangesOpen, onToggleExchanges, rankingsOpen, onToggleRankings, demoOpen, onToggleDemo, alertsOpen, onToggleAlerts, claudeOpen, onToggleClaude }: Props) {
   const activeAlerts = useAlerts((s) => s.alerts.filter((a) => a.active).length);
   const { symbol, interval, chartType } = useChartState((s) => s);
   const showPrice = useChartState((s) => s.settings.headerPrice);
@@ -467,6 +469,10 @@ export function TopBar({ onOpenIndicators, onOpenSettings, onOpenShortcuts, heat
       <button className={`pill ${exchangesOpen ? "active" : ""}`} onClick={onToggleExchanges} aria-label="Börsen" data-tip={"Börsenzeiten\nÖffnungszeiten der großen Börsen in deiner Zeitzone\nAusgewählte Börsen erscheinen im Chart"}>
         <span className="pill-icon">🕐</span>
         <span className="pill-label"> Börsen</span>
+      </button>
+      <button className={`pill ${rankingsOpen ? "active" : ""}`} onClick={onToggleRankings} aria-label="Rankings" data-tip={`Krypto-Rankings wie CoinMarketCap${keys("page.rankings")}\nMarktkapitalisierung, Rang, Volumen, Dominanz`}>
+        <span className="pill-icon">🏆</span>
+        <span className="pill-label"> Rankings</span>
       </button>
       <div className="spacer" />
       <button className={`pill claude-toggle ${claudeOpen ? "active" : ""}`} onClick={onToggleClaude} aria-label="Claude" data-tip={"Seitenleiste ein-/ausblenden\nClaude, Orderbuch, Liquidationen"}>

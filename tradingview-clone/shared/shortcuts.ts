@@ -89,6 +89,7 @@ export const SHORTCUT_ACTIONS: ShortcutAction[] = [
   { id: "page.calc", label: "Rechner", group: "Fenster", defaults: [] },
   { id: "page.journal", label: "Journal", group: "Fenster", defaults: [] },
   { id: "page.exchanges", label: "Börsen", group: "Fenster", defaults: [] },
+  { id: "page.rankings", label: "Krypto-Rankings", group: "Fenster", defaults: [] },
   { id: "replay.toggle", label: "Replay starten/beenden", group: "Replay", defaults: [] },
   { id: "replay.next", label: "Nächste Kerze", group: "Replay", defaults: ["Shift+ArrowRight"], tv: true },
   { id: "replay.prev", label: "Kerze zurück", group: "Replay", defaults: ["Shift+ArrowLeft"] },

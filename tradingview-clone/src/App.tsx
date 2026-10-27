@@ -8,6 +8,7 @@ import { ChartSettingsDialog } from "./components/ChartSettingsDialog";
 import { DemoToasts } from "./components/DemoToasts";
 import { DrawingToolbar, FavoritesBar } from "./components/DrawingToolbar";
 import { ExchangesView } from "./components/ExchangesView";
+import { RankingsView } from "./components/RankingsView";
 import { JournalView } from "./components/JournalView";
 import { IndicatorDialog, IndicatorSettings } from "./components/IndicatorDialog";
 import { LiqHeatmapView } from "./components/LiqHeatmapView";
@@ -50,6 +51,7 @@ export default function App() {
   const [journalOpen, setJournalOpen] = useState(false);
   const [exchangesOpen, setExchangesOpen] = useState(false);
   const [screenerOpen, setScreenerOpen] = useState(false);
+  const [rankingsOpen, setRankingsOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const symbol = useChartState((s) => s.symbol);
   const liveLiquidations = useChartState((s) => s.settings.liveLiquidations);
@@ -72,6 +74,7 @@ export default function App() {
     setCalcOpen(false);
     setJournalOpen(false);
     setExchangesOpen(false);
+    setRankingsOpen(false);
   };
   const openAlerts = useCallback(() => {
     setClaudeOpen(true);
@@ -149,6 +152,7 @@ export default function App() {
     "page.calc": () => togglePage(calcOpen, setCalcOpen),
     "page.journal": () => togglePage(journalOpen, setJournalOpen),
     "page.exchanges": () => togglePage(exchangesOpen, setExchangesOpen),
+    "page.rankings": () => togglePage(rankingsOpen, setRankingsOpen),
     "replay.toggle": () => (store.get().replay ? exitReplay() : startReplay()),
     ...Object.fromEntries(["1m", "5m", "15m", "30m", "1h", "4h", "1d", "1w", "1M"].map((iv) => [`interval.${iv}`, () => void loadChart(store.get().symbol, iv as Interval)])),
     ...Object.fromEntries(CHART_TYPES.map((t) => [`chartType.${t}`, () => store.set({ chartType: t })])),
@@ -166,6 +170,7 @@ export default function App() {
           setCalcOpen(false);
           setJournalOpen(false);
           setExchangesOpen(false);
+          setRankingsOpen(false);
           setHeatmapOpen((o) => !o);
         }}
         calcOpen={calcOpen}
@@ -174,6 +179,7 @@ export default function App() {
           setHeatmapOpen(false);
           setJournalOpen(false);
           setExchangesOpen(false);
+          setRankingsOpen(false);
           setCalcOpen((o) => !o);
         }}
         journalOpen={journalOpen}
@@ -182,6 +188,7 @@ export default function App() {
           setHeatmapOpen(false);
           setCalcOpen(false);
           setExchangesOpen(false);
+          setRankingsOpen(false);
           setJournalOpen((o) => !o);
         }}
         exchangesOpen={exchangesOpen}
@@ -190,17 +197,24 @@ export default function App() {
           setHeatmapOpen(false);
           setCalcOpen(false);
           setJournalOpen(false);
+          setRankingsOpen(false);
           setExchangesOpen((o) => !o);
+        }}
+        rankingsOpen={rankingsOpen}
+        onToggleRankings={() => {
+          closePages();
+          setRankingsOpen(!rankingsOpen);
         }}
         demoOpen={claudeOpen && sideTab === "demo"}
         onToggleDemo={() => {
-          if (claudeOpen && sideTab === "demo" && !(heatmapOpen || calcOpen || journalOpen || exchangesOpen || screenerOpen)) return setSideTab("claude");
+          if (claudeOpen && sideTab === "demo" && !(heatmapOpen || calcOpen || journalOpen || exchangesOpen || screenerOpen || rankingsOpen)) return setSideTab("claude");
           // Trading needs the chart, so full-screen pages close.
           setScreenerOpen(false);
           setHeatmapOpen(false);
           setCalcOpen(false);
           setJournalOpen(false);
           setExchangesOpen(false);
+          setRankingsOpen(false);
           setClaudeOpen(true);
           setSideTab("demo");
         }}
@@ -219,6 +233,7 @@ export default function App() {
       {screenerOpen && <ScreenerView onClose={() => setScreenerOpen(false)} />}
       {journalOpen && <JournalView onClose={() => setJournalOpen(false)} />}
       {exchangesOpen && <ExchangesView onClose={() => setExchangesOpen(false)} />}
+      {rankingsOpen && <RankingsView onClose={() => setRankingsOpen(false)} />}
       {/* Kept mounted while hidden so the conversation survives toggling. */}
       <div className="claude-slot" hidden={!claudeOpen}>
         <SidePanel
