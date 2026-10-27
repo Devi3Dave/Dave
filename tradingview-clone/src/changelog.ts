@@ -14,6 +14,12 @@ export interface Release {
  */
 export const CHANGELOG: Release[] = [
   {
+    version: "0.49.1",
+    date: "2026-10-27",
+    title: "Rechner: Fib-Extension nachvollziehbarer",
+    changes: ["Fibonacci-Extension zeigt zusätzlich die Spalte „Faktor × Spanne“ (1,618 / 2,618 / 3,618 × Impulsspanne) neben dem Kursziel ab C"],
+  },
+  {
     version: "0.49.0",
     date: "2026-10-27",
     title: "Notizen",

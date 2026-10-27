@@ -120,7 +120,7 @@ export const HELP: Record<string, Help> = {
       <>A = Start des Impulses (z. B. das Tief), B = Ende des Impulses (das Hoch).</>,
       <>Die Retracement-Tabelle zeigt, wohin der Kurs zurücklaufen könnte. Die wichtigste Zone ist 61,8 % (Golden Ratio, gelb).</>,
       <>C = der Punkt, an dem der Rücksetzer endet und der Kurs wieder dreht. Mit den Buttons setzt du C auf eine Fib-Stufe.</>,
-      <>Die Extension-Tabelle zeigt Ziele: C + 1,618 / 2,618 / 3,618 × Impulslänge. Bei Abwärtsbewegungen funktioniert alles spiegelverkehrt.</>,
+      <>Die Extension-Tabelle zeigt zuerst die reine Formel aus den Quellen (Faktor × Impulsspanne, z. B. 1,618 × 50 $ = 80,90 $) und dann das Kursziel: diese Strecke wird ab C abgetragen, wie beim Trend-based-Fib-Extension-Werkzeug in TradingView. Bei Abwärtsbewegungen wird nach unten abgetragen.</>,
     ],
     example: (
       <>
