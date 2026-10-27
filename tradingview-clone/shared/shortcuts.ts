@@ -18,6 +18,7 @@
  */
 
 import { CHART_TYPE_LABELS, CHART_TYPES } from "./tools.js";
+import { SHAPES } from "./drawingShapes.js";
 
 export type ShortcutGroup = "Zeichnen" | "Bearbeiten" | "Chart" | "Preisskala" | "Fenster" | "Replay" | "Zeiteinheit" | "Charttyp";
 
@@ -49,6 +50,7 @@ const TOOL_ACTIONS: ShortcutAction[] = [
   { id: "tool.long", label: "Long-Position", group: "Zeichnen", defaults: [] },
   { id: "tool.short", label: "Short-Position", group: "Zeichnen", defaults: [] },
   { id: "tool.erase", label: "Radierer", group: "Zeichnen", defaults: [] },
+  ...SHAPES.map((t): ShortcutAction => ({ id: `tool.${t.id}`, label: t.name, group: "Zeichnen", defaults: [] })),
   { id: "drawings.toggleHidden", label: "Alle Zeichnungen aus-/einblenden", group: "Zeichnen", defaults: ["Ctrl+Alt+KeyH"], tv: true },
 ];
 

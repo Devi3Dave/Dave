@@ -6,7 +6,7 @@ import { AlertToasts } from "./components/AlertsPanel";
 import { ChartGrid } from "./components/ChartGrid";
 import { ChartSettingsDialog } from "./components/ChartSettingsDialog";
 import { DemoToasts } from "./components/DemoToasts";
-import { DrawingToolbar } from "./components/DrawingToolbar";
+import { DrawingToolbar, FavoritesBar } from "./components/DrawingToolbar";
 import { ExchangesView } from "./components/ExchangesView";
 import { JournalView } from "./components/JournalView";
 import { IndicatorDialog, IndicatorSettings } from "./components/IndicatorDialog";
@@ -23,7 +23,8 @@ import { liquidationFeed } from "./market/liquidationFeed";
 import { toggleAllDrawingsHidden } from "./drawingEdit";
 import { useShortcuts } from "./shortcuts";
 import { CHART_TYPES } from "../shared/tools";
-import { activeChart, exitReplay, loadChart, MAX_CHARTS, startReplay, store, updateSettings, useChartState, workspace, type Interval, type Tool } from "./store";
+import { SHAPE_KINDS } from "../shared/drawingShapes";
+import { activeChart, BASIC_TOOLS, exitReplay, loadChart, MAX_CHARTS, startReplay, store, updateSettings, useChartState, workspace, type Interval, type Tool } from "./store";
 
 export default function App() {
   const enginesRef = useRef<(ChartEngine | null)[]>(Array(MAX_CHARTS).fill(null));
@@ -95,7 +96,7 @@ export default function App() {
   };
   const tool = (t: Tool) => () => store.set({ tool: store.get().tool === t && t !== "cursor" ? "cursor" : t });
   useShortcuts({
-    ...Object.fromEntries((["cursor", "trendline", "ray", "hline", "vline", "zone", "fib", "fibext", "channel", "measure", "brush", "text", "long", "short", "erase"] as Tool[]).map((t) => [`tool.${t}`, tool(t)])),
+    ...Object.fromEntries(([...BASIC_TOOLS, ...SHAPE_KINDS] as Tool[]).map((t) => [`tool.${t}`, tool(t)])),
     "drawings.toggleHidden": () => toggleAllDrawingsHidden(activeChart()),
     "chart.reset": () => getEngine()?.resetView(),
     "chart.scrollLeft": () => shiftView(-1),
@@ -181,6 +182,7 @@ export default function App() {
         }}
         claudeOpen={claudeOpen} onToggleClaude={() => setClaudeOpen((o) => !o)} />
       <DrawingToolbar magnet={magnet} onToggleMagnet={() => setMagnet((m) => !m)} getEngine={getEngine} />
+      <FavoritesBar />
       <ChartGrid onEngine={onEngine} magnet={magnet} onEditIndicator={setEditing} onEditPosition={setEditingPosition} />
       {/* Drawn over the chart (same grid cell) so the chart engine stays alive for Claude. */}
       {heatmapOpen && <LiqHeatmapView onClose={() => setHeatmapOpen(false)} />}

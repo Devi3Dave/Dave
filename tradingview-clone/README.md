@@ -199,10 +199,27 @@ und zusammen mit der Fill & Sign-App auf GitHub Pages veröffentlicht.
 - Claude kann beides über `get_orderbook` und `get_liquidations` auswerten
 
 **Zeichenwerkzeuge**
-Trendlinie, Strahl, horizontale/vertikale Linie, Rechteck/Zone, Fibonacci-Retracement,
-Fibonacci-Extension, Auto-Fibonacci (größter Swing im sichtbaren Bereich), paralleler Kanal,
-Messwerkzeug (Δ Preis, Δ %, Kerzen, Δ Zeit), Pinsel (Freihand), Text, Long-/Short-Position,
-Radierer, Magnet (rastet an OHLC ein). `Esc` bricht ab.
+Gruppiert wie in TradingViews linker Leiste; jede Gruppe zeigt das zuletzt gewählte Werkzeug, der kleine
+Pfeil (oder langes Drücken) öffnet alle. Mit ☆ kommt ein Werkzeug in die verschiebbare Favoritenleiste (★).
+- *Linien:* Trendlinie, Strahl, Trendwinkel (Grad auf dem Bildschirm), Pfeil, horizontale Linie,
+  horizontaler Strahl, vertikale Linie, Fadenkreuzlinie, paralleler Kanal, Regressionstrend (kleinste
+  Quadrate der Schlusskurse mit ±2 Standardabweichungen und Pearson-r, Kanal nach Gilbert Raff),
+  Pitchfork nach Alan Andrews (Mittellinie vom Pivot zur Mitte von Punkt 2 und 3), Schiff- und
+  modifizierte Schiff-Pitchfork (Start auf halber Höhe bzw. in der Mitte zwischen Punkt 1 und 2)
+- *Fibonacci & Gann:* Retracement, trendbasierte Extension, Auto-Fibonacci, Fibonacci-Kanal,
+  Zeitzonen (1, 2, 3, 5, 8, 13 … Einheiten), Speed-Resistance-Fächer (38,2 / 50 / 61,8 % von Preis und
+  Zeit), Kreise (um die Mitte der Strecke), Bögen, Gann-Box (Level 0,25 / 0,382 / 0,5 / 0,618 / 0,75)
+  und Gann-Fächer (1×8 bis 8×1, 1×1 durch den zweiten Punkt)
+- *Muster:* XABCD und Cypher (mit Verhältnissen AB/XA, BC/AB, CD/BC, AD/XA bzw. XC/XA, CD/XC), ABCD,
+  Kopf-Schulter mit Nackenlinie, Dreieck, Three Drives, Elliott-Impuls (1–5), -Korrektur (ABC),
+  -Dreieck (ABCDE) und -Doppelkombination (WXY)
+- *Prognose & Messen:* Long-/Short-Position, Messen (Δ Preis, Δ %, Kerzen, Δ Zeit), Preisbereich,
+  Datumsbereich (Kerzen, Zeit, Volumen), verankerter VWAP (hlc3 × Volumen ab der Ankerkerze)
+- *Formen:* Rechteck/Zone, Kreis, Ellipse, Dreieck, Pinsel (Freihand)
+- *Beschriftung:* Text, Sprechblase, Notiz (📌), Preisbeschriftung, Pfeile nach oben/unten, Emoji
+
+Dazu Radierer und Magnet (rastet an OHLC ein). `Esc` bricht ab. Jedes Werkzeug kann im Tastenkürzel-Dialog
+ein eigenes Kürzel bekommen; Claude zeichnet die neuen Werkzeuge mit `draw_shape`.
 
 *Long-/Short-Position (▲/▼):* Einstieg, Stop-Loss und Take-Profit nacheinander antippen (der letzte Tipp
 legt auch das Ende der Zeitspanne fest). Angezeigt werden Chance/Risiko, Abstand in % und Betrag,

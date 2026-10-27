@@ -1,3 +1,4 @@
+import { shapeDef } from "../../shared/drawingShapes";
 import type Anthropic from "@anthropic-ai/sdk";
 import { describeAlert, isChannelCondition } from "../../shared/alerts";
 import { SOURCE_INDICATORS, computeInstances, getIndicator, indicatorLabel, resolveParams } from "../../shared/indicators";
@@ -267,6 +268,15 @@ async function run(name: ToolName, input: unknown, engine: ChartEngine | null): 
       const d: Drawing = { id: newId("claude-channel"), author: "claude", kind: "channel", a, b, offset: c.price - onLine, color: i.color ?? "#2962ff", label: i.label };
       addDrawing(d);
       return ok(`Kanal${i.label ? ` „${i.label}“` : ""}`, { id: d.id, offset: num(c.price - onLine) });
+    }
+
+    case "draw_shape": {
+      const i = input as ToolInput<"draw_shape">;
+      const def = shapeDef(i.shape);
+      if (i.points.length !== def.points) return fail(`${def.name} braucht ${def.points} Punkt(e): ${def.hints.join(", ")}`);
+      const d: Drawing = { id: newId("claude-shape"), author: "claude", kind: "shape", shape: i.shape, points: i.points.map(pt), color: i.color ?? def.color, text: i.text, label: i.label };
+      addDrawing(d);
+      return ok(def.name, { id: d.id });
     }
 
     case "get_order_blocks": {

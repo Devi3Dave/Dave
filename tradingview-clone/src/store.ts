@@ -11,6 +11,7 @@ import { loadSpreadData, parseSpread } from "../shared/spread";
 import { parseVenueSymbol, type VenueSymbol } from "../shared/venues";
 import type { IndicatorSourceRef } from "../shared/indicators";
 import type { CHART_TYPES, CustomInterval, INTERVALS } from "../shared/tools";
+import type { ShapeKind } from "../shared/drawingShapes";
 import { DEFAULT_SETTINGS, type ChartSettings } from "./chartSettings";
 import { STANDALONE } from "./config";
 import { measureClock } from "./market/clockSync";
@@ -48,7 +49,9 @@ export type Drawing =
   | (DrawingBase & { kind: "channel"; a: Point; b: Point; offset: number })
   | (DrawingBase & { kind: "measure"; a: Point; b: Point })
   | (DrawingBase & { kind: "path"; points: Point[]; width: number })
-  | (DrawingBase & { kind: "position" } & PositionInput);
+  | (DrawingBase & { kind: "position" } & PositionInput)
+  /** The tools from shared/drawingShapes (pitchfork, Gann, patterns, shapes, notes …): the tapped points in order. */
+  | (DrawingBase & { kind: "shape"; shape: ShapeKind; points: Point[]; text?: string; style?: LineStyleName; width?: number });
 
 export type DrawingKind = Drawing["kind"];
 
@@ -73,7 +76,9 @@ export interface IndicatorInstance {
   source?: IndicatorSourceRef;
 }
 
-export type Tool = "cursor" | "trendline" | "ray" | "hline" | "vline" | "zone" | "fib" | "text" | "fibext" | "channel" | "measure" | "brush" | "long" | "short" | "erase";
+export const BASIC_TOOLS = ["cursor", "trendline", "ray", "hline", "vline", "zone", "fib", "fibext", "channel", "measure", "brush", "text", "long", "short", "erase"] as const;
+export type BasicTool = (typeof BASIC_TOOLS)[number];
+export type Tool = BasicTool | ShapeKind;
 
 /** Bar replay of one chart: `bars` shows only the first `shown` of `all` loaded candles. */
 export interface ReplayState {
