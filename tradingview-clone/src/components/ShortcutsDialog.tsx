@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   SHORTCUT_ACTIONS,
   SHORTCUT_GROUPS,
@@ -31,6 +31,7 @@ export function ShortcutsDialog({ onClose }: { onClose: () => void }) {
   const [recording, setRecording] = useState<string | null>(null);
   const [pending, setPending] = useState<Pending | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const listRef = useRef<HTMLDivElement>(null);
 
   // Records the next key combination for one action; Esc cancels.
   useEffect(() => {
@@ -97,6 +98,13 @@ export function ShortcutsDialog({ onClose }: { onClose: () => void }) {
           <span className="sc-tv">TV</span> = Standard wie in TradingView. Auf {IS_MAC ? "Mac und iPad stehen ⌘ und ⌥ für Strg und Alt" : "Mac und iPad gelten ⌘ statt Strg und ⌥ statt Alt"}.
           Tippe auf <b>+</b> und drücke die neue Tastenkombination; ✕ entfernt ein Kürzel.
         </div>
+        <nav className="sc-groups" aria-label="Gruppen">
+          {SHORTCUT_GROUPS.filter((g) => visible.some((a) => a.group === g)).map((g) => (
+            <button key={g} onClick={() => listRef.current?.querySelector(`[data-group="${g}"]`)?.scrollIntoView({ block: "start", behavior: "smooth" })}>
+              {g}
+            </button>
+          ))}
+        </nav>
         {error && <div className="sc-error">{error}</div>}
         {pending && (
           <div className="sc-conflict">
@@ -115,12 +123,12 @@ export function ShortcutsDialog({ onClose }: { onClose: () => void }) {
             <button onClick={() => setPending(null)}>Abbrechen</button>
           </div>
         )}
-        <div className="sc-list">
+        <div className="sc-list" ref={listRef}>
           {SHORTCUT_GROUPS.map((group) => {
             const rows = visible.filter((a) => a.group === group);
             if (!rows.length) return null;
             return (
-              <section key={group}>
+              <section key={group} data-group={group}>
                 <h3>{group}</h3>
                 {rows.map((a) => {
                   const combos = bindings[a.id];
