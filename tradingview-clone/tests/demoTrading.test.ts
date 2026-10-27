@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   applyPrice,
+  closePartial,
+  placePendingOrder,
   available,
   closePosition,
   createAccount,
@@ -159,5 +161,60 @@ describe("dragging stop and target lines", () => {
   it("saving refuses a stop dragged past the price", () => {
     const { stop, target } = draggedLevels(long, "stop", 105);
     expect(modifyPosition(acc, "p1", { stop, target }, 100)).toMatch(/Stop-Loss/);
+  });
+});
+
+describe("limit and stop orders, partial close", () => {
+  const base = () => createAccount(10_000, 0, 0);
+
+  it("only accepts orders on the waiting side of the price", () => {
+    const acc = base();
+    const order = { symbol: "BTCUSDT", side: "long" as const, qty: 1, leverage: 1 };
+    expect(placePendingOrder(acc, { ...order, type: "limit", price: 110 }, 100, 0, "a")).toMatch(/Buy-Limit/);
+    expect(placePendingOrder(acc, { ...order, type: "stop", price: 90 }, 100, 0, "a")).toMatch(/Buy-Stop/);
+    expect(placePendingOrder(acc, { ...order, type: "limit", price: 90, stop: 95 }, 100, 0, "a")).toMatch(/Orderpreis/);
+    const ok = placePendingOrder(acc, { ...order, type: "limit", price: 90, stop: 85 }, 100, 0, "a");
+    expect(typeof ok === "string" ? ok : ok.orders).toHaveLength(1);
+  });
+
+  it("fills a buy limit at its price and a sell stop at the market, then checks stops", () => {
+    let acc = placePendingOrder(base(), { symbol: "X", side: "long", type: "limit", price: 90, qty: 10, leverage: 1, stop: 80 }, 100, 0, "l") as DemoAccount;
+    acc = placePendingOrder(acc, { symbol: "X", side: "short", type: "stop", price: 85, qty: 5, leverage: 1 }, 100, 0, "s") as DemoAccount;
+    let r = applyPrice(acc, "X", 95, 1);
+    expect(r.filled).toHaveLength(0);
+    r = applyPrice(r.account, "X", 89, 2);
+    expect(r.filled.map((p) => [p.id, p.entry])).toEqual([["l", 90]]);
+    expect(r.account.orders).toHaveLength(1);
+    // Gap down through the sell stop and the long's stop-loss: short fills at 79, the long stops out at 80.
+    r = applyPrice(r.account, "X", 79, 3);
+    expect(r.filled.map((p) => [p.id, p.side, p.entry])).toEqual([["s", "short", 79]]);
+    expect(r.closed.map((t) => [t.id, t.reason, t.exit])).toEqual([["l", "stop", 80]]);
+    expect(r.account.orders).toHaveLength(0);
+  });
+
+  it("drops an order that can no longer be paid", () => {
+    const acc = placePendingOrder(base(), { symbol: "X", side: "long", type: "limit", price: 90, qty: 1000, leverage: 1 }, 100, 0, "big") as DemoAccount;
+    const r = applyPrice(acc, "X", 90, 1);
+    expect(r.filled).toHaveLength(0);
+    expect(r.rejected[0].reason).toMatch(/Nicht genug Guthaben/);
+    expect(r.account.orders).toHaveLength(0);
+  });
+
+  it("closes part of a position and keeps the rest with its levels", () => {
+    const acc = openPosition({ ...base(), feeRate: 0.001 }, { symbol: "X", side: "long", qty: 10, leverage: 2, stop: 90 }, 100, {}, 0, "p") as DemoAccount;
+    const r = closePartial(acc, "p", 0.25, 110, 5)!;
+    expect(r.trade.qty).toBeCloseTo(2.5);
+    expect(r.trade.pnl).toBeCloseTo(2.5 * 10 - 2.5 * 110 * 0.001 - 0.25);
+    const rest = r.account.positions[0];
+    expect(rest).toMatchObject({ id: "p", stop: 90 });
+    expect(rest.qty).toBeCloseTo(7.5);
+    expect(rest.margin).toBeCloseTo(375);
+    expect(r.account.positions).toHaveLength(1);
+    expect(closePartial(r.account, "p", 1, 110, 6)!.account.positions).toHaveLength(0);
+  });
+
+  it("keeps waiting orders when the account is saved and loaded", () => {
+    const acc = placePendingOrder(base(), { symbol: "X", side: "short", type: "limit", price: 120, qty: 1, leverage: 3, target: 100 }, 100, 7, "o") as DemoAccount;
+    expect(parseAccount(JSON.parse(JSON.stringify(acc)))?.orders).toEqual([{ id: "o", symbol: "X", side: "short", type: "limit", price: 120, qty: 1, leverage: 3, stop: undefined, target: 100, createdAt: 7 }]);
   });
 });

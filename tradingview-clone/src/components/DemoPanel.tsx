@@ -16,10 +16,11 @@ import {
   usedMargin,
   type DemoPosition,
   type DemoTrade,
+  type OrderType,
   type Side,
 } from "../../shared/demoTrading";
 import { formatPrice } from "../chart/DrawingsPrimitive";
-import { addToJournal, closeAllPositions, closeDemoPosition, placeOrder, resetAccount, setFeeRate, setLevels, updateDemoSettings, useDemo, useDemoBook, useReplayBook } from "../demoAccount";
+import { addToJournal, cancelOrder, closeAllPositions, closeDemoPart, closeDemoPosition, placeOrder, resetAccount, setFeeRate, setLevels, updateDemoSettings, useDemo, useDemoBook, useReplayBook } from "../demoAccount";
 import { loadChart, useChartState } from "../store";
 import { AssetSearchDialog } from "./AssetPicker";
 
@@ -28,6 +29,11 @@ type SizeMode = "margin" | "risk" | "qty";
 const LEVERAGES = [1, 2, 3, 5, 10, 20, 50, 100];
 const FEES = [0, 0.0002, 0.0005, 0.001];
 const HISTORY_SHOWN = 30;
+const ORDER_TIPS: Record<OrderType, string> = {
+  market: "Sofort zum aktuellen Kurs",
+  limit: "Wartet auf einen besseren Kurs: Kaufen unter, Verkaufen über dem aktuellen Kurs; füllt zum Limitpreis",
+  stop: "Wartet auf einen Ausbruch: Kaufen über, Verkaufen unter dem aktuellen Kurs; füllt zum Marktkurs",
+};
 
 const nf = (d: number) => new Intl.NumberFormat("de-DE", { minimumFractionDigits: d, maximumFractionDigits: d });
 const num = (v: number, d = 2) => (Number.isFinite(v) ? nf(d).format(v) : "–");
@@ -154,6 +160,11 @@ function PositionCard({ p, price }: { p: DemoPosition; price: number | undefined
           <button onClick={startEdit} data-tip="Stop-Loss und Take-Profit ändern">
             ✎ SL/TP
           </button>
+          {[25, 50].map((f) => (
+            <button key={f} onClick={() => closeDemoPart(p.id, f / 100)} disabled={price === undefined} data-tip={`${f} % der Position zum aktuellen Kurs schließen, der Rest läuft mit SL/TP weiter`}>
+              {f} %
+            </button>
+          ))}
           <button className="dm-close" onClick={() => closeDemoPosition(p.id)} disabled={price === undefined} data-tip="Zum aktuellen Kurs schließen">
             Schließen {pnl !== null && <span className={tone(pnl)}>{signed(pnl)}</span>}
           </button>
@@ -174,6 +185,8 @@ export function DemoPanel() {
   const journaled = useDemo((s) => s.journaled);
 
   const [side, setSide] = useState<Side>("long");
+  const [orderType, setOrderType] = useState<OrderType>("market");
+  const [orderPrice, setOrderPrice] = useState("");
   const [mode, setMode] = useState<SizeMode>("margin");
   const [size, setSize] = useState("");
   const [leverage, setLeverage] = useState(1);
@@ -191,6 +204,7 @@ export function DemoPanel() {
   useEffect(() => {
     setStop("");
     setTarget("");
+    setOrderPrice("");
     setError(null);
   }, [symbol]);
 
@@ -200,7 +214,10 @@ export function DemoPanel() {
     return () => clearTimeout(t);
   }, [notice]);
 
-  const price = chartLoading ? undefined : prices[symbol];
+  const market = chartLoading ? undefined : prices[symbol];
+  const orderPriceN = parseNum(orderPrice);
+  // Sizes, costs and levels are figured at the price the order fills: the market, or the limit/stop price.
+  const price = orderType === "market" ? market : orderPriceN !== undefined && orderPriceN > 0 ? orderPriceN : undefined;
   const eq = equity(account, prices);
   const free = available(account, prices);
   const open = openPnl(account, prices);
@@ -228,10 +245,14 @@ export function DemoPanel() {
 
   const submit = () => {
     if (mode === "risk" && stopN === undefined) return setError("Für „Risiko %“ zuerst einen Stop-Loss eintragen");
-    const err = placeOrder({ symbol, side, qty, leverage, stop: stopN, target: targetN });
+    const err = placeOrder({ symbol, side, qty, leverage, stop: stopN, target: targetN }, orderType, orderPriceN);
     if (err) return setError(err);
     setError(null);
-    setNotice(`${side === "long" ? "Long" : "Short"} ${symbol} eröffnet: ${qtyText(qty)} zu ${formatPrice(price!)}`);
+    setNotice(
+      orderType === "market"
+        ? `${side === "long" ? "Long" : "Short"} ${symbol} eröffnet: ${qtyText(qty)} zu ${formatPrice(price!)}`
+        : `${side === "long" ? "Buy" : "Sell"} ${orderType === "limit" ? "Limit" : "Stop"} ${symbol} wartet bei ${formatPrice(price!)}`,
+    );
     setStop("");
     setTarget("");
   };
@@ -346,7 +367,7 @@ export function DemoPanel() {
           </div>
           <div className="spacer" />
           <span className="dm-price" data-tip={priceTip}>
-            {price === undefined ? "lädt …" : formatPrice(price)}
+            {market === undefined ? "lädt …" : formatPrice(market)}
             {source === "demo" && <em className="asset-badge demo">Demo</em>}
           </span>
           <button className="pill" onClick={() => setSearchOpen(true)} data-tip="Anderes Asset handeln (wechselt den Chart)">
@@ -363,6 +384,47 @@ export function DemoPanel() {
             Verkaufen / Short ▼
           </button>
         </div>
+
+        <div className="dm-size-head">
+          <span className="dm-label">Order</span>
+          <div className="jr-seg">
+            {(["market", "limit", "stop"] as OrderType[]).map((t) => (
+              <button
+                key={t}
+                className={orderType === t ? "active" : ""}
+                onClick={() => {
+                  setOrderType(t);
+                  if (t !== "market" && !orderPrice && market !== undefined) setOrderPrice(showNum(+market.toPrecision(6)));
+                }}
+                data-tip={ORDER_TIPS[t]}
+              >
+                {t === "market" ? "Markt" : t === "limit" ? "Limit" : "Stop"}
+              </button>
+            ))}
+          </div>
+        </div>
+        {orderType !== "market" && (
+          <>
+            <div className="calc-input">
+              <input inputMode="decimal" value={orderPrice} onChange={(e) => setOrderPrice(e.target.value)} placeholder="Orderpreis" aria-label="Orderpreis" />
+              <em>Preis</em>
+            </div>
+            {market !== undefined && (
+              <div className="calc-examples">
+                {[0.5, 1, 2].map((d) => {
+                  // Limit: better than the market (buy below, sell above); stop: beyond it.
+                  const sign = (side === "long" ? -1 : 1) * (orderType === "limit" ? 1 : -1);
+                  return (
+                    <button key={d} onClick={() => setOrderPrice(showNum(+(market * (1 + (sign * d) / 100)).toPrecision(6)))}>
+                      {sign > 0 ? "+" : "−"}
+                      {num(d, 1)} %
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </>
+        )}
 
         <div className="dm-size-head">
           <span className="dm-label">Größe</span>
@@ -484,12 +546,40 @@ export function DemoPanel() {
         )}
 
         <button className={`dm-submit ${side}`} onClick={submit} disabled={price === undefined || !(qty > 0)}>
-          {side === "long" ? "Long kaufen" : "Short verkaufen"}
+          {orderType === "market" ? (side === "long" ? "Long kaufen" : "Short verkaufen") : `${side === "long" ? "Buy" : "Sell"} ${orderType === "limit" ? "Limit" : "Stop"} platzieren`}
           {price !== undefined && ` @ ${formatPrice(price)}`}
         </button>
         {error && <div className="calc-warn">{error}</div>}
         {notice && <div className="jr-notice">{notice}</div>}
       </section>
+
+      {(account.orders ?? []).length > 0 && (
+        <section>
+          <div className="liq-head">
+            <h3>Wartende Orders ({account.orders!.length})</h3>
+          </div>
+          {[...account.orders!].reverse().map((o) => (
+            <div className="dm-hist dm-order" key={o.id} data-tip={`${o.type === "limit" ? "Limit: füllt zum Orderpreis, sobald der Kurs ihn erreicht" : "Stop: füllt zum Marktkurs, sobald der Kurs den Stop erreicht"}\nMenge ${qtyText(o.qty)}${o.leverage > 1 ? ` · ${o.leverage}× Hebel` : ""}${o.stop !== undefined ? `\nSL ${formatPrice(o.stop)}` : ""}${o.target !== undefined ? `\nTP ${formatPrice(o.target)}` : ""}\nLinie im Chart zum Verschieben ziehen`}>
+              <span>{o.type === "limit" ? "⏳" : "⚡"}</span>
+              <span>
+                <strong>{o.symbol}</strong>{" "}
+                <span className={o.side === "long" ? "up" : "down"}>
+                  {o.side === "long" ? "Buy" : "Sell"} {o.type === "limit" ? "Limit" : "Stop"}
+                </span>
+                <br />
+                <span className="dm-muted">
+                  {qtyText(o.qty)} @ {formatPrice(o.price)}
+                  {prices[o.symbol] !== undefined && ` · ${pct((o.price - prices[o.symbol]) / prices[o.symbol])} vom Kurs`}
+                </span>
+              </span>
+              <span />
+              <button onClick={() => cancelOrder(o.id)} data-tip="Order streichen" aria-label="Order streichen">
+                ✕
+              </button>
+            </div>
+          ))}
+        </section>
+      )}
 
       <section>
         <div className="liq-head">

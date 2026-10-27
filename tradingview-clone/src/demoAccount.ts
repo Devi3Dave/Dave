@@ -1,7 +1,11 @@
 import { useSyncExternalStore } from "react";
 import {
   applyPrice,
+  cancelPendingOrder,
+  closePartial,
   closePosition,
+  movePendingOrder,
+  placePendingOrder,
   createAccount,
   draggedLevels,
   journalId,
@@ -14,13 +18,16 @@ import {
   type CloseReason,
   type DemoAccount,
   type DemoTrade,
+  type DemoPosition,
   type LevelHandle,
   type Order,
+  type PendingOrder,
 } from "../shared/demoTrading";
 import { parseBackup } from "../shared/journal";
 import { barPath, subBarsOf } from "../shared/replay";
 import type { TradeLine } from "./chart/ChartEngine";
 import { activeChart, charts, fetchMarketData, workspace, type ChartState } from "./store";
+import type { OrderType } from "../shared/demoTrading";
 
 const KEY = "chartai.demo.v1";
 const JOURNAL_KEY = "chartai.journal.v1";
@@ -35,11 +42,11 @@ export interface DemoSettings {
   showLines: boolean;
 }
 
-/** Something that happened without a tap (stop, target, liquidation), shown as a toast. */
-export interface DemoEvent {
-  id: number;
-  trade: DemoTrade;
-}
+/** Something that happened without a tap (stop, target, liquidation, a filled or dropped order), shown as a toast. */
+export type DemoEvent =
+  | { id: number; trade: DemoTrade }
+  | { id: number; fill: DemoPosition; order: PendingOrder }
+  | { id: number; rejected: PendingOrder; reason: string };
 
 /**
  * Play-money account of a running bar replay: it trades at the replayed prices and times, apart from the
@@ -168,12 +175,32 @@ function afterClose(trades: DemoTrade[], announce: boolean) {
   if (state.settings.autoJournal && live.length) addToJournal(live);
 }
 
-/** Opens a market position at the last known price of the symbol. Returns an error text or null. */
-export function placeOrder(order: Order): string | null {
+/** Orders filled or dropped by a price update, as toasts. */
+function afterOrders(before: DemoAccount, filled: DemoPosition[], rejected: { order: PendingOrder; reason: string }[]) {
+  if (!filled.length && !rejected.length) return;
+  const orders = before.orders ?? [];
+  const events: DemoEvent[] = [
+    ...filled.map((fill) => ({ id: ++eventSeq, fill, order: orders.find((o) => o.id === fill.id)! })),
+    ...rejected.map((r) => ({ id: ++eventSeq, rejected: r.order, reason: r.reason })),
+  ];
+  set({ events: [...state.events, ...events].slice(-5) });
+}
+
+/**
+ * Opens a market position at the last known price of the symbol, or places a limit/stop order at `orderPrice`.
+ * Returns an error text or null.
+ */
+export function placeOrder(order: Order, type: OrderType = "market", orderPrice?: number): string | null {
   const kind = currentBook();
   const book = readBook(kind);
   if (kind === "replay" && order.symbol !== state.replay?.symbol) return `Im Replay ist nur ${state.replay?.symbol} handelbar`;
   const price = book.prices[order.symbol];
+  if (type !== "market") {
+    const next = placePendingOrder(book.account, { ...order, type, price: orderPrice ?? NaN }, price, book.now, newId());
+    if (typeof next === "string") return next;
+    writeAccount(kind, kind === "replay" ? { ...next, orders: next.orders?.map((o) => ((book.account.orders ?? []).includes(o) ? o : { ...o, replay: true })) } : next);
+    return null;
+  }
   const next = openPosition(book.account, order, price, book.prices, book.now, newId());
   if (typeof next === "string") return next;
   // Marked so closed replay trades are told apart from demo trades (journal, toasts).
@@ -195,6 +222,37 @@ function closeIn(kind: BookKind, id: string, reason: CloseReason): DemoTrade | n
 
 export function closeDemoPosition(id: string, reason: CloseReason = "manual"): DemoTrade | null {
   return closeIn(currentBook(), id, reason);
+}
+
+/** Closes `fraction` (0–1) of a position at the current price. */
+export function closeDemoPart(id: string, fraction: number): DemoTrade | null {
+  const kind = currentBook();
+  const book = readBook(kind);
+  const p = book.account.positions.find((x) => x.id === id);
+  const price = p && book.prices[p.symbol];
+  if (!p || !price) return null;
+  const r = closePartial(book.account, id, fraction, price, book.now);
+  if (!r) return null;
+  writeAccount(kind, r.account);
+  afterClose([r.trade], false);
+  return r.trade;
+}
+
+export function cancelOrder(id: string) {
+  const kind = currentBook();
+  writeAccount(kind, cancelPendingOrder(readBook(kind).account, id));
+}
+
+/** Moves a waiting order to `price`; returns an error text or null. */
+export function moveOrder(id: string, price: number, slot = activeChart().slot): string | null {
+  const kind = bookOf(slot);
+  const book = readBook(kind);
+  const o = (book.account.orders ?? []).find((x) => x.id === id);
+  if (!o) return "Order nicht gefunden";
+  const next = movePendingOrder(book.account, id, price, book.prices[o.symbol]);
+  if (typeof next === "string") return next;
+  writeAccount(kind, next);
+  return null;
 }
 
 /** Closes every position that has a price; returns how many were closed. */
@@ -261,8 +319,10 @@ export function addToJournal(trades: DemoTrade[]): number {
 export function updatePrice(symbol: string, price: number) {
   if (!(price > 0) || state.prices[symbol] === price) return;
   const prices = { ...state.prices, [symbol]: price };
-  const { account, closed } = applyPrice(state.account, symbol, price, Date.now());
-  set(closed.length ? { prices, account } : { prices });
+  const before = state.account;
+  const { account, closed, filled, rejected } = applyPrice(before, symbol, price, Date.now(), prices);
+  set(account !== before ? { prices, account } : { prices });
+  afterOrders(before, filled, rejected);
   afterClose(closed, true);
 }
 
@@ -302,6 +362,7 @@ function syncReplay(slot: number, s: ChartState) {
     const closed: DemoTrade[] = [];
     for (const price of barPath(part)) {
       const res = applyPrice(account, book.symbol, price, part.time * 1000);
+      afterOrders(account, res.filled, res.rejected);
       account = res.account;
       closed.push(...res.closed);
     }
@@ -320,6 +381,7 @@ function syncReplay(slot: number, s: ChartState) {
     if (bar.time <= book.lastBar) continue;
     for (const price of barPath(bar)) {
       const res = applyPrice(account, book.symbol, price, bar.time * 1000);
+      afterOrders(account, res.filled, res.rejected);
       account = res.account;
       closed.push(...res.closed);
     }
@@ -404,6 +466,7 @@ function parseDragId(dragId: string): { id: string; handle: LevelHandle } | null
 
 /** Saves the level of a dragged line (stop, target, or a new one pulled from the entry line). Returns an error text or null. */
 export function dropLevel(dragId: string, price: number, slot: number): string | null {
+  if (dragId.startsWith(ORDER_DRAG)) return moveOrder(dragId.slice(ORDER_DRAG.length), price, slot);
   const kind = bookOf(slot);
   const d = parseDragId(dragId);
   const p = d && readBook(kind).account.positions.find((x) => x.id === d.id);
@@ -412,12 +475,24 @@ export function dropLevel(dragId: string, price: number, slot: number): string |
   return setLevelsIn(kind, p.id, { stop, target });
 }
 
-/** Price lines for the open positions of a symbol in the chart `slot` (empty when lines are switched off). */
+const ORDER_DRAG = "order:";
+
+/** Price lines for the open positions and waiting orders of a symbol in the chart `slot` (empty when lines are switched off). */
 export function tradeLinesFor(symbol: string, slot: number, draft?: LineDraft | null): TradeLine[] {
   if (!state.settings.showLines) return [];
   const d = draft ? parseDragId(draft.dragId) : null;
   const replay = bookOf(slot) === "replay";
-  return readBook(bookOf(slot)).account.positions
+  const account = readBook(bookOf(slot)).account;
+  const orderLines: TradeLine[] = (account.orders ?? [])
+    .filter((o) => o.symbol === symbol)
+    .map((o) => ({
+      price: draft?.dragId === ORDER_DRAG + o.id ? draft.price : o.price,
+      color: o.side === "long" ? "#2962ff" : "#ff9800",
+      title: `${o.side === "long" ? "Buy" : "Sell"} ${o.type === "limit" ? "Limit" : "Stop"} ${qtyText(o.qty)}`,
+      dashed: true,
+      drag: ORDER_DRAG + o.id,
+    }));
+  return orderLines.concat(account.positions
     .filter((p) => p.symbol === symbol)
     .flatMap((pos) => {
       let p = pos;
@@ -443,5 +518,5 @@ export function tradeLinesFor(symbol: string, slot: number, draft?: LineDraft | 
       const liq = p.leverage > 1 ? liquidationPrice(p) : null;
       if (liq !== null) lines.push({ price: liq, color: "#f5c518", title: "Liq", dashed: true });
       return lines;
-    });
+    }));
 }

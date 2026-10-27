@@ -21,11 +21,37 @@ export function DemoButton({ active, onClick }: { active: boolean; onClick: () =
 }
 
 function Toast({ event, onOpen }: { event: DemoEvent; onOpen: () => void }) {
-  const t = event.trade;
   useEffect(() => {
     const timer = setTimeout(() => dismissEvent(event.id), 8000);
     return () => clearTimeout(timer);
   }, [event.id]);
+  const open = () => {
+    dismissEvent(event.id);
+    onOpen();
+  };
+  if ("fill" in event) {
+    const o = event.order;
+    return (
+      <div className="demo-toast up" onClick={open}>
+        <span>✅</span>
+        <span>
+          <strong>{o ? `${o.side === "long" ? "Buy" : "Sell"} ${o.type === "limit" ? "Limit" : "Stop"} ausgeführt` : "Order ausgeführt"}</strong> {event.fill.symbol} @{" "}
+          {+event.fill.entry.toPrecision(6)}
+        </span>
+      </div>
+    );
+  }
+  if ("rejected" in event) {
+    return (
+      <div className="demo-toast down" onClick={open}>
+        <span>⚠️</span>
+        <span>
+          <strong>Order verworfen</strong> {event.rejected.symbol}: {event.reason}
+        </span>
+      </div>
+    );
+  }
+  const t = event.trade;
   return (
     <div
       className={`demo-toast ${t.pnl >= 0 ? "up" : "down"}`}
