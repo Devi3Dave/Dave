@@ -134,6 +134,95 @@ textarea {
   color: var(--accent);
 }
 
+.version-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 2px 8px 8px;
+  font-size: 13px;
+}
+
+.version-info .muted {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.version-row .vh-version {
+  min-width: 44px;
+}
+
+.version-row-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------- version history ---------- */
+
+.version-modal {
+  height: 80vh;
+  height: 80dvh;
+}
+
+.vh-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.vh-release {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  padding: 10px 4px;
+  border-bottom: 1px solid var(--border);
+}
+
+.vh-release.current {
+  border-left: 3px solid var(--accent);
+  padding-left: 8px;
+}
+
+.vh-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+}
+
+.vh-version {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+}
+
+.vh-title {
+  font-weight: 600;
+  flex: 1 1 200px;
+}
+
+.vh-badge {
+  font-size: 11px;
+  padding: 0 6px;
+  border-radius: 8px;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+}
+
+.vh-date {
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.vh-release ul {
+  margin: 6px 0 0;
+  padding-left: 20px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+
 .symbol-picker {
   display: flex;
   gap: 4px;
@@ -1070,7 +1159,7 @@ textarea {
 }
 
 /* Title, search and buttons keep their size, only the list in between shrinks. */
-.modal > :not(.indicator-list, .settings-body) {
+.modal > :not(.indicator-list, .settings-body, .vh-list) {
   flex-shrink: 0;
 }
 
