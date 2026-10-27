@@ -166,6 +166,8 @@ export class ChartEngine {
   onVisibleTime: (from: number, to: number) => void = () => {};
   /** Set while another chart moves this one, so the change is not sent back. */
   private syncing = false;
+  /** The crosshair shows another chart's position: only its vertical line, as in TradingView. */
+  private foreignCrosshair = false;
 
   constructor(container: HTMLElement) {
     this.chart = createChart(container, {
@@ -273,6 +275,8 @@ export class ChartEngine {
       container.setPointerCapture(ev.pointerId);
       this.onDrag("start", e);
     });
+    // The user's own pointer gets the full crosshair back.
+    container.addEventListener("pointerenter", () => this.setForeignCrosshair(false));
     container.addEventListener("pointermove", (ev) => {
       if (press && Math.hypot(ev.clientX - press.x, ev.clientY - press.y) > 10) cancelPress();
       if (drawingDrag) {
@@ -1081,10 +1085,21 @@ export class ChartEngine {
     try {
       const i = time === null ? -1 : barIndexAt(this.bars, time);
       if (i < 0) this.chart.clearCrosshairPosition();
-      else this.chart.setCrosshairPosition(this.bars[i].close, this.bars[i].time as UTCTimestamp, this.main);
+      else {
+        // Without the horizontal line: placed at each candle's close it jumped up and down while
+        // the pointer moved straight across the other chart.
+        this.setForeignCrosshair(true);
+        this.chart.setCrosshairPosition(this.bars[i].close, this.bars[i].time as UTCTimestamp, this.main);
+      }
     } finally {
       this.syncing = false;
     }
+  }
+
+  private setForeignCrosshair(on: boolean) {
+    if (this.destroyed || this.foreignCrosshair === on) return;
+    this.foreignCrosshair = on;
+    this.chart.applyOptions({ crosshair: { horzLine: { visible: !on, labelVisible: !on } } });
   }
 
   /** Scrolls and zooms to the same time range as another chart. */

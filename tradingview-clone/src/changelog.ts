@@ -14,6 +14,16 @@ export interface Release {
  */
 export const CHANGELOG: Release[] = [
   {
+    version: "0.50.1",
+    date: "2026-10-27",
+    title: "Ruhiges Fadenkreuz in Nachbarcharts",
+    changes: [
+      "Fadenkreuz-Sync: In den anderen Charts erscheint nur noch die senkrechte Zeitlinie, wie bei TradingView",
+      "Die waagrechte Linie und das Preisschild sprangen dort bisher bei jeder Kerze auf deren Schlusskurs und zappelten",
+      "Sobald der Zeiger in einen Chart kommt, hat er dort wieder das volle Fadenkreuz",
+    ],
+  },
+  {
     version: "0.50.0",
     date: "2026-10-27",
     title: "Risiko-Rechner",
