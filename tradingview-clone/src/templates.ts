@@ -181,7 +181,8 @@ export function snapshotOf(chart: ChartStore, opts: { symbol: boolean; interval:
     ...(opts.interval ? { interval: s.interval } : {}),
     chartType: s.chartType,
     indicators: s.indicators.map(({ type, params, colors, hidden }) => ({ type, params, ...(colors ? { colors } : {}), ...(hidden ? { hidden } : {}) })),
-    ...(opts.drawings ? { drawings: s.drawings, markers: s.markers } : {}),
+    // Strategy tester arrows are only shown while its panel is open.
+    ...(opts.drawings ? { drawings: s.drawings, markers: s.markers.filter((m) => !m.id.startsWith("strategy-")) } : {}),
   };
 }
 

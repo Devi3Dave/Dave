@@ -239,6 +239,17 @@ Zeichnungen des aktiven Charts (oberste zuerst). Zeichnungen lassen sich dort au
 schieben, sperren, ein-/ausblenden und löschen, Indikatoren ausblenden, entfernen und einstellen. Das
 Datenfenster zeigt Datum, OHLC, Veränderung, Volumen und alle Indikatorwerte unter dem Fadenkreuz.
 
+**Strategietester (📊 Strategie in der Seitenleiste)**
+Fertige Strategien nach TradingViews eingebauten Strategie-Skripten auf den geladenen Kerzen des aktiven
+Charts: MA-Kreuzung („MovingAvg2Line Cross“), RSI-Strategie, MACD-Strategie, Bollinger-Bänder-Strategie
+(Stop-Orders an den Bändern), Supertrend-Strategie und Kanalausbruch („ChannelBreakOutStrategy“, Stop-Orders
+am Hoch/Tief der letzten n Kerzen). Wie TradingViews Broker-Emulator: Signal auf dem Schluss, Ausführung zur
+Eröffnung der nächsten Kerze, ein Gegensignal dreht die Position. Einstellbar sind die Parameter, Startkapital,
+Ordergröße in % vom Kapital, Kommission je Seite und Richtung (Long und Short, nur Long, nur Short).
+Angezeigt werden Equity-Kurve, die Übersicht (Nettogewinn, Brutto, Profit-Faktor, max. Drawdown, Buy & Hold,
+Trefferquote, Ø Trade, Ø Gewinn/Verlust, größter Gewinn/Verlust, Ø Kerzen, offener Gewinn, Kommission), die
+Trade-Liste und Ein-/Ausstiegspfeile im Chart. Claude testet mit `backtest_strategy`.
+
 **Gehe zu Datum (📅 unten am Chart oder `Alt+G`)**
 Springt zur Kerze, die das Datum (bei Intraday auch die Uhrzeit, in der Zeitzone des Charts) enthält, und
 zeigt dort das Fadenkreuz. Liegt das Datum vor den geladenen Kerzen, sagt der Dialog, ab wann Daten da sind.

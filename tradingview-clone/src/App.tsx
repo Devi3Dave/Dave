@@ -132,6 +132,11 @@ export default function App() {
       setClaudeOpen(true);
       setSideTab("objects");
     },
+    "panel.strategy": () => {
+      closePages();
+      setClaudeOpen(true);
+      setSideTab("strategy");
+    },
     "dialog.indicators": () => setShowIndicators(true),
     "dialog.settings": () => setShowSettings(true),
     "dialog.shortcuts": () => setShortcutsOpen((o) => !o),
