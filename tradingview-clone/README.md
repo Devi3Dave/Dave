@@ -152,6 +152,12 @@ und zusammen mit der Fill & Sign-App auf GitHub Pages veröffentlicht.
 - Vorlagen (▤ Vorlagen): fertige Setups Nur Chart (ohne Indikatoren), Scalping, Daytrading, Swing, Krypto-Zyklus und
   Smart Money, Mustererkennung; eigene Vorlagen aus dem aktiven Chart speichern (Indikatoren mit Parametern/Farben,
   optional Zeiteinheit, Symbol und Zeichnungen) und ganze Arbeitsbereiche (Layout mit allen Charts)
+- Benannte Chart-Layouts wie bei TradingView (💾 in der Kopfzeile): das aktuelle Layout hat einen Namen, `⌘S` /
+  `Strg+S` speichert es (beim ersten Mal mit Namen), „Kopie speichern unter“, „Umbenennen“, „Neues Layout“
+  (ein Chart, nur Volumen) und die Liste aller gespeicherten Layouts zum Öffnen oder Löschen. Mit
+  „Automatisch speichern“ wird jede Änderung nach 1,5 s ins Layout geschrieben, sonst zeigt ● ungespeicherte
+  Änderungen. Gespeichert werden alle Charts mit Symbol, Zeiteinheit, Charttyp, Indikatoren, Zeichnungen und
+  Synchronisierung; die Layouts erscheinen auch unter Vorlagen → Arbeitsbereiche
 - Versionsnummer neben dem Logo; sie zeigt „Update“, sobald eine neuere Version online ist –
   Antippen lädt sie
 

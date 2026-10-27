@@ -4283,3 +4283,39 @@ select,
 .goto-form .modal-actions {
   margin: 0 -16px;
 }
+
+/* ---------------- Saved chart layouts ---------------- */
+
+.layout-name-text {
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: inline-block;
+  vertical-align: bottom;
+}
+
+.layout-dirty {
+  margin-left: 4px;
+  color: #f7c948;
+  font-size: 10px;
+}
+
+.menu-keys {
+  float: right;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.layout-search {
+  width: 100%;
+  margin: 2px 0 6px;
+}
+
+.menu-item.template-item.active .template-name {
+  color: var(--accent);
+}
+
+.hint.error {
+  color: var(--down);
+}

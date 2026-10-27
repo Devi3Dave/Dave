@@ -14,6 +14,7 @@ import { MAX_COMPARE } from "../../shared/compare";
 import { Menu } from "./Menu";
 import { shortcutLabel, useShortcutOverrides, useShortcuts } from "../shortcuts";
 import { TemplatesMenu } from "./TemplatesMenu";
+import { SavedLayoutMenu } from "./LayoutMenu";
 
 const SPECIAL_LABELS: Record<string, string> = {
   "1M": "1 Monat",
@@ -381,6 +382,7 @@ export function TopBar({ onOpenIndicators, onOpenSettings, onOpenShortcuts, heat
         <span className="pill-label"> Replay</span>
       </button>
       <FavoritesMenu />
+      <SavedLayoutMenu />
       <TemplatesMenu />
       <LayoutMenu />
       <button className="pill" onClick={onOpenShortcuts} aria-label="Tastenkürzel" data-tip={`Tastenkürzel${keys("dialog.shortcuts")}\nAlle Kürzel nachschlagen, ändern und neu belegen`}>
