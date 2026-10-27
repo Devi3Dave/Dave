@@ -4527,3 +4527,149 @@ select,
   color: var(--muted);
   margin-top: 2px;
 }
+
+/* ---------- notes panel ---------- */
+.notes-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  height: 100%;
+  min-height: 0;
+  padding: 10px 12px 12px;
+}
+
+.notes-scope {
+  align-self: flex-start;
+}
+
+.notes-new textarea,
+.note-edit textarea {
+  width: 100%;
+  resize: vertical;
+  min-height: 64px;
+  font: inherit;
+}
+
+.notes-new-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.notes-new-bar label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.notes-panel .primary {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+.notes-panel .primary:disabled {
+  opacity: 0.5;
+}
+
+.notes-search {
+  width: 100%;
+}
+
+.notes-list {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.notes-empty {
+  padding: 16px 4px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.note-card {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 10px;
+  background: var(--panel);
+}
+
+.note-card.pinned {
+  border-color: rgba(41, 98, 255, 0.6);
+}
+
+.note-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.note-title {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  font-weight: 600;
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.note-actions {
+  display: flex;
+  gap: 2px;
+}
+
+.note-actions button {
+  background: none;
+  border: none;
+  padding: 2px 5px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.note-actions button:hover {
+  color: var(--text);
+}
+
+.note-body {
+  margin-top: 6px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+}
+
+.note-edit {
+  margin-top: 6px;
+}
+
+.note-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.note-tag {
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: var(--panel-2);
+  border: none;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.note-tag.link {
+  color: var(--accent);
+}

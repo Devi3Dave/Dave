@@ -311,6 +311,21 @@ export const toolSchemas = {
     description: "Löscht einen Alarm per ID.",
     schema: z.object({ id: z.string() }),
   },
+  add_note: {
+    description:
+      "Speichert eine Notiz im Notizen-Panel des Nutzers (erste Zeile = Titel), z. B. ein Setup oder ein Analyse-Fazit. Standard: zum Symbol des aktiven Charts; general=true für eine Notiz ohne Symbol. Nur speichern, wenn der Nutzer darum bittet.",
+    schema: z.object({
+      text: z.string().min(1).max(5000),
+      general: z.boolean().optional(),
+    }),
+  },
+  list_notes: {
+    description: "Liest die Notizen des Nutzers: zum aktiven Symbol (plus allgemeine) oder alle, optional nach Suchbegriff gefiltert.",
+    schema: z.object({
+      all_symbols: z.boolean().optional(),
+      query: z.string().optional(),
+    }),
+  },
   take_screenshot: {
     description: "Macht ein Bild des aktuellen Charts inkl. Indikatoren und Zeichnungen, um das Ergebnis visuell zu prüfen.",
     schema: z.object({}),
