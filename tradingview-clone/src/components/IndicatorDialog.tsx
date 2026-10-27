@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { INDICATORS, SOURCE_INDICATORS, getIndicator, indicatorLabel, resolveParams, type IndicatorCategory, type IndicatorDef } from "../../shared/indicators";
+import { REFERENCE_KIND_LABEL, REFERENCE_KIND_TIP, indicatorReference } from "../../shared/indicatorReferences";
 import { toggleFavorite, useFavorites } from "../favorites";
 import { addIndicator, updateIndicator, useChartState } from "../store";
 
@@ -9,7 +10,7 @@ export function IndicatorDialog({ onClose }: { onClose: () => void }) {
   const [query, setQuery] = useState("");
   const filtered = useMemo(() => {
     const q = query.toLowerCase();
-    return INDICATORS.filter((d) => !q || d.name.toLowerCase().includes(q) || d.id.includes(q) || d.description.toLowerCase().includes(q));
+    return INDICATORS.filter((d) => !q || d.name.toLowerCase().includes(q) || d.id.includes(q) || d.description.toLowerCase().includes(q) || !!indicatorReference(d.id)?.source.toLowerCase().includes(q));
   }, [query]);
   const favorites = useFavorites();
   const favoriteDefs = favorites.map((id) => filtered.find((d) => d.id === id)).filter((d): d is IndicatorDef => !!d);
@@ -27,6 +28,7 @@ export function IndicatorDialog({ onClose }: { onClose: () => void }) {
         >
           <strong>{d.name}</strong>
           <span>{d.description}</span>
+          <Reference id={d.id} />
           <em>{d.overlay ? "Overlay" : "Panel"}</em>
         </button>
         <button
@@ -146,7 +148,22 @@ export function IndicatorSettings({ id, onClose }: { id: string; onClose: () => 
           ))}
         </div>
         <p className="hint">{def.description}</p>
+        <Reference id={def.id} />
       </div>
     </div>
+  );
+}
+
+/** "Quelle: …" line with a badge saying how the formula is backed (TA-Lib checked, original, approximation …). */
+function Reference({ id }: { id: string }) {
+  const ref = indicatorReference(id);
+  if (!ref) return null;
+  return (
+    <small className="indicator-source">
+      <b className={`ref-${ref.kind}`} data-tip={REFERENCE_KIND_TIP[ref.kind]}>
+        {REFERENCE_KIND_LABEL[ref.kind]}
+      </b>{" "}
+      Quelle: {ref.source}
+    </small>
   );
 }
