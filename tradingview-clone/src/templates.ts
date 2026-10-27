@@ -32,7 +32,7 @@ export interface Template {
   builtin?: boolean;
   description?: string;
   chart?: ChartSnapshot;
-  workspace?: { layout: LayoutId; syncInterval: boolean; syncSymbol?: boolean; charts: ChartSnapshot[] };
+  workspace?: { layout: LayoutId; syncInterval: boolean; syncSymbol?: boolean; syncCrosshair?: boolean; syncTime?: boolean; charts: ChartSnapshot[] };
   savedAt?: number;
 }
 
@@ -216,19 +216,56 @@ export async function applyTemplate(t: Template, target: ChartStore) {
     const w = t.workspace;
     const symbol = target.get().symbol;
     setLayout(w.layout);
-    workspace.set({ syncInterval: w.syncInterval, ...(w.syncSymbol !== undefined ? { syncSymbol: w.syncSymbol } : {}), active: 0 });
+    workspace.set({
+      syncInterval: w.syncInterval,
+      ...(w.syncSymbol !== undefined ? { syncSymbol: w.syncSymbol } : {}),
+      ...(w.syncCrosshair !== undefined ? { syncCrosshair: w.syncCrosshair } : {}),
+      ...(w.syncTime !== undefined ? { syncTime: w.syncTime } : {}),
+      active: 0,
+    });
     await Promise.all(w.charts.slice(0, layoutCount(w.layout)).map((snap, i) => applySnapshot(charts[i], { ...snap, symbol: snap.symbol ?? symbol })));
   }
 }
 
-export function saveWorkspace(name: string): Template {
+/** The whole layout as it is now: every visible chart with symbol, interval, indicators and drawings. */
+export function workspaceSnapshot(): NonNullable<Template["workspace"]> {
   const w = workspace.get();
   const count = layoutCount(w.layout);
-  return saveTemplate({
-    name,
-    kind: "workspace",
-    workspace: { layout: w.layout, syncInterval: w.syncInterval, charts: charts.slice(0, count).map((c) => snapshotOf(c, { symbol: true, interval: true, drawings: true })) },
-  });
+  return {
+    layout: w.layout,
+    syncInterval: w.syncInterval,
+    syncSymbol: w.syncSymbol,
+    syncCrosshair: w.syncCrosshair,
+    syncTime: w.syncTime,
+    charts: charts.slice(0, count).map((c) => snapshotOf(c, { symbol: true, interval: true, drawings: true })),
+  };
+}
+
+export function saveWorkspace(name: string): Template {
+  return saveTemplate({ name, kind: "workspace", workspace: workspaceSnapshot() });
+}
+
+/** Overwrites the saved workspace `id` with the current layout (keeps its name); null when it is gone. */
+export function overwriteWorkspace(id: string): Template | null {
+  const t = saved.find((x) => x.id === id && x.kind === "workspace");
+  if (!t) return null;
+  const full: Template = { ...t, workspace: workspaceSnapshot(), savedAt: Date.now() };
+  saved = saved.map((x) => (x.id === id ? full : x));
+  persist();
+  return full;
+}
+
+/** Renames a saved template; false when another one of the same kind already has the name. */
+export function renameTemplate(id: string, name: string): boolean {
+  const t = saved.find((x) => x.id === id);
+  if (!t || saved.some((x) => x.id !== id && x.kind === t.kind && x.name.toLowerCase() === name.toLowerCase())) return false;
+  saved = saved.map((x) => (x.id === id ? { ...x, name } : x));
+  persist();
+  return true;
+}
+
+export function findTemplate(id: string): Template | undefined {
+  return saved.find((t) => t.id === id);
 }
 
 export function describeTemplate(t: Template): string {

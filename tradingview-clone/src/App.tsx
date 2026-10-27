@@ -16,6 +16,8 @@ import { SidePanel, type SideTab } from "./components/SidePanel";
 import { TooltipLayer } from "./components/Tooltip";
 import { ShortcutsDialog } from "./components/ShortcutsDialog";
 import { GoToDateDialog, OPEN_GOTO_EVENT } from "./components/GoToDateDialog";
+import { OPEN_SAVE_LAYOUT_EVENT } from "./components/LayoutMenu";
+import { saveLayout, startLayoutWatch } from "./layouts";
 import { TopBar } from "./components/TopBar";
 import { isCryptoSymbol } from "../shared/marketData";
 import { OPEN_ALERTS_EVENT, startAlertFeed } from "./alerts";
@@ -37,6 +39,7 @@ export default function App() {
   const [magnet, setMagnet] = useState(true);
   const [sideTab, setSideTab] = useState<SideTab>("claude");
   const [gotoOpen, setGotoOpen] = useState(false);
+  useEffect(() => startLayoutWatch(), []);
   useEffect(() => {
     const open = () => setGotoOpen(true);
     window.addEventListener(OPEN_GOTO_EVENT, open);
@@ -107,6 +110,9 @@ export default function App() {
     "drawings.toggleHidden": () => toggleAllDrawingsHidden(activeChart()),
     "chart.reset": () => getEngine()?.resetView(),
     "chart.goto": () => setGotoOpen(true),
+    "layout.save": () => {
+      if (!saveLayout()) window.dispatchEvent(new Event(OPEN_SAVE_LAYOUT_EVENT));
+    },
     "chart.scrollLeft": () => shiftView(-1),
     "chart.scrollRight": () => shiftView(1),
     "chart.zoomIn": () => shiftView(0, 0.8),

@@ -74,6 +74,7 @@ export const SHORTCUT_ACTIONS: ShortcutAction[] = [
   { id: "scale.percent", label: "Prozent-Skala an/aus", group: "Preisskala", defaults: ["Alt+KeyP"], tv: true },
   { id: "scale.invert", label: "Skala invertieren", group: "Preisskala", defaults: ["Alt+KeyI"], tv: true },
   { id: "panel.alerts", label: "Alarme", group: "Fenster", defaults: ["Alt+KeyA"], tv: true },
+  { id: "layout.save", label: "Layout speichern", group: "Fenster", defaults: ["Mod+KeyS"] },
   { id: "dialog.search", label: "Asset-Suche", group: "Fenster", defaults: ["Mod+KeyK"], tv: true },
   { id: "dialog.indicators", label: "Indikatoren", group: "Fenster", defaults: ["/"], tv: true },
   { id: "dialog.shortcuts", label: "Tastenkürzel (diese Liste)", group: "Fenster", defaults: ["Mod+/"], tv: true },
