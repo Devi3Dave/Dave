@@ -12,6 +12,7 @@ import { getSelectedExchanges, subscribeExchanges } from "../exchangeSelection";
 import { liquidationFeed } from "../market/liquidationFeed";
 import { DEFAULT_FIBEXT_LEVELS, DEFAULT_FIB_LEVELS, formatPrice } from "../chart/DrawingsPrimitive";
 import { placeOnSide } from "../../shared/position";
+import { SHAPES, isShapeKind, shapeDef } from "../../shared/drawingShapes";
 import { activeChart, addDrawing, newId, pickReplayStart, removeIndicator, removeCompare, stepBackReplay, stepReplay, updateIndicator, updateSettings, useChart, workspace, type ChartStore, type Drawing, type Point } from "../store";
 import { cloneInPlace, copyDrawing, deleteDrawing, pasteDrawing, redoDrawings, replaceDrawing, selectDrawing, selectedDrawing, trackHistory, undoDrawings, useSelectedDrawing } from "../drawingEdit";
 import { useShortcuts } from "../shortcuts";
@@ -30,7 +31,16 @@ interface Props {
 }
 
 /** Clicks needed per multi-point tool. */
-const POINT_COUNT: Record<string, number> = { trendline: 2, ray: 2, zone: 2, fib: 2, measure: 2, fibext: 3, channel: 3 };
+const POINT_COUNT: Record<string, number> = {
+  trendline: 2,
+  ray: 2,
+  zone: 2,
+  fib: 2,
+  measure: 2,
+  fibext: 3,
+  channel: 3,
+  ...Object.fromEntries(SHAPES.map((s) => [s.id, s.points])),
+};
 
 /** Step hints for tools that need more than the obvious two taps. */
 const STEP_HINTS: Record<string, string[]> = {
@@ -38,6 +48,7 @@ const STEP_HINTS: Record<string, string[]> = {
   channel: ["Start der Kanallinie antippen", "Ende der Kanallinie antippen", "Breite des Kanals antippen"],
   measure: ["Startpunkt antippen", "Endpunkt antippen"],
   brush: ["Mit gedrücktem Finger / gedrückter Maus zeichnen"],
+  ...Object.fromEntries(SHAPES.filter((s) => s.points > 1).map((s) => [s.id, s.hints])),
 };
 const POSITION_TOOLS = new Set(["long", "short"]);
 
@@ -76,6 +87,10 @@ function makeDrawing(tool: string, pts: Point[]): Drawing | null {
   const base = { id: newId("user"), author: "user" as const };
   const a = pts[0];
   const b = pts[1] ?? a;
+  if (isShapeKind(tool)) {
+    const def = shapeDef(tool);
+    return { ...base, kind: "shape", shape: tool, points: pts.slice(0, def.points), color: def.color };
+  }
   switch (tool) {
     case "fibext":
       return { ...base, kind: "fibext", a, b, c: pts[2] ?? b, levels: DEFAULT_FIBEXT_LEVELS, color: "auto" };
@@ -379,6 +394,19 @@ export function ChartArea({ chart, onEngine, magnet, onEditIndicator, onEditPosi
           return;
         }
         const d = makeDrawing(currentTool, pendingRef.current);
+        if (d?.kind === "shape" && shapeDef(d.shape).text) {
+          // Callout, note and emoji ask for their text after the last tap.
+          const emoji = shapeDef(d.shape).text === "emoji";
+          const text = window.prompt(emoji ? "Emoji oder Symbol (z. B. ⭐ 🚀 ⚠️ ✅):" : "Text:", emoji ? "⭐" : "");
+          if (!text) {
+            pendingRef.current = [];
+            engine.drawings.setPreview(null);
+            setHint(null);
+            chart.set({ tool: "cursor" });
+            return;
+          }
+          d.text = text;
+        }
         if (d) done(d);
       }
     };

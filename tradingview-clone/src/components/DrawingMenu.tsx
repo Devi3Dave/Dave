@@ -50,9 +50,13 @@ const EXTENDS: { value: "none" | "right" | "left" | "both"; label: string }[] = 
 ];
 
 const hasColor = (d: Drawing) => d.kind !== "measure" && d.kind !== "position";
-const hasStyle = (d: Drawing) => d.kind === "trendline" || d.kind === "hline" || d.kind === "vline";
+/** Shapes drawn as lines get the line style and width buttons; labels and markers do not. */
+const LINE_SHAPES = new Set<string>(["hray", "crossline", "trendangle", "arrowline", "pitchfork", "schiff", "modschiff", "xabcd", "cypher", "abcd", "headshoulders", "trianglepattern", "threedrives", "elliott5", "elliottabc", "elliotttri", "elliottwxy", "avwap", "circle", "ellipse", "triangle"]);
+const hasStyle = (d: Drawing) => d.kind === "trendline" || d.kind === "hline" || d.kind === "vline" || (d.kind === "shape" && LINE_SHAPES.has(d.shape));
 const hasWidth = (d: Drawing) => hasStyle(d) || d.kind === "path";
-const hasLabel = (d: Drawing) => d.kind === "trendline" || d.kind === "hline" || d.kind === "vline" || d.kind === "zone" || d.kind === "channel";
+const hasLabel = (d: Drawing) => d.kind === "trendline" || d.kind === "hline" || d.kind === "vline" || d.kind === "zone" || d.kind === "channel" || (d.kind === "shape" && (d.shape === "hray" || d.shape === "avwap"));
+/** Shapes that keep levels in several colors can go back to the automatic palette. */
+const hasAutoColor = (d: Drawing) => d.kind === "fib" || d.kind === "fibext" || (d.kind === "shape" && ["fibchannel", "fibtimezone", "fibfan", "fibcircles", "fibarcs", "gannbox", "gannfan"].includes(d.shape));
 
 function Item({ icon, children, keys, onClick, danger, disabled }: { icon: string; children: ReactNode; keys?: string; onClick: () => void; danger?: boolean; disabled?: boolean }) {
   return (
@@ -121,7 +125,7 @@ export function DrawingMenu({ chart, target, onClose, onMove, onEditPosition }: 
 
       {hasColor(d) && !d.locked && (
         <div className="ctx-colors">
-          {(d.kind === "fib" || d.kind === "fibext") && (
+          {hasAutoColor(d) && (
             <button className={`ctx-swatch auto ${d.color === "auto" ? "active" : ""}`} data-tip="Automatische Farben je Level" aria-label="Automatische Farben" onClick={act(() => patch({ color: "auto" }), true)}>
               A
             </button>
@@ -200,15 +204,15 @@ export function DrawingMenu({ chart, target, onClose, onMove, onEditPosition }: 
           Einstellungen …
         </Item>
       )}
-      {d.kind === "text" && !d.locked && (
+      {(d.kind === "text" || (d.kind === "shape" && (d.shape === "callout" || d.shape === "note" || d.shape === "emoji" || d.shape === "arrowup" || d.shape === "arrowdown"))) && !d.locked && (
         <Item
           icon="✎"
           onClick={act(() => {
-            const text = window.prompt("Text:", d.text);
-            if (text) patch({ text } as Partial<Drawing>);
+            const text = window.prompt(d.kind === "shape" && d.shape === "emoji" ? "Emoji oder Symbol:" : "Text:", d.text ?? "");
+            if (text !== null && (text || d.kind === "shape")) patch({ text: text || undefined } as Partial<Drawing>);
           })}
         >
-          Text bearbeiten …
+          {d.kind === "shape" && (d.shape === "arrowup" || d.shape === "arrowdown") ? "Beschriftung …" : "Text bearbeiten …"}
         </Item>
       )}
       {hasLabel(d) && !d.locked && (

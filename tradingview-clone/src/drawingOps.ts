@@ -1,3 +1,4 @@
+import { shapeDef } from "../shared/drawingShapes";
 import type { Drawing, Point } from "./store";
 
 /** Name of a drawing as shown in the context menu. */
@@ -25,6 +26,8 @@ export function drawingName(d: Drawing): string {
       return "Pinsel";
     case "position":
       return d.side === "long" ? "Long-Position" : "Short-Position";
+    case "shape":
+      return shapeDef(d.shape).name;
   }
 }
 
@@ -54,6 +57,7 @@ export function shiftDrawing(d: Drawing, shiftTime: (t: number) => number, dPric
         to: d.to === undefined ? undefined : shiftTime(d.to),
       };
     case "path":
+    case "shape":
       return { ...d, points: d.points.map(p) };
     case "position":
       return { ...d, entry: d.entry + dPrice, stop: d.stop + dPrice, target: d.target + dPrice, from: shiftTime(d.from), to: shiftTime(d.to) };
@@ -62,7 +66,7 @@ export function shiftDrawing(d: Drawing, shiftTime: (t: number) => number, dPric
 
 /** Kinds whose anchor points (as drawn when selected) can be dragged one by one. */
 export function hasMovableAnchors(d: Drawing): boolean {
-  return d.kind === "trendline" || d.kind === "fib" || d.kind === "measure" || d.kind === "fibext" || d.kind === "channel";
+  return d.kind === "trendline" || d.kind === "fib" || d.kind === "measure" || d.kind === "fibext" || d.kind === "channel" || d.kind === "shape";
 }
 
 /** Moves one anchor point (index as in the drawn anchors) to `pt`; null when the drawing has no such anchor. */
@@ -77,6 +81,8 @@ export function moveAnchor(d: Drawing, index: number, pt: Point): Drawing | null
     case "channel":
       // The third anchor sits on the parallel line at the start time: it sets the width.
       return index === 0 ? { ...d, a: pt } : index === 1 ? { ...d, b: pt } : index === 2 ? { ...d, offset: pt.price - d.a.price } : null;
+    case "shape":
+      return index >= 0 && index < d.points.length ? { ...d, points: d.points.map((q, i) => (i === index ? pt : q)) } : null;
     default:
       return null;
   }

@@ -5,6 +5,7 @@ import { z } from "zod";
 import { INDICATOR_IDS } from "./indicators.js";
 import { MAX_COMPARE } from "./compare.js";
 import { isValidInterval } from "./marketData.js";
+import { SHAPES, SHAPE_KINDS } from "./drawingShapes.js";
 
 /** Preset time frames (menu); any other like 7m, 90s, 2d works too (see parseInterval). */
 export const INTERVALS = ["1s", "5s", "15s", "30s", "1m", "3m", "5m", "15m", "30m", "45m", "1h", "2h", "3h", "4h", "6h", "8h", "12h", "1d", "3d", "1w", "1M", "3M", "1y", "all"] as const;
@@ -190,6 +191,19 @@ export const toolSchemas = {
   draw_parallel_channel: {
     description: "Zeichnet einen parallelen Kanal: Basislinie start→end und eine parallele Linie durch den Preis width_point (z. B. gegenüberliegendes Swing-Hoch/-Tief).",
     schema: z.object({ start: point, end: point, width_point: point, color: color.optional(), label: z.string().optional() }),
+  },
+  draw_shape: {
+    description:
+      "Zeichnet eines der weiteren TradingView-Zeichenwerkzeuge aus Punkten in Tipp-Reihenfolge. Werkzeuge und Punktzahl: " +
+      SHAPES.map((s) => `${s.id} (${s.name}, ${s.points} Punkt${s.points > 1 ? "e" : ""}: ${s.hints.map((h) => h.replace(/ antippen$/, "")).join(", ")})`).join("; ") +
+      ".",
+    schema: z.object({
+      shape: z.enum(SHAPE_KINDS),
+      points: z.array(point).min(1).max(7),
+      text: z.string().optional().describe("Text für callout, note, emoji und Pfeile"),
+      color: color.optional(),
+      label: z.string().optional(),
+    }),
   },
   get_order_blocks: {
     description:

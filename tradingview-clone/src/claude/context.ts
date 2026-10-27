@@ -2,6 +2,8 @@ import { computeInstances, indicatorLabel } from "../../shared/indicators";
 import type { Bar } from "../../shared/math";
 import type { ChartEngine } from "../chart/ChartEngine";
 import { positionStats } from "../../shared/position";
+import { shapeDef } from "../../shared/drawingShapes";
+import { describeShapeValues } from "../chart/ShapeRenderer";
 import { resolveTimeZone } from "../chartSettings";
 import { charts, layoutCount, workspace, type ChartState, type Drawing } from "../store";
 
@@ -36,6 +38,10 @@ export function describeDrawing(d: Drawing, bars: Bar[] = []): string {
       return `${tag} Messung ${p(d.a)} -> ${p(d.b)} (${(((d.b.price - d.a.price) / d.a.price) * 100).toFixed(2)} %)`;
     case "path":
       return `${tag} Freihandzeichnung (${d.points.length} Punkte, ${num(Math.min(...d.points.map((q) => q.price)))}–${num(Math.max(...d.points.map((q) => q.price)))})`;
+    case "shape": {
+      const extra = describeShapeValues(d, bars);
+      return `${tag} ${shapeDef(d.shape).name} ${d.points.map(p).join(" -> ")}${d.text ? ` Text "${d.text}"` : ""}${extra ? ` (${extra})` : ""}`;
+    }
     case "position": {
       const st = positionStats(d, bars);
       return `${tag} ${d.side === "long" ? "Long" : "Short"}-Position Einstieg ${num(d.entry)}, Stop ${num(d.stop)}, Ziel ${num(d.target)} (${iso(d.from)} bis ${iso(d.to)}), CRV ${st.rr.toFixed(2)}, Konto ${num(d.account)}, Risiko ${num(d.risk)} %, Hebel ${num(d.leverage)}×, Menge ${num(st.qty)}, Status ${st.status}, PnL ${num(st.pnl)}`;

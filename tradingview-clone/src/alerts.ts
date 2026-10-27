@@ -249,6 +249,7 @@ export function targetOf(d: Drawing): Alert["target"] | null {
   if (d.kind === "hline") return { kind: "value", value: d.price };
   if (d.kind === "trendline") return { kind: "line", a: d.a, b: d.b };
   if (d.kind === "zone") return { kind: "channel", top: d.top, bottom: d.bottom };
+  if (d.kind === "shape" && d.shape === "hray") return { kind: "value", value: d.points[0].price };
   return null;
 }
 

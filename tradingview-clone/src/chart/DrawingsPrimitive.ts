@@ -13,6 +13,7 @@ import type {
 import type { Bar } from "../../shared/math";
 import { positionStats } from "../../shared/position";
 import type { Drawing, LineStyleName, Point } from "../store";
+import { drawShape, shapeGeometry } from "./ShapeRenderer";
 
 export const DEFAULT_FIB_LEVELS = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1, 1.618];
 // TradingView "Trend-Based Fib Extension" levels up to 3.618 (golden-ratio multiples 1.618 / 2.618 / 3.618).
@@ -44,7 +45,7 @@ export class DrawingsPrimitive implements ISeriesPrimitive<Time> {
   private series: ISeriesApi<SeriesType> | null = null;
   private requestUpdate: (() => void) | null = null;
   private drawings: Drawing[] = [];
-  private bars: Bar[] = [];
+  bars: Bar[] = [];
   private preview: Drawing | null = null;
   private selected: string | null = null;
   /** Drawn in place of the stored drawing with the same id (while it is dragged), or on top if new. */
@@ -229,6 +230,8 @@ export class DrawingsPrimitive implements ISeriesPrimitive<Time> {
         for (let i = 1; i < pts.length; i++) g.segments.push({ x1: pts[i - 1].x, y1: pts[i - 1].y, x2: pts[i].x, y2: pts[i].y });
         break;
       }
+      case "shape":
+        return shapeGeometry(d, this, width, height);
       case "position": {
         const x1 = this.timeToX(d.from);
         const x2 = this.timeToX(d.to);
@@ -443,6 +446,10 @@ export class DrawingsPrimitive implements ISeriesPrimitive<Time> {
       }
       case "position":
         this.drawPosition(ctx, d, g, preview);
+        break;
+      case "shape":
+        drawShape(ctx, d, this, width, height, { line, label, withAlpha, formatPrice, formatDuration });
+        ctx.font = "11px -apple-system, BlinkMacSystemFont, 'Trebuchet MS', Roboto, sans-serif";
         break;
     }
     if (!preview || d.kind === "text" || d.kind === "position") return;
