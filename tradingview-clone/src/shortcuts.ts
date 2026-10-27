@@ -1,5 +1,5 @@
 import { useEffect, useRef, useSyncExternalStore } from "react";
-import { findAction, formatCombo, parseOverrides, resolveBindings, type ShortcutOverrides } from "../shared/shortcuts";
+import { claimsEscape, findAction, formatCombo, parseOverrides, resolveBindings, type ShortcutOverrides } from "../shared/shortcuts";
 
 /** ⌘/⌥ on Apple devices (also an iPad with keyboard), Ctrl/Alt elsewhere. */
 export const IS_MAC = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
@@ -87,6 +87,10 @@ function install() {
   if (installed || typeof window === "undefined") return;
   installed = true;
   window.addEventListener("keydown", onKeyDown);
+  // After every other Esc handler on window: Safari would otherwise leave full screen.
+  window.addEventListener("keydown", (ev) => {
+    if (claimsEscape(ev)) ev.preventDefault();
+  });
 }
 
 /** Runs the handlers while the component is mounted; the newest handler is always used. */

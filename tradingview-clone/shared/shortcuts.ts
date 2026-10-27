@@ -259,10 +259,20 @@ const RESERVED: { combo: string; mac?: boolean; what: string }[] = [
   { combo: "Mod+KeyM", mac: true, what: "minimiert das Fenster" },
   { combo: "Mod+Comma", mac: true, what: "öffnet die Safari-Einstellungen" },
   { combo: "Mod+Space", mac: true, what: "öffnet Spotlight" },
-  { combo: "Escape", what: "bricht in ChartAI immer ab (Zeichnen, Auswahl, Dialoge)" },
+  { combo: "Escape", what: "bricht in ChartAI immer ab (Zeichnen, Auswahl, Dialoge) und beendet kein Vollbild-Fenster" },
   { combo: "F5", mac: false, what: "lädt die Seite neu" },
   { combo: "Alt+F4", mac: false, what: "schließt das Fenster" },
 ];
+
+/**
+ * Plain Esc belongs to ChartAI, so the browser must not see it as unused.
+ * Safari (macOS) and some other browsers leave window full screen on an Esc the page
+ * did not take; marking it handled (preventDefault) keeps the window full screen.
+ * Esc with modifiers and Esc during text composition (IME) stay with the browser.
+ */
+export function claimsEscape(ev: KeyLike & { isComposing?: boolean }): boolean {
+  return ev.key === "Escape" && !ev.isComposing && !ev.metaKey && !ev.ctrlKey && !ev.altKey && !ev.shiftKey;
+}
 
 /** Why the combo cannot be used on this device, or null. */
 export function reservedReason(combo: string, mac: boolean): string | null {

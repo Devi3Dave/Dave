@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   SHORTCUT_ACTIONS,
   assignCombo,
+  claimsEscape,
   comboFromEvent,
   conflictFor,
   findAction,
@@ -136,5 +137,14 @@ describe("editing", () => {
   it("reads stored overrides defensively", () => {
     expect(parseOverrides("not json")).toEqual({});
     expect(parseOverrides('{"tool.ray":["Alt+KeyJ",3],"nope":["Alt+KeyX"]}')).toEqual({ "tool.ray": ["Alt+KeyJ"] });
+  });
+});
+
+describe("Esc and full screen", () => {
+  it("claims plain Esc so the browser keeps the full-screen window", () => {
+    expect(claimsEscape(key("Escape", "Escape"))).toBe(true);
+    expect(claimsEscape({ ...key("Escape", "Escape"), isComposing: true })).toBe(false);
+    expect(claimsEscape(key("Escape", "Escape", { metaKey: true }))).toBe(false);
+    expect(claimsEscape(key("a", "KeyA"))).toBe(false);
   });
 });

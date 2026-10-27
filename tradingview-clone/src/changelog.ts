@@ -14,6 +14,15 @@ export interface Release {
  */
 export const CHANGELOG: Release[] = [
   {
+    version: "0.50.3",
+    date: "2026-10-27",
+    title: "Vollbild bleibt bei Esc",
+    changes: [
+      "Esc beendet in Safari auf dem Mac kein Vollbild-Fenster mehr, sondern bricht nur noch in ChartAI ab (Zeichnen, Auswahl, Menüs, Dialoge)",
+      "Vollbild verlassen geht weiter über ⌃⌘F oder den grünen Fensterknopf",
+    ],
+  },
+  {
     version: "0.50.2",
     date: "2026-10-27",
     title: "Fadenkreuz-Sync bei mehreren Charts",
