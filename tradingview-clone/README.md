@@ -240,6 +240,17 @@ Zeichnungen des aktiven Charts (oberste zuerst). Zeichnungen lassen sich dort au
 schieben, sperren, ein-/ausblenden und löschen, Indikatoren ausblenden, entfernen und einstellen. Das
 Datenfenster zeigt Datum, OHLC, Veränderung, Volumen und alle Indikatorwerte unter dem Fadenkreuz.
 
+**Strategietester (📊 Strategie in der Seitenleiste)**
+Fertige Strategien nach TradingViews eingebauten Strategie-Skripten auf den geladenen Kerzen des aktiven
+Charts: MA-Kreuzung („MovingAvg2Line Cross“), RSI-Strategie, MACD-Strategie, Bollinger-Bänder-Strategie
+(Stop-Orders an den Bändern), Supertrend-Strategie und Kanalausbruch („ChannelBreakOutStrategy“, Stop-Orders
+am Hoch/Tief der letzten n Kerzen). Wie TradingViews Broker-Emulator: Signal auf dem Schluss, Ausführung zur
+Eröffnung der nächsten Kerze, ein Gegensignal dreht die Position. Einstellbar sind die Parameter, Startkapital,
+Ordergröße in % vom Kapital, Kommission je Seite und Richtung (Long und Short, nur Long, nur Short).
+Angezeigt werden Equity-Kurve, die Übersicht (Nettogewinn, Brutto, Profit-Faktor, max. Drawdown, Buy & Hold,
+Trefferquote, Ø Trade, Ø Gewinn/Verlust, größter Gewinn/Verlust, Ø Kerzen, offener Gewinn, Kommission), die
+Trade-Liste und Ein-/Ausstiegspfeile im Chart. Claude testet mit `backtest_strategy`.
+
 **Gehe zu Datum (📅 unten am Chart oder `Alt+G`)**
 Springt zur Kerze, die das Datum (bei Intraday auch die Uhrzeit, in der Zeitzone des Charts) enthält, und
 zeigt dort das Fadenkreuz. Liegt das Datum vor den geladenen Kerzen, sagt der Dialog, ab wann Daten da sind.
@@ -284,7 +295,11 @@ aktiven Charts, wie bei einem Futures-Konto mit isolierter Margin; das Konto lie
 - Kaufen/Long oder Verkaufen/Short, Größe als Einsatz in $, als Risiko in % (über den Stop) oder als Menge
 - Hebel 1×–100×, Stop-Loss und Take-Profit (Schnellwahl 1/2/5 % bzw. Chance-Risiko 1:2 und 1:3)
 - Vorschau: Positionswert, Margin, Gebühr, Verlust bei SL, Gewinn bei TP, Liquidationspreis
+- Ordertyp Markt, Limit oder Stop: Limit wartet auf einen besseren Kurs (Kaufen unter, Verkaufen über
+  dem Kurs) und füllt zum Limitpreis, Stop wartet auf einen Ausbruch und füllt zum Marktkurs. Wartende
+  Orders stehen in einer Liste zum Streichen und als gestrichelte Linie im Chart, die man ziehen kann
 - Offene Positionen mit laufendem G/V, SL/TP nachträglich verschieben, schließen per Tipp
+- Teilschließen: 25 % oder 50 % einer Position zum aktuellen Kurs schließen, der Rest läuft weiter
 - SL, TP und Liquidation lösen automatisch aus (solange die App offen ist), mit Hinweis oben im Bild
 - Einstieg, SL, TP und Liquidation als Linien im Chart; laufendes Ergebnis in der Kopfzeile
 - SL- und TP-Linie im Chart mit Finger oder Maus ziehen, um sie während des Trades zu verschieben

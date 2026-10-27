@@ -6,6 +6,7 @@ import { INDICATOR_IDS } from "./indicators.js";
 import { MAX_COMPARE } from "./compare.js";
 import { isValidInterval } from "./marketData.js";
 import { SHAPES, SHAPE_KINDS } from "./drawingShapes.js";
+import { STRATEGIES } from "./strategyTester.js";
 
 /** Preset time frames (menu); any other like 7m, 90s, 2d works too (see parseInterval). */
 export const INTERVALS = ["1s", "5s", "15s", "30s", "1m", "3m", "5m", "15m", "30m", "45m", "1h", "2h", "3h", "4h", "6h", "8h", "12h", "1d", "3d", "1w", "1M", "3M", "1y", "all"] as const;
@@ -207,6 +208,20 @@ export const toolSchemas = {
       text: z.string().optional().describe("Text für callout, note, emoji und Pfeile"),
       color: color.optional(),
       label: z.string().optional(),
+    }),
+  },
+  backtest_strategy: {
+    description:
+      "Testet eine fertige Strategie (wie TradingViews Strategietester) auf den geladenen Kerzen des aktiven Charts: Signal auf dem Schluss, Ausführung zur nächsten Eröffnung, Gegensignal dreht die Position. Liefert Nettogewinn, Drawdown, Profit-Faktor, Trefferquote, Buy & Hold und die letzten Trades. Strategien: " +
+      STRATEGIES.map((s) => `${s.id} (${s.name}; Parameter ${s.params.map((p) => `${p.key}=${p.default}`).join(", ")})`).join("; ") +
+      ".",
+    schema: z.object({
+      strategy: z.enum(STRATEGIES.map((s) => s.id) as [string, ...string[]]),
+      params: z.record(z.string(), z.number()).optional(),
+      direction: z.enum(["both", "long", "short"]).optional(),
+      capital: z.number().positive().optional(),
+      size_percent: z.number().positive().max(1000).optional(),
+      commission_percent: z.number().min(0).max(5).optional(),
     }),
   },
   get_order_blocks: {

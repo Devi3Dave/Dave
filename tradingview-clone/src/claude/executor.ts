@@ -1,4 +1,5 @@
 import { shapeDef } from "../../shared/drawingShapes";
+import { DEFAULT_TESTER, defaultParams, getStrategy, runStrategy } from "../../shared/strategyTester";
 import type Anthropic from "@anthropic-ai/sdk";
 import { describeAlert, isChannelCondition } from "../../shared/alerts";
 import { SOURCE_INDICATORS, computeInstances, getIndicator, indicatorLabel, resolveParams } from "../../shared/indicators";
@@ -277,6 +278,34 @@ async function run(name: ToolName, input: unknown, engine: ChartEngine | null): 
       const d: Drawing = { id: newId("claude-shape"), author: "claude", kind: "shape", shape: i.shape, points: i.points.map(pt), color: i.color ?? def.color, text: i.text, label: i.label };
       addDrawing(d);
       return ok(def.name, { id: d.id });
+    }
+
+    case "backtest_strategy": {
+      const i = input as ToolInput<"backtest_strategy">;
+      const def = getStrategy(i.strategy);
+      if (!def) return fail(`Unbekannte Strategie ${i.strategy}`);
+      const params = { ...defaultParams(def), ...i.params };
+      const r = runStrategy(bars, def, params, {
+        capital: i.capital ?? DEFAULT_TESTER.capital,
+        sizePct: i.size_percent ?? DEFAULT_TESTER.sizePct,
+        commissionPct: i.commission_percent ?? DEFAULT_TESTER.commissionPct,
+        direction: i.direction ?? "both",
+      });
+      return ok(`Backtest ${def.name}`, {
+        params,
+        candles: bars.length,
+        net_profit: num(r.netProfit),
+        net_profit_pct: num(r.netProfitPct),
+        profit_factor: r.profitFactor === null ? null : num(r.profitFactor),
+        max_drawdown_pct: num(r.maxDrawdownPct),
+        closed_trades: r.closedTrades,
+        win_rate_pct: num(r.winRate),
+        avg_trade: num(r.avgTrade),
+        buy_hold_pct: num(r.buyHoldPct),
+        open_pnl: num(r.openPnl),
+        last_trades: r.trades.slice(-10).map((t) => ({ side: t.dir === 1 ? "long" : "short", entry: iso(t.entryTime), entry_price: num(t.entryPrice), exit: t.open ? "offen" : iso(t.exitTime), exit_price: num(t.exitPrice), pnl: num(t.pnl) })),
+        hint: "Der Nutzer sieht den Test im Seitenleisten-Tab 📊 Strategie.",
+      });
     }
 
     case "get_order_blocks": {

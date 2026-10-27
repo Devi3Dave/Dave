@@ -45,7 +45,29 @@ export interface DemoAccount {
   positions: DemoPosition[];
   /** Closed trades, oldest first. */
   history: DemoTrade[];
+  /** Limit and stop orders waiting for their price (older saved accounts have none). */
+  orders?: PendingOrder[];
   createdAt: number;
+}
+
+export type OrderType = "market" | "limit" | "stop";
+
+/**
+ * An order that opens a position once the price gets there, like TradingView's paper trading:
+ * a buy limit below the price, a buy stop above it, a sell limit above, a sell stop below.
+ */
+export interface PendingOrder {
+  id: string;
+  symbol: string;
+  side: Side;
+  type: "limit" | "stop";
+  price: number;
+  qty: number;
+  leverage: number;
+  stop?: number;
+  target?: number;
+  createdAt: number;
+  replay?: boolean;
 }
 
 export const START_BALANCES = [1_000, 10_000, 100_000];
@@ -54,7 +76,7 @@ export const MAX_LEVERAGE = 125;
 const MAX_HISTORY = 500;
 
 export function createAccount(startBalance = 10_000, now = Date.now(), feeRate = DEFAULT_FEE_RATE): DemoAccount {
-  return { version: 1, startBalance, balance: startBalance, feeRate, positions: [], history: [], createdAt: now };
+  return { version: 1, startBalance, balance: startBalance, feeRate, positions: [], history: [], orders: [], createdAt: now };
 }
 
 const dir = (side: Side) => (side === "long" ? 1 : -1);
@@ -193,11 +215,84 @@ export function triggerOf(p: DemoPosition, price: number): { reason: CloseReason
   return null;
 }
 
-/** Closes every position of `symbol` whose stop, target or liquidation price was reached. Fills at the level. */
-export function applyPrice(acc: DemoAccount, symbol: string, price: number, now: number): { account: DemoAccount; closed: DemoTrade[] } {
+/** Explains why a limit or stop order cannot wait at `orderPrice` with the market at `market`, or returns null. */
+export function checkPendingPrice(side: Side, type: "limit" | "stop", orderPrice: number, market: number): string | null {
+  if (!(orderPrice > 0) || !Number.isFinite(orderPrice)) return "Bitte einen Orderpreis eintragen";
+  if (!(market > 0)) return "Kein aktueller Kurs – bitte warten, bis der Chart geladen ist";
+  const below = orderPrice < market;
+  const buy = side === "long";
+  if (type === "limit" && buy && !below) return "Ein Buy-Limit liegt unter dem aktuellen Kurs (sonst Markt-Order nehmen)";
+  if (type === "limit" && !buy && below) return "Ein Sell-Limit liegt über dem aktuellen Kurs (sonst Markt-Order nehmen)";
+  if (type === "stop" && buy && below) return "Ein Buy-Stop liegt über dem aktuellen Kurs";
+  if (type === "stop" && !buy && !below) return "Ein Sell-Stop liegt unter dem aktuellen Kurs";
+  return null;
+}
+
+/** Places a limit or stop order; stop-loss and take-profit are checked against the order price. */
+export function placePendingOrder(acc: DemoAccount, order: Order & { type: "limit" | "stop"; price: number }, market: number, now: number, id: string): DemoAccount | string {
+  const wrong = checkPendingPrice(order.side, order.type, order.price, market);
+  if (wrong) return wrong;
+  if (!(order.qty > 0) || !Number.isFinite(order.qty)) return "Bitte eine Größe eintragen";
+  if (!(order.leverage >= 1 && order.leverage <= MAX_LEVERAGE)) return `Hebel zwischen 1 und ${MAX_LEVERAGE}`;
+  const levels = checkLevels(order.side, order.price, order.stop, order.target);
+  if (levels) return levels.replace("dem Kurs", "dem Orderpreis");
+  const pending: PendingOrder = { id, symbol: order.symbol, side: order.side, type: order.type, price: order.price, qty: order.qty, leverage: order.leverage, stop: order.stop, target: order.target, createdAt: now };
+  return { ...acc, orders: [...(acc.orders ?? []), pending] };
+}
+
+export function cancelPendingOrder(acc: DemoAccount, id: string): DemoAccount {
+  return { ...acc, orders: (acc.orders ?? []).filter((o) => o.id !== id) };
+}
+
+/** Moves a waiting order to a new price (dragged line or edited field). */
+export function movePendingOrder(acc: DemoAccount, id: string, price: number, market: number): DemoAccount | string {
+  const o = (acc.orders ?? []).find((x) => x.id === id);
+  if (!o) return "Order nicht gefunden";
+  const rounded = +price.toPrecision(6);
+  const wrong = checkPendingPrice(o.side, o.type, rounded, market) ?? checkLevels(o.side, rounded, o.stop, o.target);
+  if (wrong) return wrong;
+  return { ...acc, orders: (acc.orders ?? []).map((x) => (x.id === id ? { ...x, price: rounded } : x)) };
+}
+
+/** Whether `price` reached the order, and at which price it fills: a limit at its price, a stop at the market (slippage past the stop). */
+export function pendingFill(o: PendingOrder, price: number): number | null {
+  const buy = o.side === "long";
+  if (o.type === "limit") return (buy ? price <= o.price : price >= o.price) ? o.price : null;
+  return (buy ? price >= o.price : price <= o.price) ? price : null;
+}
+
+/**
+ * A new price of `symbol`: waiting orders that are reached open their position (an order that cannot be
+ * paid any more is dropped and reported), then positions whose stop, target or liquidation price was
+ * reached are closed at that level.
+ */
+export function applyPrice(
+  acc: DemoAccount,
+  symbol: string,
+  price: number,
+  now: number,
+  prices: Record<string, number> = {},
+): { account: DemoAccount; closed: DemoTrade[]; filled: DemoPosition[]; rejected: { order: PendingOrder; reason: string }[] } {
   let account = acc;
+  const filled: DemoPosition[] = [];
+  const rejected: { order: PendingOrder; reason: string }[] = [];
+  for (const o of acc.orders ?? []) {
+    if (o.symbol !== symbol) continue;
+    const at = pendingFill(o, price);
+    if (at === null) continue;
+    const rest = cancelPendingOrder(account, o.id);
+    const next = openPosition(rest, o, at, { ...prices, [symbol]: price }, now, o.id);
+    if (typeof next === "string") {
+      account = rest;
+      rejected.push({ order: o, reason: next });
+      continue;
+    }
+    const pos = next.positions[next.positions.length - 1];
+    account = o.replay ? { ...next, positions: next.positions.map((p) => (p === pos ? { ...p, replay: true } : p)) } : next;
+    filled.push(account.positions[account.positions.length - 1]);
+  }
   const closed: DemoTrade[] = [];
-  for (const p of acc.positions) {
+  for (const p of account.positions) {
     if (p.symbol !== symbol) continue;
     const hit = triggerOf(p, price);
     if (!hit) continue;
@@ -207,7 +302,21 @@ export function applyPrice(acc: DemoAccount, symbol: string, price: number, now:
       closed.push(r.trade);
     }
   }
-  return { account, closed };
+  return { account, closed, filled, rejected };
+}
+
+/**
+ * Closes `fraction` (0–1) of a position at `price`: margin and opening fee are split in proportion,
+ * the rest stays open with its stop and target. 1 (or more) closes it completely.
+ */
+export function closePartial(acc: DemoAccount, id: string, fraction: number, price: number, now: number): { account: DemoAccount; trade: DemoTrade } | null {
+  const p = acc.positions.find((x) => x.id === id);
+  if (!p || !(price > 0) || !(fraction > 0)) return null;
+  if (fraction >= 0.999999) return closePosition(acc, id, price, "manual", now);
+  const part: DemoPosition = { ...p, id: `${p.id}~${now.toString(36)}`, qty: p.qty * fraction, margin: p.margin * fraction, openFee: p.openFee * fraction };
+  const rest: DemoPosition = { ...p, qty: p.qty - part.qty, margin: p.margin - part.margin, openFee: p.openFee - part.openFee };
+  const withPart = { ...acc, positions: acc.positions.map((x) => (x.id === id ? rest : x)).concat(part) };
+  return closePosition(withPart, part.id, price, "manual", now);
 }
 
 /** Size from the margin you want to put in. */
@@ -314,10 +423,17 @@ export function parseAccount(json: unknown): DemoAccount | null {
     const reason = (["manual", "stop", "target", "liquidation"] as const).find((x) => x === t.reason) ?? "manual";
     return [{ ...p, exit: t.exit, pnl: t.pnl, reason, closedAt: finite(t.closedAt) ? t.closedAt : 0, closeFee: finite(t.closeFee) ? t.closeFee : 0 }];
   });
+  const orders = (Array.isArray(r.orders) ? r.orders : []).flatMap((raw): PendingOrder[] => {
+    const p = parsePosition({ margin: 0, entry: (raw as { price?: unknown })?.price, ...(raw as object) });
+    const o = raw as Record<string, unknown>;
+    if (!p || !finite(o.price) || (o.type !== "limit" && o.type !== "stop")) return [];
+    return [{ id: p.id, symbol: p.symbol, side: p.side, type: o.type, price: o.price, qty: p.qty, leverage: p.leverage, stop: p.stop, target: p.target, createdAt: finite(o.createdAt) ? o.createdAt : 0 }];
+  });
   return {
     version: 1,
     startBalance: r.startBalance,
     balance: r.balance,
+    orders,
     feeRate: finite(r.feeRate) && r.feeRate >= 0 ? r.feeRate : DEFAULT_FEE_RATE,
     positions,
     history,

@@ -4,10 +4,11 @@ import { ClaudePanel } from "./ClaudePanel";
 import { DemoPanel } from "./DemoPanel";
 import { LiquidationsPanel } from "./LiquidationsPanel";
 import { ObjectTreePanel } from "./ObjectTreePanel";
+import { StrategyPanel } from "./StrategyPanel";
 import { OrderBookPanel } from "./OrderBookPanel";
 import { WatchlistPanel } from "./WatchlistPanel";
 
-export type SideTab = "claude" | "demo" | "alerts" | "watch" | "objects" | "book" | "liq";
+export type SideTab = "claude" | "demo" | "alerts" | "watch" | "objects" | "strategy" | "book" | "liq";
 
 const TABS: { id: SideTab; label: string; tip: string }[] = [
   { id: "claude", label: "✦ Claude", tip: "Chart-Analyse mit Claude" },
@@ -15,6 +16,7 @@ const TABS: { id: SideTab; label: string; tip: string }[] = [
   { id: "alerts", label: "🔔 Alarme", tip: "Alarme auf Preis, Indikatoren, Linien und Zonen" },
   { id: "watch", label: "📋 Liste", tip: "Watchlists mit Kurs und 24-h-Veränderung, Krypto-Screener" },
   { id: "objects", label: "🗂 Objekte", tip: "Objektbaum und Datenfenster\nAlle Indikatoren und Zeichnungen des aktiven Charts, Werte unter dem Fadenkreuz" },
+  { id: "strategy", label: "📊 Strategie", tip: "Strategietester\nFertige Strategien auf den Kerzen des aktiven Charts testen: Nettogewinn, Drawdown, Trefferquote, Trades" },
   { id: "book", label: "Orderbuch", tip: "Live-Orderbuch von Binance (Spot oder Futures)" },
   { id: "liq", label: "Liquidationen", tip: "Liquidations-Heatmap und Live-Liquidationen" },
 ];
@@ -61,6 +63,11 @@ export function SidePanel({ tab, onTab, getEngine, onOpenHeatmap, onOpenScreener
         {tab === "objects" && (
           <div className="side-page">
             <ObjectTreePanel onEditIndicator={onEditIndicator} />
+          </div>
+        )}
+        {tab === "strategy" && (
+          <div className="side-page">
+            <StrategyPanel />
           </div>
         )}
         {tab === "book" && (
