@@ -15,6 +15,7 @@ import { PositionDialog } from "./components/PositionDialog";
 import { SidePanel, type SideTab } from "./components/SidePanel";
 import { TooltipLayer } from "./components/Tooltip";
 import { ShortcutsDialog } from "./components/ShortcutsDialog";
+import { GoToDateDialog, OPEN_GOTO_EVENT } from "./components/GoToDateDialog";
 import { TopBar } from "./components/TopBar";
 import { isCryptoSymbol } from "../shared/marketData";
 import { OPEN_ALERTS_EVENT, startAlertFeed } from "./alerts";
@@ -35,6 +36,12 @@ export default function App() {
   const [claudeOpen, setClaudeOpen] = useState(true);
   const [magnet, setMagnet] = useState(true);
   const [sideTab, setSideTab] = useState<SideTab>("claude");
+  const [gotoOpen, setGotoOpen] = useState(false);
+  useEffect(() => {
+    const open = () => setGotoOpen(true);
+    window.addEventListener(OPEN_GOTO_EVENT, open);
+    return () => window.removeEventListener(OPEN_GOTO_EVENT, open);
+  }, []);
   const [heatmapOpen, setHeatmapOpen] = useState(false);
   const [calcOpen, setCalcOpen] = useState(false);
   const [journalOpen, setJournalOpen] = useState(false);
@@ -99,6 +106,7 @@ export default function App() {
     ...Object.fromEntries(([...BASIC_TOOLS, ...SHAPE_KINDS] as Tool[]).map((t) => [`tool.${t}`, tool(t)])),
     "drawings.toggleHidden": () => toggleAllDrawingsHidden(activeChart()),
     "chart.reset": () => getEngine()?.resetView(),
+    "chart.goto": () => setGotoOpen(true),
     "chart.scrollLeft": () => shiftView(-1),
     "chart.scrollRight": () => shiftView(1),
     "chart.zoomIn": () => shiftView(0, 0.8),
@@ -112,6 +120,11 @@ export default function App() {
       closePages();
       setClaudeOpen(true);
       setSideTab("demo");
+    },
+    "panel.objects": () => {
+      closePages();
+      setClaudeOpen(true);
+      setSideTab("objects");
     },
     "dialog.indicators": () => setShowIndicators(true),
     "dialog.settings": () => setShowSettings(true),
@@ -204,6 +217,7 @@ export default function App() {
             closePages();
             setScreenerOpen(true);
           }}
+          onEditIndicator={setEditing}
         />
       </div>
       {showIndicators && <IndicatorDialog onClose={() => setShowIndicators(false)} />}
@@ -211,6 +225,7 @@ export default function App() {
       {editingPosition && <PositionDialog id={editingPosition} onClose={() => setEditingPosition(null)} />}
       {showSettings && <ChartSettingsDialog onClose={() => setShowSettings(false)} />}
       {shortcutsOpen && <ShortcutsDialog onClose={() => setShortcutsOpen(false)} />}
+      {gotoOpen && <GoToDateDialog getEngine={getEngine} onClose={() => setGotoOpen(false)} />}
       <AlertToasts onOpen={() => {
         closePages();
         openAlerts();

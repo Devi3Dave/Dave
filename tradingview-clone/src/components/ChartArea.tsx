@@ -15,10 +15,12 @@ import { placeOnSide } from "../../shared/position";
 import { SHAPES, isShapeKind, shapeDef } from "../../shared/drawingShapes";
 import { activeChart, addDrawing, newId, pickReplayStart, removeIndicator, removeCompare, stepBackReplay, stepReplay, updateIndicator, updateSettings, useChart, workspace, type ChartStore, type Drawing, type Point } from "../store";
 import { cloneInPlace, copyDrawing, deleteDrawing, pasteDrawing, redoDrawings, replaceDrawing, selectDrawing, selectedDrawing, trackHistory, undoDrawings, useSelectedDrawing } from "../drawingEdit";
-import { useShortcuts } from "../shortcuts";
+import { shortcutLabel, useShortcuts } from "../shortcuts";
+import { OPEN_GOTO_EVENT } from "./GoToDateDialog";
 import { cloneDrawing, hasMovableAnchors, moveAnchor, shiftDrawing } from "../drawingOps";
 import { DrawingMenu, type MenuTarget } from "./DrawingMenu";
 import { FreshnessBadge } from "./FreshnessBadge";
+import { publishCrosshair } from "../crosshair";
 import { lastPositionDefaults } from "./PositionDialog";
 import { ReplayBar } from "./ReplayBar";
 
@@ -572,6 +574,8 @@ export function ChartArea({ chart, onEngine, magnet, onEditIndicator, onEditPosi
   const change = bar && prev ? ((bar.close - prev.close) / prev.close) * 100 : 0;
   const up = bar ? bar.close >= bar.open : true;
 
+  useEffect(() => publishCrosshair(chart.slot, { index: idx, bars, computed }), [chart, idx, bars, computed]);
+
   const legendFor = (paneIndex: number) =>
     computed
       .filter((c) => c.paneIndex === paneIndex)
@@ -687,6 +691,9 @@ export function ChartArea({ chart, onEngine, magnet, onEditIndicator, onEditPosi
             data-tip={"Prozent-Skala ein/aus\nVeränderung ab der ersten sichtbaren Kerze"}
           >
             %
+          </button>
+          <button onClick={() => window.dispatchEvent(new Event(OPEN_GOTO_EVENT))} aria-label="Gehe zu Datum" data-tip={`Gehe zu Datum${shortcutLabel("chart.goto") ? ` (${shortcutLabel("chart.goto")})` : ""}`}>
+            📅
           </button>
           <button onClick={() => engineRef.current?.autoScale()} data-tip={"Auto-Skalierung\nPreisachse wieder an die sichtbaren Kerzen anpassen"}>
             A
