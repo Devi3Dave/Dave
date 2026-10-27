@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { CHANGELOG, formatReleaseDate, searchChangelog } from "../changelog";
 import { APP_VERSION } from "../version";
 
@@ -13,8 +14,10 @@ export function VersionHistoryDialog({ onClose }: { onClose: () => void }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  return (
-    <div className="modal-backdrop" onClick={onClose}>
+  // Opened from the top bar, which scrolls sideways; Safari clips fixed dialogs inside such a container,
+  // so the dialog is rendered at the page root.
+  return createPortal(
+    <div className="modal-backdrop version-backdrop" onClick={onClose}>
       <div className="modal version-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
           <h2>Versionshistorie</h2>
@@ -48,6 +51,7 @@ export function VersionHistoryDialog({ onClose }: { onClose: () => void }) {
           {releases.length === 0 && <div className="menu-empty">Keine Version gefunden.</div>}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

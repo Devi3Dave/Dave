@@ -159,9 +159,25 @@ textarea {
 
 /* ---------- version history ---------- */
 
-.version-modal {
-  height: 80vh;
-  height: 80dvh;
+/* Above toasts and tool flyouts, inside the safe area (iPad home bar, notch). */
+.version-backdrop {
+  z-index: 95;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+.modal.version-modal {
+  height: min(80vh, 100% - 24px);
+  height: min(80dvh, 100% - 24px);
+  max-height: calc(100% - 24px);
+  /* Only the list scrolls, title and search stay visible. */
+  overflow: hidden;
+}
+
+@media (max-height: 560px), (max-width: 520px) {
+  .modal.version-modal {
+    height: calc(100% - 16px);
+    max-height: calc(100% - 16px);
+  }
 }
 
 .vh-list {
@@ -169,6 +185,8 @@ textarea {
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 8px;
 }
 
 .vh-release {
