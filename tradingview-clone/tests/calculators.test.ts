@@ -5,13 +5,24 @@ import {
   fibExtension,
   fibRetracement,
   losingStreakProbability,
+  lossesUntilDrawdown,
   positionSize,
   requiredMargin,
+  riskAmount,
   simulateTrades,
   targetPrice,
 } from "../shared/calculators";
 
 describe("trading calculators", () => {
+  it("computes the risk amount from budget and percent", () => {
+    expect(riskAmount(10000, 1)).toBe(100);
+    expect(riskAmount(5000, 2.5)).toBe(125);
+    expect(lossesUntilDrawdown(1)).toBe(50);
+    expect(lossesUntilDrawdown(2)).toBe(25);
+    expect(lossesUntilDrawdown(3)).toBe(17);
+    expect(lossesUntilDrawdown(0)).toBe(Infinity);
+  });
+
   it("sizes positions like the source examples", () => {
     expect(positionSize(100, 135.5, 130)).toBeCloseTo(18.18, 2);
     expect(positionSize(100, 153.52, 150.52)).toBeCloseTo(33.33, 2);

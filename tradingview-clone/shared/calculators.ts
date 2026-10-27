@@ -1,6 +1,16 @@
 // Pure trading math for the calculator page (position sizing, expectancy, R-multiples,
 // Fibonacci, leverage). All amounts are in quote currency, rates as fractions 0..1.
 
+/** Amount at risk per trade: `percent` % of the trading budget. */
+export function riskAmount(budget: number, percent: number): number {
+  return (budget * percent) / 100;
+}
+
+/** Losses in a row (fixed amount of `percent` % each) until the budget is down by `drawdown` %. */
+export function lossesUntilDrawdown(percent: number, drawdown = 50): number {
+  return percent > 0 ? Math.ceil(drawdown / percent - 1e-9) : Infinity;
+}
+
 /** Units to buy/sell so that hitting the stop loses exactly `risk`. */
 export function positionSize(risk: number, entry: number, stop: number): number {
   const dist = Math.abs(entry - stop);
