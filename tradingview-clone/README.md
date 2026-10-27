@@ -221,6 +221,16 @@ Pfeil (oder langes Drücken) öffnet alle. Mit ☆ kommt ein Werkzeug in die ver
 Dazu Radierer und Magnet (rastet an OHLC ein). `Esc` bricht ab. Jedes Werkzeug kann im Tastenkürzel-Dialog
 ein eigenes Kürzel bekommen; Claude zeichnet die neuen Werkzeuge mit `draw_shape`.
 
+**Objektbaum und Datenfenster (🗂 Objekte in der Seitenleiste)**
+Wie TradingViews „Objektbaum und Datenfenster“: der Objektbaum listet Symbol, Vergleiche, Indikatoren und
+Zeichnungen des aktiven Charts (oberste zuerst). Zeichnungen lassen sich dort auswählen, nach vorne/hinten
+schieben, sperren, ein-/ausblenden und löschen, Indikatoren ausblenden, entfernen und einstellen. Das
+Datenfenster zeigt Datum, OHLC, Veränderung, Volumen und alle Indikatorwerte unter dem Fadenkreuz.
+
+**Gehe zu Datum (📅 unten am Chart oder `Alt+G`)**
+Springt zur Kerze, die das Datum (bei Intraday auch die Uhrzeit, in der Zeitzone des Charts) enthält, und
+zeigt dort das Fadenkreuz. Liegt das Datum vor den geladenen Kerzen, sagt der Dialog, ab wann Daten da sind.
+
 *Long-/Short-Position (▲/▼):* Einstieg, Stop-Loss und Take-Profit nacheinander antippen (der letzte Tipp
 legt auch das Ende der Zeitspanne fest). Angezeigt werden Chance/Risiko, Abstand in % und Betrag,
 Positionsgröße aus Kontogröße × Risiko-%, bei Hebel die geschätzte Liquidation, und ob Ziel oder Stop

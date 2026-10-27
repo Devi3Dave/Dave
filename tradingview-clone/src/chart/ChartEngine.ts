@@ -1,3 +1,4 @@
+import { findBarForDate, type GoToResult } from "../../shared/goToDate";
 import {
   AreaSeries,
   BarSeries,
@@ -1053,6 +1054,24 @@ export class ChartEngine {
     if (i >= 0 && i < n) return bars[i].time;
     const step = n > 1 ? bars[n - 1].time - bars[n - 2].time : 60;
     return i < 0 ? bars[0].time + i * step : bars[n - 1].time + (i - n + 1) * step;
+  }
+
+  /** Jumps to the candle containing `time`; says why not when it is outside the loaded candles. */
+  goToTime(time: number): GoToResult {
+    const r = findBarForDate(this.bars, time);
+    if (r.kind === "ok") this.goToIndex(r.index);
+    return r;
+  }
+
+  /** Scrolls so candle `index` sits in the middle, keeping the zoom, and marks it with the crosshair ("Gehe zu"). */
+  goToIndex(index: number) {
+    if (this.destroyed || !this.bars[index]) return;
+    const ts = this.chart.timeScale();
+    const r = ts.getVisibleLogicalRange();
+    const width = r ? Math.max(20, r.to - r.from) : 120;
+    ts.setVisibleLogicalRange({ from: index - width / 2, to: index + width / 2 });
+    const time = this.bars[index].time;
+    requestAnimationFrame(() => this.showCrosshairAt(time));
   }
 
   /** Shows the crosshair at the candle containing `time` (from another chart); null hides it. */
