@@ -295,7 +295,11 @@ aktiven Charts, wie bei einem Futures-Konto mit isolierter Margin; das Konto lie
 - Kaufen/Long oder Verkaufen/Short, Größe als Einsatz in $, als Risiko in % (über den Stop) oder als Menge
 - Hebel 1×–100×, Stop-Loss und Take-Profit (Schnellwahl 1/2/5 % bzw. Chance-Risiko 1:2 und 1:3)
 - Vorschau: Positionswert, Margin, Gebühr, Verlust bei SL, Gewinn bei TP, Liquidationspreis
+- Ordertyp Markt, Limit oder Stop: Limit wartet auf einen besseren Kurs (Kaufen unter, Verkaufen über
+  dem Kurs) und füllt zum Limitpreis, Stop wartet auf einen Ausbruch und füllt zum Marktkurs. Wartende
+  Orders stehen in einer Liste zum Streichen und als gestrichelte Linie im Chart, die man ziehen kann
 - Offene Positionen mit laufendem G/V, SL/TP nachträglich verschieben, schließen per Tipp
+- Teilschließen: 25 % oder 50 % einer Position zum aktuellen Kurs schließen, der Rest läuft weiter
 - SL, TP und Liquidation lösen automatisch aus (solange die App offen ist), mit Hinweis oben im Bild
 - Einstieg, SL, TP und Liquidation als Linien im Chart; laufendes Ergebnis in der Kopfzeile
 - SL- und TP-Linie im Chart mit Finger oder Maus ziehen, um sie während des Trades zu verschieben

@@ -14,6 +14,18 @@ export interface Release {
  */
 export const CHANGELOG: Release[] = [
   {
+    version: "0.48.0",
+    date: "2026-10-27",
+    title: "Strategietester und Limit-/Stop-Orders",
+    changes: [
+      "Strategietester in der Seitenleiste: MA-Kreuzung, RSI, MACD, Bollinger, Supertrend und Kanal-Ausbruch",
+      "Bericht mit Nettogewinn, Profitfaktor, max. Drawdown, Equity-Kurve, Trade-Liste und Pfeilen im Chart",
+      "Claude kann Strategien selbst testen (backtest_strategy)",
+      "Demo-Konto: Limit- und Stop-Orders mit verschiebbarer Linie im Chart, Liste wartender Orders",
+      "Positionen zu 25 % oder 50 % teilweise schließen",
+    ],
+  },
+  {
     version: "0.47.0",
     date: "2026-10-27",
     title: "Versionen und Historie in der App",
