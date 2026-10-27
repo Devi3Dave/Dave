@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { displayBars, isPriceDriven } from "../../shared/chartTypes";
+import { brickKey as brickOptionsKey, displayBars, isPriceDriven } from "../../shared/chartTypes";
 import { SOURCE_INDICATORS, indicatorLabel } from "../../shared/indicators";
 import { ChartEngine, type ComputedIndicator, type PointerEvent } from "../chart/ChartEngine";
 import { alertLinesFor, alertStore } from "../alerts";
@@ -129,7 +129,7 @@ export function ChartArea({ chart, onEngine, magnet, onEditIndicator, onEditPosi
 
   const { symbol, interval, bars: loaded, chartType, settings, source, tool, loading, error } = useChart(chart, (s) => s);
   // The legend reads the candles as drawn (Renko bricks, Line Break lines).
-  const brickKey = isPriceDriven(chartType) ? `${chartType}|${settings.renkoBox}|${settings.renkoAtr}|${settings.lineBreakLines}` : "";
+  const brickKey = brickOptionsKey(chartType, settings);
   const bars = useMemo(() => (brickKey ? displayBars(loaded, chartType, settings) : loaded), [loaded, brickKey]);
   const selected = useSelectedDrawing(chart.slot);
   const compareLines = useCompareData(chart);
@@ -601,7 +601,7 @@ export function ChartArea({ chart, onEngine, magnet, onEditIndicator, onEditPosi
               )}
             </div>
           )}
-          {i === 0 && settings.footprint && (
+          {i === 0 && (settings.footprint || chartType === "volume_footprint") && (
             <div className="legend-row indicator">
               <span className="legend-name">
                 Footprint{" "}
@@ -610,11 +610,11 @@ export function ChartArea({ chart, onEngine, magnet, onEditIndicator, onEditPosi
                   : source === "demo"
                     ? "– nicht mit Demo-Daten"
                     : isPriceDriven(chartType)
-                      ? "– nicht bei Renko/Line Break"
+                      ? "– nicht bei preisbasierten Charttypen"
                       : "lädt …"}
               </span>
               <span className="legend-actions">
-                <button data-tip="Footprint ausschalten" aria-label="Footprint ausschalten" onClick={() => chart.set((st) => ({ settings: { ...st.settings, footprint: false } }))}>
+                <button data-tip="Footprint ausschalten" aria-label="Footprint ausschalten" onClick={() => chart.set((st) => ({ settings: { ...st.settings, footprint: false }, ...(st.chartType === "volume_footprint" ? { chartType: "candles" as const } : {}) }))}>
                   ✕
                 </button>
               </span>

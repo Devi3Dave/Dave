@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { INDICATORS, getIndicator, resolveParams } from "../../shared/indicators";
 import { intervalSeconds, isValidInterval, normalizeInterval } from "../../shared/marketData";
-import { CHART_TYPES, INTERVALS, MAIN_INTERVALS } from "../../shared/tools";
+import { CHART_TYPE_GROUPS, INTERVALS, MAIN_INTERVALS } from "../../shared/tools";
 import { formatPrice } from "../chart/DrawingsPrimitive";
 import { toggleFavorite, useFavorites } from "../favorites";
 import { LAYOUTS, addCompare, addIndicator, exitReplay, loadChart, setLayout, startReplay, store, useChartState, useWorkspace, workspace, type ChartType, type Interval } from "../store";
@@ -14,19 +14,6 @@ import { MAX_COMPARE } from "../../shared/compare";
 import { Menu } from "./Menu";
 import { shortcutLabel, useShortcutOverrides, useShortcuts } from "../shortcuts";
 import { TemplatesMenu } from "./TemplatesMenu";
-
-const CHART_TYPE_LABELS: Record<ChartType, string> = {
-  candles: "Kerzen",
-  hollow_candles: "Hohle Kerzen",
-  bars: "Balken",
-  heikin_ashi: "Heikin Ashi",
-  line: "Linie",
-  step_line: "Stufenlinie",
-  area: "Fläche",
-  baseline: "Baseline",
-  renko: "Renko",
-  line_break: "Line Break",
-};
 
 const SPECIAL_LABELS: Record<string, string> = {
   "1M": "1 Monat",
@@ -370,10 +357,14 @@ export function TopBar({ onOpenIndicators, onOpenSettings, onOpenShortcuts, heat
       </div>
       <IntervalMenu className="intervals-compact" />
       <select value={chartType} onChange={(e) => store.set({ chartType: e.target.value as ChartType })} aria-label="Charttyp" data-tip="Charttyp">
-        {CHART_TYPES.map((t) => (
-          <option key={t} value={t}>
-            {CHART_TYPE_LABELS[t]}
-          </option>
+        {CHART_TYPE_GROUPS.map(([group, types]) => (
+          <optgroup key={group} label={group}>
+            {types.map(([t, label]) => (
+              <option key={t} value={t}>
+                {label}
+              </option>
+            ))}
+          </optgroup>
         ))}
       </select>
       <button className="pill" onClick={onOpenIndicators} aria-label="Indikatoren" data-tip={`Indikatoren hinzufügen${keys("dialog.indicators")}\n${INDICATORS.length} verfügbar`}>

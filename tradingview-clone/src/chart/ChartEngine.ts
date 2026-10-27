@@ -24,7 +24,7 @@ import {
   type Time,
   type UTCTimestamp,
 } from "lightweight-charts";
-import { displayBars, hollowStyle, isPriceDriven } from "../../shared/chartTypes";
+import { brickKey as brickOptionsKey, displayBars, hollowStyle, isPriceDriven } from "../../shared/chartTypes";
 import { alignCompare } from "../../shared/compare";
 import { buildFootprints, footprintRowSize } from "../../shared/footprint";
 import { SOURCE_INDICATORS, computeIndicator, getIndicator, resolveParams, type IndicatorDef, type OutputDef } from "../../shared/indicators";
@@ -47,6 +47,7 @@ import { HeatmapPrimitive } from "./HeatmapPrimitive";
 import { LiquidationBubblesPrimitive } from "./LiquidationBubblesPrimitive";
 import { PatternsPrimitive } from "./PatternsPrimitive";
 import { SessionsPrimitive, type SessionBand } from "./SessionsPrimitive";
+import { PriceSeriesView, type PriceSeriesKind } from "./PriceSeries";
 import { VolumeProfilePrimitive } from "./VolumeProfilePrimitive";
 
 export const THEME = {
@@ -57,6 +58,21 @@ export const THEME = {
   up: "#26a69a",
   down: "#ef5350",
 };
+
+/** Chart types drawn by PriceSeriesView. */
+const CUSTOM_KINDS = new Set<string>(["volume_candles", "hlc_area", "columns", "high_low", "kagi", "point_figure"] satisfies PriceSeriesKind[]);
+const LINE_TYPES = new Set<string>(["line", "line_markers", "area", "step_line", "baseline"]);
+
+/** Ids of the indicators a chart type brings along; they are not in the legend and cannot be edited. */
+const TYPE_INDICATOR_PREFIX = "charttype:";
+
+/** Session Volume Profile and TPO chart types: TradingView's profiles per session (here the matching indicators, one day per session). */
+function typeIndicators(type: ChartType): IndicatorInstance[] {
+  const one = (t: string): IndicatorInstance => ({ id: TYPE_INDICATOR_PREFIX + t, type: t, params: {}, author: "user" });
+  if (type === "session_vp") return [one("vp_session")];
+  if (type === "tpo") return [one("tpo")];
+  return [];
+}
 
 export interface ComputedIndicator {
   instance: IndicatorInstance;
@@ -382,7 +398,7 @@ export class ChartEngine {
 
     const symbolKey = `${s.symbol}|${s.interval}`;
     const prev = this.rawBars;
-    const brickKey = isPriceDriven(s.chartType) ? `${s.settings.renkoBox}|${s.settings.renkoAtr}|${s.settings.lineBreakLines}` : "";
+    const brickKey = brickOptionsKey(s.chartType, s.settings);
     const barsChanged = s.bars !== prev || typeChanged || brickKey !== this.brickKey;
     // Bricks and lines can change anywhere on a new price, so they are always redrawn.
     const isTick =
@@ -411,7 +427,7 @@ export class ChartEngine {
     const indicatorKey = JSON.stringify(s.indicators);
     if (indicatorKey !== this.indicatorKey || typeChanged) {
       this.indicatorKey = indicatorKey;
-      this.buildIndicators(s.indicators);
+      this.buildIndicators([...typeIndicators(s.chartType), ...s.indicators]);
     } else if (barsChanged) {
       this.fillIndicators();
     }
@@ -511,6 +527,13 @@ export class ChartEngine {
       case "line":
         this.main = this.chart.addSeries(LineSeries, { ...common, color: "#2962ff", lineWidth: 2 });
         break;
+      case "line_markers":
+        this.main = this.chart.addSeries(LineSeries, { ...common, color: "#2962ff", lineWidth: 2, pointMarkersVisible: true, pointMarkersRadius: 3 });
+        break;
+      case "tpo":
+        // TradingView's TPO chart shows the profiles instead of the candles; the hidden candles keep the price scale and crosshair.
+        this.main = this.chart.addSeries(CandlestickSeries, { ...common, upColor: "transparent", downColor: "transparent", borderVisible: false, wickVisible: false });
+        break;
       case "step_line":
         this.main = this.chart.addSeries(LineSeries, { ...common, color: "#2962ff", lineWidth: 2, lineType: LineType.WithSteps });
         break;
@@ -535,6 +558,14 @@ export class ChartEngine {
           bottomColor: "rgba(41,98,255,0.02)",
           lineWidth: 2,
         });
+        break;
+      case "volume_candles":
+      case "hlc_area":
+      case "columns":
+      case "high_low":
+      case "kagi":
+      case "point_figure":
+        this.main = this.chart.addCustomSeries(new PriceSeriesView(type, { up: THEME.up, down: THEME.down }), common) as unknown as ISeriesApi<SeriesType>;
         break;
       default:
         this.main = this.chart.addSeries(CandlestickSeries, {
@@ -741,7 +772,8 @@ export class ChartEngine {
   private toMainPoint(bars: Bar[], i: number) {
     const b = bars[i];
     const t = this.chartType;
-    if (t === "line" || t === "area" || t === "step_line" || t === "baseline") return { time: ts(b.time), value: b.close };
+    if (t && LINE_TYPES.has(t)) return { time: ts(b.time), value: b.close };
+    if (t && CUSTOM_KINDS.has(t)) return { ...b, time: ts(b.time) };
     const ohlc = { time: ts(b.time), open: b.open, high: b.high, low: b.low, close: b.close };
     return t === "hollow_candles" ? { ...ohlc, ...hollowStyle(bars, i, THEME.up, THEME.down) } : ohlc;
   }
@@ -979,7 +1011,7 @@ export class ChartEngine {
   }
 
   get computed(): ComputedIndicator[] {
-    return this.built.map((b) => b.computed);
+    return this.built.map((b) => b.computed).filter((c) => !c.instance.id.startsWith(TYPE_INDICATOR_PREFIX));
   }
 
   /** Top offset and height (CSS px) of every pane, for overlay legends. */

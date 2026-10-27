@@ -57,12 +57,23 @@ und zusammen mit der Fill & Sign-App auf GitHub Pages veröffentlicht.
 ## Funktionen
 
 **Chart**
-- Charttypen: Kerzen, hohle Kerzen, Balken, Heikin Ashi, Linie, Stufenlinie, Fläche, Baseline, Renko und
-  Line Break. Hohle Kerzen: Farbe nach dem vorherigen Schluss, hohl wenn Schluss über Eröffnung (wie
-  mplfinance `hollow_and_filled`). Baseline: grün über, rot unter dem Kurs von vor ~160 Kerzen.
-  Renko (Steine nur bei Bewegung um eine Box, Umkehr erst nach zwei Boxen) und Line Break (Umkehr erst,
-  wenn der Schluss die letzten 3 Linien durchbricht) nach Steve Nison, „Beyond Candlesticks“, bzw. der
-  Referenz `stocktrends`; Boxgröße ATR 14 oder fest und Linienzahl in den Chart-Einstellungen.
+- Alle 21 Charttypen aus TradingViews Menü, gleich benannt und gruppiert: Balken, Kerzen, Hohlkerzen,
+  Volumenkerzen, Linie, Linie mit Markierungen, Step-Line, Bereich, HLC-Bereich, Baseline, Säulen, Hoch-Tief,
+  Volumen-Fußabdruck, Time Price Opportunity, Session-Volumenprofil, Heikin Ashi, Renko, Line-Break, Kagi,
+  Point & Figure und Range. Hohlkerzen: Farbe nach dem vorherigen Schluss, hohl wenn Schluss über Eröffnung
+  (wie mplfinance `hollow_and_filled`). Baseline: grün über, rot unter dem Kurs von vor ~160 Kerzen.
+  Volumenkerzen: Kerzenbreite nach dem Volumen (relativ zum größten Volumen im Bild), HLC-Bereich: Hoch-,
+  Tief- und Schlusslinie mit Flächen dazwischen, Säulen: bis zum Schluss, grün bei Schluss ≥ Eröffnung,
+  Hoch-Tief: ein Balken von Tief bis Hoch mit beiden Preisen (alle wie in TradingViews Blogartikeln zu
+  den Charttypen). Volumen-Fußabdruck, TPO und Session-Volumenprofil zeigen Footprint, Market Profile bzw.
+  Volumenprofil je Tag (TPO ohne Kerzen, wie bei TradingView).
+  Renko (Steine nur bei Bewegung um eine Box, Umkehr erst nach zwei Boxen), Line Break (Umkehr erst,
+  wenn der Schluss die letzten 3 Linien durchbricht) und Kagi (Umkehr nach dem Umkehrbetrag, dick über der
+  letzten Schulter, dünn unter der letzten Taille) nach Steve Nison, „Beyond Candlesticks“, bzw. der
+  Referenz `stocktrends`; Point & Figure nach du Plessis / Dorsey (Boxen auf festem Raster, Umkehr nach
+  3 Boxen, Hoch/Tief oder Schluss); Range-Kerzen nach Nicolellis (jede Kerze gleich hoch, neue Kerze beim
+  Verlassen der Spanne; innerhalb einer Kerze wird der Weg Eröffnung → Tief → Hoch → Schluss bzw. umgekehrt
+  angenommen). Box-, Umkehr- und Range-Größen ATR 14 oder fest in den Chart-Einstellungen.
   Indikatoren und Zeichnungen rechnen dort auf den Steinen/Linien, Claude und Alarme auf den Kerzen
 - Zeiteinheiten wie bei TradingView Ultimate: Sekunden (1s, 5s, 15s, 30s – nur Binance-Spot-Krypto, live
   über den 1-s-Stream), Minuten bis 45m, Stunden bis 12h, 1D, 3D, Woche, Monat, Quartal, Jahr, und eigene

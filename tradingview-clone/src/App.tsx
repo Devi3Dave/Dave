@@ -22,7 +22,8 @@ import { startDemoFeed } from "./demoAccount";
 import { liquidationFeed } from "./market/liquidationFeed";
 import { toggleAllDrawingsHidden } from "./drawingEdit";
 import { useShortcuts } from "./shortcuts";
-import { activeChart, exitReplay, loadChart, MAX_CHARTS, startReplay, store, updateSettings, useChartState, workspace, type ChartType, type Interval, type Tool } from "./store";
+import { CHART_TYPES } from "../shared/tools";
+import { activeChart, exitReplay, loadChart, MAX_CHARTS, startReplay, store, updateSettings, useChartState, workspace, type Interval, type Tool } from "./store";
 
 export default function App() {
   const enginesRef = useRef<(ChartEngine | null)[]>(Array(MAX_CHARTS).fill(null));
@@ -120,7 +121,7 @@ export default function App() {
     "page.exchanges": () => togglePage(exchangesOpen, setExchangesOpen),
     "replay.toggle": () => (store.get().replay ? exitReplay() : startReplay()),
     ...Object.fromEntries(["1m", "5m", "15m", "30m", "1h", "4h", "1d", "1w", "1M"].map((iv) => [`interval.${iv}`, () => void loadChart(store.get().symbol, iv as Interval)])),
-    ...Object.fromEntries((["candles", "hollow_candles", "bars", "heikin_ashi", "line", "area", "baseline"] as ChartType[]).map((t) => [`chartType.${t}`, () => store.set({ chartType: t })])),
+    ...Object.fromEntries(CHART_TYPES.map((t) => [`chartType.${t}`, () => store.set({ chartType: t })])),
   });
 
   return (

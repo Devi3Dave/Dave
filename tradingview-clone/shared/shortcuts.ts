@@ -17,6 +17,8 @@
  * letters, digits, arrows and named keys, or a printed character such as "/" (layout independent).
  */
 
+import { CHART_TYPE_LABELS, CHART_TYPES } from "./tools.js";
+
 export type ShortcutGroup = "Zeichnen" | "Bearbeiten" | "Chart" | "Preisskala" | "Fenster" | "Replay" | "Zeiteinheit" | "Charttyp";
 
 export interface ShortcutAction {
@@ -51,15 +53,6 @@ const TOOL_ACTIONS: ShortcutAction[] = [
 ];
 
 const MAIN_INTERVALS = ["1m", "5m", "15m", "30m", "1h", "4h", "1d", "1w", "1M"];
-const CHART_TYPES: [string, string][] = [
-  ["candles", "Kerzen"],
-  ["hollow_candles", "Hohle Kerzen"],
-  ["bars", "Balken"],
-  ["heikin_ashi", "Heikin Ashi"],
-  ["line", "Linie"],
-  ["area", "Fläche"],
-  ["baseline", "Baseline"],
-];
 
 export const SHORTCUT_ACTIONS: ShortcutAction[] = [
   ...TOOL_ACTIONS,
@@ -93,7 +86,7 @@ export const SHORTCUT_ACTIONS: ShortcutAction[] = [
   { id: "replay.next", label: "Nächste Kerze", group: "Replay", defaults: ["Shift+ArrowRight"], tv: true },
   { id: "replay.prev", label: "Kerze zurück", group: "Replay", defaults: ["Shift+ArrowLeft"] },
   ...MAIN_INTERVALS.map((iv): ShortcutAction => ({ id: `interval.${iv}`, label: `Zeiteinheit ${iv === "1M" ? "1 Monat" : iv.replace(/d$/, "D").replace(/w$/, "W")}`, group: "Zeiteinheit", defaults: [] })),
-  ...CHART_TYPES.map(([t, label]): ShortcutAction => ({ id: `chartType.${t}`, label, group: "Charttyp", defaults: [] })),
+  ...CHART_TYPES.map((t): ShortcutAction => ({ id: `chartType.${t}`, label: CHART_TYPE_LABELS[t], group: "Charttyp", defaults: [] })),
 ];
 
 export const getAction = (id: string) => SHORTCUT_ACTIONS.find((a) => a.id === id);
