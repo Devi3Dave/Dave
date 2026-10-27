@@ -164,8 +164,9 @@ und zusammen mit der Fill & Sign-App auf GitHub Pages veröffentlicht.
   „Automatisch speichern“ wird jede Änderung nach 1,5 s ins Layout geschrieben, sonst zeigt ● ungespeicherte
   Änderungen. Gespeichert werden alle Charts mit Symbol, Zeiteinheit, Charttyp, Indikatoren, Zeichnungen und
   Synchronisierung; die Layouts erscheinen auch unter Vorlagen → Arbeitsbereiche
-- Versionsnummer neben dem Logo; sie zeigt „Update“, sobald eine neuere Version online ist –
-  Antippen lädt sie
+- Versionsnummer neben dem Logo; sie zeigt „Update“, sobald eine neuere Version online ist. Antippen öffnet
+  ein Menü mit Version, Build, Update-Suche und der Versionshistorie: jede Version mit Datum und Änderungen,
+  durchsuchbar (src/changelog.ts, bei jeder neuen Version oben ergänzen)
 
 **Indikatoren (83)**
 - Favoriten: im Indikator-Dialog mit ☆ markieren; sie stehen dort oben und im ★-Menü der Kopfzeile
