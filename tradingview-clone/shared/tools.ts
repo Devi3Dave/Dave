@@ -12,6 +12,10 @@ export const INTERVALS = ["1s", "5s", "15s", "30s", "1m", "3m", "5m", "15m", "30
 /** Time frames shown as buttons in the top bar. */
 export const MAIN_INTERVALS = ["1m", "5m", "15m", "30m", "1h", "4h", "1d", "1w", "1M", "3M", "1y", "all"] as const;
 export type CustomInterval = `${number}${"s" | "m" | "h" | "d"}`;
+/** Bars after a number of trades (100T) or a price range in minimum price changes (10R), see shared/tickBars.ts. */
+export const TICK_INTERVALS = ["1T", "10T", "100T", "1000T"] as const;
+export const RANGE_INTERVALS = ["1R", "10R", "100R", "1000R"] as const;
+export type TradeIntervalCode = `${number}${"T" | "R"}`;
 /** In the order of TradingView's chart type menu. */
 export const CHART_TYPES = [
   "bars",
@@ -101,12 +105,12 @@ export const toolSchemas = {
         .describe("z. B. BTCUSDT, ETHUSDT (Binance) oder AAPL, ^GDAXI, EURUSD=X (Yahoo). Spread-Chart aus zwei Symbolen: BTCUSDT/ETHUSDT (Verhältnis), BTCUSDT - ETHUSDT, A+B, A*B."),
       interval: z
         .string()
-        .refine(isValidInterval, "Zeiteinheit wie 1m, 15m, 4h, 1d oder eigene wie 7m, 90s, 2d")
+        .refine(isValidInterval, "Zeiteinheit wie 1m, 15m, 4h, 1d, eigene wie 7m, 90s, 2d oder Ticks/Bereiche wie 100T, 10R")
         .optional()
         .describe(
           "Voreinstellungen: " +
             INTERVALS.join(", ") +
-            ". 1M = Monat, 3M = Quartal, 1y = Jahr, all = gesamte Historie (Wochenkerzen). Eigene Zeiteinheiten: Zahl + s/m/h/d bis 7 Tage (z. B. 7m, 90s, 2d). Sekunden nur für Binance-Spot-Krypto.",
+            ". 1M = Monat, 3M = Quartal, 1y = Jahr, all = gesamte Historie (Wochenkerzen). Eigene Zeiteinheiten: Zahl + s/m/h/d bis 7 Tage (z. B. 7m, 90s, 2d). Sekunden nur für Binance-Spot-Krypto. Ticks: 1T, 10T, 100T, 1000T (neuer Balken nach so vielen Trades); Bereiche: 1R, 10R, 100R, 1000R (Balken über so viele Mindest-Kursschritte); beide aus Binance-Trades, nur Krypto.",
         ),
       chart_type: z.enum(CHART_TYPES).optional(),
       compare: z

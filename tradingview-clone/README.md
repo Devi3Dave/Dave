@@ -80,6 +80,12 @@ und zusammen mit der Fill & Sign-App auf GitHub Pages veröffentlicht.
   Zeiteinheiten bis 7 Tage im Menü (z. B. 7m, 90s, 3h, 2D; werden gemerkt). Was die Datenquelle nicht direkt
   liefert, wird aus der größten passenden Kerze zusammengesetzt (z. B. 45m aus 15m, bei Binance bis zu
   5 Abrufe zurück); Zeiteinheiten, die keinen Tag glatt teilen, beginnen um 00:00 UTC neu.
+- Ticks und Bereiche wie im Zeiteinheiten-Menü von TradingView (Gruppen Ticks, Sekunden, Minuten, Stunden,
+  Tage, Bereiche): 1, 10, 100 oder 1000 Ticks (neuer Balken nach so vielen Trades) und 1, 10, 100 oder
+  1000 Bereiche (jeder Balken spannt so viele kleinste Kursschritte von Tief bis Hoch; 1 Bereich = 1 Tick-Größe
+  laut TradingView-Hilfe „Understanding range charts“). Gebaut aus Binance-Trades (`aggTrades` für die
+  Historie, bis 10 Abrufe à 1000; live über den `@aggTrade`-Stream; ein zusammengefasster Trade zählt so viele
+  Ticks, wie er Einzeltrades enthält), nur Krypto. Eigene wie 50T oder 25R im Menüfeld.
 - Zeiteinheiten 1m – 1w, Monat (1Mo), Quartal (1Q),
   Jahr (1J) und „Alles“ (gesamte Historie in Wochenkerzen, komplett eingepasst)
 - Kursdaten: Krypto über Binance (inkl. Live-Updates per WebSocket), Aktien/Indizes/Forex über Yahoo
