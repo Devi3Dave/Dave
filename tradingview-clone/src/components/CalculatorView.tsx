@@ -496,13 +496,15 @@ export function CalculatorView({ onClose }: { onClose: () => void }) {
                 <thead>
                   <tr>
                     <th>Extension</th>
-                    <th>Ziel</th>
+                    <th>Faktor × Spanne</th>
+                    <th>Ziel (ab C)</th>
                   </tr>
                 </thead>
                 <tbody>
                   {ext.map((l) => (
                     <tr key={l.ratio}>
                       <td>{num(l.ratio, 3)} ×</td>
+                      <td>{num(l.ratio * Math.abs(impulse))}</td>
                       <td className="up">{num(l.price)}</td>
                     </tr>
                   ))}
