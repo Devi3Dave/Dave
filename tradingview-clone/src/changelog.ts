@@ -14,6 +14,14 @@ export interface Release {
  */
 export const CHANGELOG: Release[] = [
   {
+    version: "0.60.1",
+    date: "2026-10-28",
+    title: "Proxy: Startseite statt Fehler 403",
+    changes: [
+      "Öffnest du die Adresse deines Proxys im Browser, zeigt er „✓ ChartAI-Proxy läuft“ und wie es weitergeht, statt „origin not allowed“ (403). Dafür den neuen worker.js-Code einmal in Cloudflare einfügen und Deploy tippen",
+    ],
+  },
+  {
     version: "0.60.0",
     date: "2026-10-28",
     title: "Gesperrte Börsen über deinen eigenen Proxy",

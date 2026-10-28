@@ -21,8 +21,9 @@ Der kostenlose Cloudflare-Tarif reicht (100.000 Anfragen am Tag).
 3. **Namen vergeben:** als Namen z. B. `chartai-proxy` eintragen und **Deploy** klicken. Cloudflare zeigt danach die Adresse, etwa `https://chartai-proxy.deinname.workers.dev`.
 4. **Code einfügen:** auf **Edit code** klicken. Links ist die Datei `worker.js` offen. Den ganzen Inhalt löschen und den Inhalt von [`worker.js`](./worker.js) einfügen
    (auf GitHub oben rechts beim Code auf **Copy raw file** tippen). Dann oben rechts **Deploy** klicken.
-5. **Prüfen:** die Worker-Adresse mit `/health` dahinter im Browser öffnen, z. B. `https://chartai-proxy.deinname.workers.dev/health`.
-   Es muss `{"ok":true,"service":"chartai-proxy","allowed":false}` erscheinen. `allowed:false` ist hier richtig: der Browser-Tab ist nicht die ChartAI-Seite.
+5. **Prüfen:** die Worker-Adresse im Browser öffnen, z. B. `https://chartai-proxy.deinname.workers.dev`. Es muss „✓ ChartAI-Proxy läuft“ erscheinen.
+   Steht dort „Hello World!“, ist der Code aus Schritt 4 noch nicht bereitgestellt. „origin not allowed“ (403) bei anderen Adressen ist gewollt:
+   Kurse gibt der Proxy nur an die ChartAI-Seite heraus.
 6. **In ChartAI eintragen:** Asset-Auswahl öffnen → **🩺 Test** → oben bei „Eigener Proxy für gesperrte Börsen“ die Worker-Adresse eintragen → **Speichern**.
    ChartAI prüft den Proxy sofort („Proxy läuft und nimmt Anfragen dieser Seite an“). Danach erscheinen KuCoin und BitMEX wieder in der Börsenauswahl,
    bei Kraken lässt sich Perp wählen, und die Suche zeigt auch die Binance-Optionen.

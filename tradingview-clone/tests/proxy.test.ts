@@ -123,6 +123,13 @@ describe("Cloudflare Worker", () => {
     expect(upstream).not.toHaveBeenCalled();
   });
 
+  it("shows a short page when the address is opened in a browser tab", async () => {
+    const res = await ask("/", { origin: null });
+    expect(res.status).toBe(200);
+    expect(await res.text()).toContain("ChartAI-Proxy läuft");
+    expect((await ask("/api.kucoin.com/x", { origin: null })).status).toBe(403);
+  });
+
   it("answers the browser's preflight and the health check", async () => {
     const pre = await ask("/api.kucoin.com/x", { method: "OPTIONS" });
     expect(pre.status).toBe(204);
