@@ -133,9 +133,9 @@ describe("Cloudflare Worker", () => {
   it("answers the browser's preflight and the health check", async () => {
     const pre = await ask("/api.kucoin.com/x", { method: "OPTIONS" });
     expect(pre.status).toBe(204);
-    expect(pre.headers.get("Access-Control-Allow-Methods")).toBe("GET, OPTIONS");
-    expect(await (await ask("/health")).json()).toEqual({ ok: true, service: "chartai-proxy", allowed: true });
-    expect(await (await ask("/health", { origin: "https://evil.example" })).json()).toEqual({ ok: true, service: "chartai-proxy", allowed: false });
+    expect(pre.headers.get("Access-Control-Allow-Methods")).toBe("GET, POST, OPTIONS");
+    expect(await (await ask("/health")).json()).toEqual({ ok: true, service: "chartai-proxy", allowed: true, sync: false });
+    expect(await (await ask("/health", { origin: "https://evil.example" })).json()).toEqual({ ok: true, service: "chartai-proxy", allowed: false, sync: false });
   });
 
   it("does not follow redirects away from the exchange", async () => {

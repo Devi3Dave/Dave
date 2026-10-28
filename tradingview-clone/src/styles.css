@@ -5141,3 +5141,26 @@ select,
   color: var(--claude);
   font-size: 12px;
 }
+
+/* Sync between devices (SyncDialog) */
+.sync-pill.error {
+  color: var(--down);
+}
+
+.sync-dialog {
+  width: min(560px, calc(100vw - 32px));
+}
+
+.sync-toast {
+  position: fixed;
+  top: 56px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 90;
+  padding: 10px 14px;
+  border-radius: 6px;
+  background: var(--panel);
+  border: 1px solid var(--up);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+  font-size: 13px;
+}

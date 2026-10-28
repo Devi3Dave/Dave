@@ -78,7 +78,7 @@ export function VenueCheckDialog() {
           </label>
           <p className="hint">
             Damit laden auch KuCoin, BitMEX, die Kraken-Perps und die Binance-Optionen. Der Proxy reicht nur öffentliche Kurse weiter, ohne Login und ohne
-            Schlüssel; deine Einstellungen und Trades bleiben auf diesem Gerät.{" "}
+            Schlüssel; deine Einstellungen und Trades bleiben auf diesem Gerät, außer du schaltest oben ☁ Sync ein.{" "}
             <a href={GUIDE_URL} target="_blank" rel="noreferrer">
               Anleitung zum Einrichten
             </a>
