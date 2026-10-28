@@ -4,6 +4,7 @@
  * Browsers block REST calls of exchanges without CORS headers (Safari: "Load failed"); WebSockets are not affected.
  */
 import type { Bar } from "./math.js";
+import { proxiedUrl, wsVia } from "./proxy.js";
 import { loadVenueMarkets } from "./venueMarkets.js";
 import { getVenue, parseVenueSymbol, perpSymbol, venueSymbol, type Instrument, type VenueId, type VenueTrade } from "./venues.js";
 
@@ -23,7 +24,11 @@ export interface CheckDeps {
 
 const LIVE_TIMEOUT_MS = 15_000;
 
-const why = (deps: CheckDeps, e: unknown) => (deps.isNetworkError(e) ? "vom Browser blockiert (CORS) oder nicht erreichbar" : String((e as Error)?.message ?? e));
+const why = (deps: CheckDeps, e: unknown, url?: string) =>
+  deps.isNetworkError(e) ? (url && proxiedUrl(url) ? "auch über den Proxy nicht erreichbar" : "vom Browser blockiert (CORS) oder nicht erreichbar") : String((e as Error)?.message ?? e);
+
+/** " über Proxy" for what goes through the own relay. */
+const via = (url: string) => (proxiedUrl(url) ? " über Proxy" : "");
 
 const lastPrice = (bars: Bar[]) => (bars.length ? `, letzter Kurs ${bars[bars.length - 1].close}` : "");
 
@@ -32,19 +37,20 @@ async function checkInstrument(form: string, inst: Instrument, deps: CheckDeps):
   const interval = "1h" in feed.intervals ? "1h" : Object.keys(feed.intervals)[0];
   const steps: CheckStep[] = [];
   let restOk = false;
+  const url = feed.candlesUrl(inst.native, feed.intervals[interval], 5);
   try {
-    const bars = feed.parseCandles(await deps.fetchJson(feed.candlesUrl(inst.native, feed.intervals[interval], 5)));
+    const bars = feed.parseCandles(await deps.fetchJson(url));
     restOk = bars.length > 0;
-    steps.push({ label: `${form}: Kerzen (REST)`, state: restOk ? "ok" : "fail", detail: restOk ? `${bars.length} Kerzen${lastPrice(bars)}` : "keine Kerzen" });
+    steps.push({ label: `${form}: Kerzen (REST)`, state: restOk ? "ok" : "fail", detail: restOk ? `${bars.length} Kerzen${lastPrice(bars)}${via(url)}` : "keine Kerzen" });
   } catch (e) {
-    steps.push({ label: `${form}: Kerzen (REST)`, state: "fail", detail: why(deps, e) });
+    steps.push({ label: `${form}: Kerzen (REST)`, state: "fail", detail: why(deps, e, url) });
   }
   const ws = feed.wsHistory;
   if (restOk) steps.push({ label: `${form}: Kerzen über WebSocket`, state: "skip", detail: "nicht nötig, REST geht" });
   else if (!ws || !feed.wsUrl) steps.push({ label: `${form}: Kerzen über WebSocket`, state: "skip", detail: `${inst.venue.name} bietet keinen Ausweg` });
   else {
     try {
-      const bars = await deps.wsRequest(feed.wsUrl, ws.request(inst.wsNative ?? inst.native, interval, 5), ws.parse);
+      const bars = await deps.wsRequest(wsVia(feed.wsUrl), ws.request(inst.wsNative ?? inst.native, interval, 5), ws.parse);
       steps.push({ label: `${form}: Kerzen über WebSocket`, state: bars.length ? "ok" : "fail", detail: bars.length ? `${bars.length} Kerzen${lastPrice(bars)}` : "keine Kerzen" });
     } catch (e) {
       steps.push({ label: `${form}: Kerzen über WebSocket`, state: "fail", detail: why(deps, e) });
@@ -53,13 +59,13 @@ async function checkInstrument(form: string, inst: Instrument, deps: CheckDeps):
   if (!feed.wsUrl) steps.push({ label: `${form}: Live-Kurse`, state: "skip", detail: "kein WebSocket, der Chart lädt jede Minute neu" });
   else {
     try {
-      const trades = await deps.wsRequest<VenueTrade[]>(feed.wsUrl, feed.subscribe(inst.wsNative ?? inst.native), (m) => {
+      const trades = await deps.wsRequest<VenueTrade[]>(wsVia(feed.wsUrl), feed.subscribe(inst.wsNative ?? inst.native), (m) => {
         const t = feed.parseTrades(m);
         return t.length ? t : null;
       }, LIVE_TIMEOUT_MS);
-      steps.push({ label: `${form}: Live-Kurse`, state: "ok", detail: `Trade zu ${trades[trades.length - 1].price}` });
+      steps.push({ label: `${form}: Live-Kurse`, state: "ok", detail: `Trade zu ${trades[trades.length - 1].price}${via(feed.wsUrl)}` });
     } catch (e) {
-      steps.push({ label: `${form}: Live-Kurse`, state: "fail", detail: why(deps, e) });
+      steps.push({ label: `${form}: Live-Kurse`, state: "fail", detail: why(deps, e, feed.wsUrl) });
     }
   }
   return steps;
