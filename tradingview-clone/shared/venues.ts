@@ -56,6 +56,17 @@ export interface Feed {
   /** Message to keep the connection open, and how often. */
   ping?: { everyMs: number; message: string };
   parseTrades(msg: unknown): VenueTrade[];
+  /**
+   * Candles over the WebSocket, for when the browser blocks the REST call (CORS, Safari's
+   * "Load failed"). WebSockets are not subject to CORS. `paging`: older pages can be asked for too.
+   */
+  wsHistory?: {
+    paging: boolean;
+    /** Request for `limit` candles of our time frame `interval`, ending before `endSec`. */
+    request(native: string, interval: string, limit: number, endSec?: number): string;
+    /** The candles in a reply, oldest first; null for other messages (acks, heartbeats). Throws the exchange's error. */
+    parse(msg: unknown): Bar[] | null;
+  };
 }
 
 export interface VenuePair {
@@ -215,8 +226,10 @@ const krakenAsset = (a: string) => (a === "BTC" ? "XBT" : a === "DOGE" ? "XDG" :
 /** And back: XBT → BTC. */
 export const krakenCoin = (a: string) => (a === "XBT" ? "BTC" : a === "XDG" ? "DOGE" : a);
 
+const krakenSpotIntervals: Record<string, string> = { "1m": "1", "5m": "5", "15m": "15", "30m": "30", "1h": "60", "4h": "240", "1d": "1440", "1w": "10080" };
+
 const krakenSpot: Feed = {
-  intervals: { "1m": "1", "5m": "5", "15m": "15", "30m": "30", "1h": "60", "4h": "240", "1d": "1440", "1w": "10080" },
+  intervals: krakenSpotIntervals,
   maxLimit: 720,
   paging: false,
   candlesUrl: (native, code) => `https://api.kraken.com/0/public/OHLC?pair=${native}&interval=${code}`,
@@ -234,6 +247,20 @@ const krakenSpot: Feed = {
     const m = msg as { channel?: string; type?: string; data?: { price: number; qty: number; timestamp: string }[] };
     if (m.channel !== "trade" || m.type !== "update" || !Array.isArray(m.data)) return [];
     return m.data.map((t) => ({ price: num(t.price), size: num(t.qty), timeMs: Date.parse(t.timestamp) }));
+  },
+  // WS v2 "ohlc" channel, snapshot of the newest candles (https://docs.kraken.com/api/docs/websocket-v2/ohlc).
+  wsHistory: {
+    paging: false,
+    request: (native, interval) =>
+      JSON.stringify({ method: "subscribe", params: { channel: "ohlc", symbol: [native], interval: Number(krakenSpotIntervals[interval]), snapshot: true } }),
+    parse(msg) {
+      const m = msg as { method?: string; success?: boolean; error?: string; channel?: string; type?: string; data?: { open: number; high: number; low: number; close: number; volume: number; interval_begin: string }[] };
+      if (m.method === "subscribe" && m.success === false) fail("Kraken", m.error ?? "Abo abgelehnt");
+      if (m.channel !== "ohlc" || m.type !== "snapshot" || !Array.isArray(m.data)) return null;
+      return m.data
+        .map((c) => ({ time: Math.floor(Date.parse(c.interval_begin) / 1000), open: num(c.open), high: num(c.high), low: num(c.low), close: num(c.close), volume: num(c.volume) }))
+        .sort((a, b) => a.time - b.time);
+    },
   },
 };
 
@@ -459,6 +486,11 @@ const bitfinex: Venue = {
 
 type BitgetProduct = "SPOT" | "USDT-FUTURES" | "USDC-FUTURES" | "COIN-FUTURES";
 
+/** WebSocket candle channel suffix, the same for spot and futures. */
+const BITGET_WS_CANDLE: Record<string, string> = {
+  "1m": "1m", "3m": "3m", "5m": "5m", "15m": "15m", "30m": "30m", "1h": "1H", "4h": "4H", "6h": "6H", "12h": "12H", "1d": "1D", "3d": "3D", "1w": "1W", "1M": "1M",
+};
+
 function bitgetFeed(product: BitgetProduct): Feed {
   const spot = product === "SPOT";
   return {
@@ -485,6 +517,17 @@ function bitgetFeed(product: BitgetProduct): Feed {
       const m = msg as { arg?: { channel?: string }; action?: string; data?: { ts: string; price: string; size: string }[] };
       if (m.arg?.channel !== "trade" || m.action !== "update" || !Array.isArray(m.data)) return [];
       return m.data.map((t) => ({ price: num(t.price), size: num(t.size), timeMs: num(t.ts) }));
+    },
+    // Public "candle" channel, first push is a snapshot (https://www.bitget.com/api-doc/spot/websocket/public/Candlesticks-Channel).
+    wsHistory: {
+      paging: false,
+      request: (native, interval) => JSON.stringify({ op: "subscribe", args: [{ instType: product, channel: `candle${BITGET_WS_CANDLE[interval]}`, instId: native }] }),
+      parse(msg) {
+        const m = msg as { event?: string; msg?: string; arg?: { channel?: string }; action?: string; data?: unknown[][] };
+        if (m.event === "error") fail("Bitget", m.msg ?? "Abo abgelehnt");
+        if (!m.arg?.channel?.startsWith("candle") || m.action !== "snapshot" || !Array.isArray(m.data)) return null;
+        return m.data.map((r) => ({ time: Math.floor(num(r[0]) / 1000), open: num(r[1]), high: num(r[2]), low: num(r[3]), close: num(r[4]), volume: num(r[5]) })).sort((a, b) => a.time - b.time);
+      },
     },
   };
 }
@@ -584,13 +627,21 @@ const DERIBIT_RES: Record<string, [string, number]> = {
 };
 const DERIBIT_STEP = Object.fromEntries(Object.values(DERIBIT_RES));
 
+/** Query of get_tradingview_chart_data, for REST and JSON-RPC over the WebSocket. */
+function deribitChartParams(native: string, code: string, limit: number, endSec?: number) {
+  const end = endSec ? endSec * 1000 - 1 : Date.now();
+  return { instrument_name: native, resolution: code, start_timestamp: end - limit * DERIBIT_STEP[code] * 1000, end_timestamp: end };
+}
+
+const DERIBIT_HISTORY_ID = 7;
+
 const deribitFeed: Feed = {
   intervals: Object.fromEntries(Object.entries(DERIBIT_RES).map(([k, [code]]) => [k, code])),
   maxLimit: 1000,
   paging: true,
   candlesUrl(native, code, limit, endSec) {
-    const end = endSec ? endSec * 1000 - 1 : Date.now();
-    return `https://www.deribit.com/api/v2/public/get_tradingview_chart_data?instrument_name=${native}&resolution=${code}&start_timestamp=${end - limit * DERIBIT_STEP[code] * 1000}&end_timestamp=${end}`;
+    const q = deribitChartParams(native, code, limit, endSec);
+    return `https://www.deribit.com/api/v2/public/get_tradingview_chart_data?instrument_name=${q.instrument_name}&resolution=${q.resolution}&start_timestamp=${q.start_timestamp}&end_timestamp=${q.end_timestamp}`;
   },
   parseCandles(json) {
     const j = json as { result?: { status?: string; ticks?: number[]; open?: number[]; high?: number[]; low?: number[]; close?: number[]; volume?: number[] }; error?: { message?: string } };
@@ -605,6 +656,16 @@ const deribitFeed: Feed = {
     const m = msg as { method?: string; params?: { channel?: string; data?: { price: number; amount: number; timestamp: number }[] } };
     if (m.method !== "subscription" || !m.params?.channel?.startsWith("trades.") || !Array.isArray(m.params.data)) return [];
     return m.params.data.map((t) => ({ price: num(t.price), size: num(t.amount), timeMs: num(t.timestamp) }));
+  },
+  // The same method as JSON-RPC over the WebSocket (https://docs.deribit.com/#public-get_tradingview_chart_data).
+  wsHistory: {
+    paging: true,
+    request: (native, interval, limit, endSec) =>
+      JSON.stringify({ jsonrpc: "2.0", id: DERIBIT_HISTORY_ID, method: "public/get_tradingview_chart_data", params: deribitChartParams(native, DERIBIT_RES[interval][0], limit, endSec) }),
+    parse(msg) {
+      const m = msg as { id?: number };
+      return m.id === DERIBIT_HISTORY_ID ? deribitFeed.parseCandles(msg) : null;
+    },
   },
 };
 

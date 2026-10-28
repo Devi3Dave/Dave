@@ -14,6 +14,16 @@ export interface Release {
  */
 export const CHANGELOG: Release[] = [
   {
+    version: "0.56.0",
+    date: "2026-10-28",
+    title: "„Load failed“ bei manchen Börsen: WebSocket-Ausweg und Verbindungstest",
+    changes: [
+      "Sperrt der Browser den Kerzen-Abruf einer Börse (CORS, in Safari „Load failed“), laden Kraken Spot, Bitget und Deribit die Kerzen über ihren WebSocket; Kraken und Bitget liefern so nur die neuesten Kerzen",
+      "Statt „Load failed“ nennt der Fehler jetzt die Börse: „… lässt den Abruf aus dem Browser nicht zu (CORS) oder ist gerade nicht erreichbar“",
+      "🩺 Test in der Asset-Auswahl: prüft pro Börse mit BTC die Kerzen (REST und WebSocket), die Live-Kurse und die Marktliste und zeigt, ob Charts laden",
+    ],
+  },
+  {
     version: "0.55.0",
     date: "2026-10-28",
     title: "EU-Modus, Länderfilter und MiCA-Info",
