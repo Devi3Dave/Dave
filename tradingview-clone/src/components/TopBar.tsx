@@ -8,6 +8,7 @@ import { toggleFavorite, useFavorites } from "../favorites";
 import { LAYOUTS, addCompare, addIndicator, exitReplay, loadChart, setLayout, startReplay, store, useChartState, useWorkspace, workspace, type ChartType, type Interval } from "../store";
 import { APP_VERSION, BUILD_SHA, BUILD_TIME, formatBuildTime, reloadToLatest, useUpdateCheck } from "../version";
 import { AssetMenu, AssetSearchDialog } from "./AssetPicker";
+import { MicaDialog } from "./MicaDialog";
 import { useAlerts } from "../alerts";
 import { DemoButton } from "./DemoToasts";
 import { RefreshButton } from "./FreshnessBadge";
@@ -389,6 +390,7 @@ export function TopBar({ onOpenIndicators, onOpenSettings, onOpenShortcuts, heat
       </div>
       {searchOpen && <AssetSearchDialog onClose={() => setSearchOpen(false)} />}
       {compareOpen && <AssetSearchDialog title="Symbol vergleichen" onSelect={(symbol) => addCompare(symbol)} onClose={() => setCompareOpen(false)} />}
+      <MicaDialog />
       {showPrice && last && (
         <div className="header-price" data-tip={"Aktueller Kurs\nVeränderung über 24 Stunden (bei Tages-/Wochenchart zur Vorkerze)"}>
           <strong className={change !== null && change < 0 ? "down" : "up"}>{formatPrice(last.close)}</strong>

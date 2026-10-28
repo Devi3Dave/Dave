@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { ASSETS, ASSET_CATEGORIES, categoryOfFutures, findAsset, resolveAsset, searchAssets, type AssetCategory, type DataSource, type SearchHit } from "../../shared/assets";
-import { refreshBinanceLists, refreshVenueMarkets, setCryptoForm, setCryptoVenue, symbolFor, toggleAssetFavorite, useAssets } from "../assetStore";
+import { refreshBinanceLists, refreshVenueMarkets, setCryptoForm, setCryptoVenue, setEuMode, setMicaOpen, symbolFor, toggleAssetFavorite, useAssets } from "../assetStore";
 import { useFeedSettings } from "../market/exchangeFeed";
 import { STANDALONE } from "../config";
 import { loadChart, useChartState } from "../store";
 import { formatSpread, parseSpread, SPREAD_OP_LABELS } from "../../shared/spread";
 import { KIND_LABEL, parseVenueSymbol, VENUES, venueName, venueSymbol } from "../../shared/venues";
 import { marketLabel, searchMarkets } from "../../shared/venueMarkets";
+import { availabilityIn, EU_QUOTES, isEea, MICA, MICA_STATUS_ICON, MICA_STATUS_LABEL } from "../../shared/mica";
 import { Menu } from "./Menu";
 
 type Tab = "fav" | AssetCategory;
@@ -46,7 +47,7 @@ function readTab(): Tab {
 function useSourceOf() {
   const futuresSet = useAssets((s) => s.futuresSet);
   const feed = useFeedSettings().apiKey.length > 0;
-  useAssets((s) => s.venue + s.form); // the exchange and form decide where crypto loads from
+  useAssets((s) => `${s.venue}${s.form}${s.euMode}${!!s.markets[s.venue]}`); // the exchange, form and EU mode decide where crypto loads from
   return (hit: SearchHit): DataSource => {
     if (hit.symbol.includes(":") || (!hit.fixed && hit.category === "Krypto" && symbolFor(hit.symbol, hit.asset, true).includes(":"))) return "venue";
     if (hit.asset) return resolveAsset(hit.asset, STANDALONE, futuresSet, feed).source;
@@ -108,25 +109,41 @@ function AssetRow({ hit, onPick, onSelect }: { hit: SearchHit; onPick: () => voi
   );
 }
 
-/** Exchange and form crypto loads from, like TradingView's exchange filter (BINANCE:BTCUSDT, COINBASE:BTCUSD, BYBIT:BTCUSDT.P …). */
+/** Exchange and form crypto loads from, like TradingView's exchange filter (BINANCE:BTCUSDT, COINBASE:BTCUSD, BYBIT:BTCUSDT.P …), with the MiCA status of each exchange. */
 function VenueTabs() {
   const venue = useAssets((s) => s.venue);
   const form = useAssets((s) => s.form);
+  const euMode = useAssets((s) => s.euMode);
+  const country = useAssets((s) => s.country);
+  const onlyAllowed = useAssets((s) => s.onlyAllowed);
   const perps = VENUES.find((v) => v.id === venue)?.perps ?? false;
+  // The EU mode picks the EUR or USDC pair from the exchange's market list.
+  useEffect(() => {
+    if (euMode) void refreshVenueMarkets(venue).catch(() => undefined);
+  }, [euMode, venue]);
+  const filter = onlyAllowed && isEea(country);
+  const shown = VENUES.filter((v) => !filter || v.id === venue || availabilityIn(country, v.id).spot === "yes");
   return (
     <div className="asset-tabs venue-tabs" role="group" aria-label="Krypto-Börse">
       <span className="venue-label">Börse</span>
-      {VENUES.map((v) => (
-        <button
-          key={v.id}
-          className={venue === v.id ? "active" : ""}
-          onClick={() => setCryptoVenue(v.id)}
-          aria-pressed={venue === v.id}
-          data-tip={v.id === "BINANCE" ? "Krypto von Binance (wie bisher)" : `Krypto direkt von ${v.name} laden, z. B. ${venueSymbol(v.id, "BTCUSDT")}`}
-        >
-          {v.name}
-        </button>
-      ))}
+      {shown.map((v) => {
+        const status = MICA[v.id].status;
+        return (
+          <button
+            key={v.id}
+            className={venue === v.id ? "active" : ""}
+            onClick={() => setCryptoVenue(v.id)}
+            aria-pressed={venue === v.id}
+            data-tip={`${v.id === "BINANCE" ? "Krypto von Binance (wie bisher)" : `Krypto direkt von ${v.name} laden, z. B. ${venueSymbol(v.id, "BTCUSDT")}`}\n${MICA_STATUS_ICON[status]} ${MICA_STATUS_LABEL[status]}`}
+          >
+            {v.name}
+            <span className={`mica-dot ${status}`} aria-label={MICA_STATUS_LABEL[status]}>
+              {MICA_STATUS_ICON[status]}
+            </span>
+          </button>
+        );
+      })}
+      {filter && shown.length < VENUES.length && <span className="venue-label">+{VENUES.length - shown.length} ausgeblendet</span>}
       <span className="venue-label venue-form-label">Form</span>
       <button className={form === "spot" || !perps ? "active" : ""} onClick={() => setCryptoForm("spot")} aria-pressed={form === "spot" || !perps} data-tip="Spot-Paar (BTCUSDT)">
         Spot
@@ -139,6 +156,18 @@ function VenueTabs() {
         data-tip={perps ? "Perpetual-Kontrakt der Börse (BTCUSDT.P). Futures mit Laufzeit über 🔍 suchen, z. B. „btc futures“" : `${venueName(venue)} hat keine öffentlichen Perpetuals`}
       >
         Perp
+      </button>
+      <span className="venue-label venue-form-label">EU</span>
+      <button
+        className={euMode ? "active" : ""}
+        onClick={() => setEuMode(!euMode)}
+        aria-pressed={euMode}
+        data-tip={euMode ? "EU-Modus an: EUR- und USDC-Paare statt USDT (MiCA)" : "EU-Modus: EUR- und USDC-Paare statt USDT bevorzugen (MiCA)"}
+      >
+        🇪🇺 EUR/USDC
+      </button>
+      <button onClick={() => setMicaOpen(true)} data-tip="Welche Börse ist MiCA-lizenziert, was ist in deinem Land erlaubt">
+        MiCA-Info
       </button>
     </div>
   );
@@ -221,6 +250,7 @@ export function AssetSearchDialog({ onClose, onSelect, title = "Assets suchen" }
   const interval = useChartState((s) => s.interval);
   const venue = useAssets((s) => s.venue);
   const venueList = useAssets((s) => s.markets[venue]);
+  const euMode = useAssets((s) => s.euMode);
   const [loadingMarkets, setLoadingMarkets] = useState(false);
 
   useEffect(() => {
@@ -237,8 +267,8 @@ export function AssetSearchDialog({ onClose, onSelect, title = "Assets suchen" }
   const hits = useMemo(() => searchAssets(query, spot, futures), [query, spot, futures]);
   const q = query.trim().toUpperCase();
   const marketHits: SearchHit[] = useMemo(
-    () => (q && venueList ? searchMarkets(venueList.markets, query).map((m) => ({ symbol: m.symbol, name: marketLabel(m), category: "Krypto" as AssetCategory, fixed: true })) : []),
-    [q, query, venueList],
+    () => (q && venueList ? searchMarkets(venueList.markets, query, euMode ? EU_QUOTES : undefined).map((m) => ({ symbol: m.symbol, name: marketLabel(m), category: "Krypto" as AssetCategory, fixed: true })) : []),
+    [q, query, venueList, euMode],
   );
   const favHits = favorites.filter((f) => !q || f.symbol.includes(q) || f.name.toUpperCase().includes(q));
   const crypto = tab === "all" || tab === "Krypto";
@@ -344,7 +374,7 @@ export function AssetSearchDialog({ onClose, onSelect, title = "Assets suchen" }
           {STANDALONE
             ? "iPad-Version: Krypto live von Binance. Gold, Silber, Öl und viele US-Aktien kommen von Binance-Perpetuals (Perp). Für Assets mit „Demo“ gibt es hier keine Datenquelle."
             : "Krypto live von Binance, Aktien, Indizes, Rohstoffe und Forex über Yahoo Finance."}
-          {" Krypto-Börse: oben wählen, von welcher Börse Krypto kommt (Binance, Coinbase, Kraken, Bybit, OKX, Bitstamp, Bitfinex, Bitget, KuCoin, Deribit, BitMEX) und ob als Spot oder Perpetual. Die Suche zeigt alle Märkte der gewählten Börse: Spot-Paare, Perpetuals (.P), Futures mit Laufzeit und Optionen (Deribit, OKX, Binance), z. B. „btc perp“, „eth futures“ oder „btc call 100000“. Direkt eintippen geht auch: COINBASE:BTCUSD, BINANCE:BTCUSDT.P, OKX:BTC-USD-260327, DERIBIT:BTC-27MAR26-100000-C."}
+          {" Krypto-Börse: oben wählen, von welcher Börse Krypto kommt (Binance, Coinbase, Kraken, Bybit, OKX, Bitstamp, Bitfinex, Bitget, KuCoin, Deribit, BitMEX) und ob als Spot oder Perpetual. ✓/⏳/✕ zeigt, ob die Börse MiCA-lizenziert ist (MiCA-Info: Wohnsitzland, Quellen, Stand). 🇪🇺 EUR/USDC lädt statt USDT das Euro- oder USDC-Paar. Die Suche zeigt alle Märkte der gewählten Börse: Spot-Paare, Perpetuals (.P), Futures mit Laufzeit und Optionen (Deribit, OKX, Binance), z. B. „btc perp“, „eth futures“ oder „btc call 100000“. Direkt eintippen geht auch: COINBASE:BTCUSD, BINANCE:BTCUSDT.P, OKX:BTC-USD-260327, DERIBIT:BTC-27MAR26-100000-C."}
           {" Spread-Charts: zwei Symbole mit / - + * verbinden, z. B. BTCUSDT/ETHUSDT oder GC=F / SI=F, oder den Preisunterschied zweier Börsen: COINBASE:BTCUSD - BINANCE:BTCUSDT."}
           {" Mit einem eigenen Twelve-Data-Schlüssel (Aktualitäts-Nachweis → Börsenkurs einrichten) kommen Aktien, Indizes und Forex als Börsenkurs („Börse“)."}
         </p>

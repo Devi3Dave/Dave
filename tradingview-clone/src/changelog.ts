@@ -14,6 +14,17 @@ export interface Release {
  */
 export const CHANGELOG: Release[] = [
   {
+    version: "0.55.0",
+    date: "2026-10-28",
+    title: "EU-Modus, Länderfilter und MiCA-Info",
+    changes: [
+      "EU-Modus (🇪🇺 EUR/USDC in der Asset-Auswahl): Krypto lädt bei der gewählten Börse das Euro-Paar statt USDT, z. B. KRAKEN:BTCEUR, sonst USDC, EURC oder USD; die Suche zeigt diese Paare zuerst",
+      "MiCA-Info: pro Börse Lizenzstatus (✓ lizenziert, ⏳ beantragt, ✕ keine), Gesellschaft, Land, Aufsicht, Datum, Dienste, Derivate nach MiFID II und Quellen, Stand 28.10.2026",
+      "Wohnsitzland wählen: zeigt pro Börse, ob Spot und Derivate dort erlaubt sind; auf Wunsch blendet die Börsenzeile nicht erlaubte Börsen aus. Ein EU-Land schaltet beim ersten Mal den EU-Modus ein",
+      "Lizenziert laut Recherche: Coinbase (CSSF), Kraken (Central Bank of Ireland), OKX (MFSA), Bybit (FMA), Bitstamp (CSSF), KuCoin (FMA, Betrieb unklar); Bitget beantragt; Binance, Bitfinex, Deribit und BitMEX ohne Lizenz. Nur ein Hinweis, keine Rechtsberatung",
+    ],
+  },
+  {
     version: "0.54.0",
     date: "2026-10-28",
     title: "Bitget, KuCoin, Deribit, BitMEX und Krypto-Optionen",
