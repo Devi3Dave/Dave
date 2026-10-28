@@ -10,7 +10,7 @@ Ein kleiner Cloudflare Worker holt diese öffentlichen Kurse für dich ab und re
 - Nur Anfragen von deiner ChartAI-Seite `https://devi3dave.github.io` (`ALLOWED_ORIGINS`)
 - Keine Logins, keine API-Schlüssel, keine Orders, kein Geld. Dort kommt nie ein Schlüssel hinein
 - Höchstens 300 Anfragen pro Minute und Adresse, Antworten werden 10 Sekunden zwischengespeichert
-- Journal, Einstellungen und Demo-Trades bleiben wie bisher nur auf deinem Gerät
+- Journal, Einstellungen und Demo-Trades bleiben nur auf deinem Gerät, außer du schaltest den Sync ein (unten)
 
 Der kostenlose Cloudflare-Tarif reicht (100.000 Anfragen am Tag).
 
@@ -31,6 +31,54 @@ Der kostenlose Cloudflare-Tarif reicht (100.000 Anfragen am Tag).
 
 Die Adresse wird nur auf dem jeweiligen Gerät gespeichert: auf iPad und iPhone also je einmal eintragen.
 
+## Geräte synchronisieren (Mac ↔ iPad)
+
+Derselbe Worker kann deine Charts, Indikatoren, Zeichnungen, Layouts, Vorlagen, Alarme, Watchlisten, Journal, Demo-Konto und Einstellungen
+zwischen deinen Geräten abgleichen. Danach geht alles von selbst: was du am Mac einzeichnest, ist auf dem iPad da, sobald du ChartAI dort öffnest,
+und umgekehrt. Die API-Schlüssel für Claude und Twelve Data werden nie übertragen, sie bleiben auf dem jeweiligen Gerät.
+
+Dafür bekommt der Worker einen kleinen Speicher (Cloudflare KV) und einen geheimen Schlüssel. Nur wer diesen Schlüssel kennt, kann die Daten lesen
+oder ändern. Die Daten liegen in deinem eigenen Cloudflare-Konto. Einmalig ca. 10 Minuten, ohne Kommandozeile
+(Cloudflare benennt Menüs ab und zu leicht um; die Begriffe in **fett** stehen so oder ähnlich im Dashboard):
+
+1. **Neuen Worker-Code bereitstellen:** wie oben in Schritt 4: in Cloudflare den Worker öffnen → **Edit code** → den ganzen Inhalt durch den aktuellen
+   [`worker.js`](./worker.js) ersetzen → **Deploy**.
+2. **Speicher anlegen:** im Dashboard links **Storage & Databases** → **Workers KV** öffnen, dann **Create** (bzw. „Create instance“).
+   Als Namen `chartai-sync` eintragen und **Create** klicken.
+3. **Speicher mit dem Worker verbinden:** links **Compute (Workers)** → **Workers & Pages** → deinen Worker (z. B. `chartai-proxy`) anklicken →
+   oben den Reiter **Bindings** → **Add binding** → **KV namespace** wählen.
+   Bei **Variable name** genau `CHARTAI_SYNC` eintragen (Großbuchstaben, mit Unterstrich), bei **KV namespace** `chartai-sync` auswählen → **Add binding**.
+4. **Schlüssel erzeugen:** am Mac in ChartAI oben auf **☁** tippen → **🎲 Schlüssel erzeugen** → **Schlüssel kopieren**.
+   Das Fenster offen lassen.
+5. **Schlüssel im Worker hinterlegen:** in Cloudflare beim Worker den Reiter **Settings** → **Variables and Secrets** → **Add**.
+   **Type:** `Secret`, **Variable name:** genau `SYNC_KEY`, **Value:** den kopierten Schlüssel einfügen → **Deploy** (bzw. „Save and deploy“).
+6. **Am Mac einschalten:** zurück in ChartAI. Die Worker-Adresse steht schon drin, wenn du den Proxy eingetragen hast, sonst eintragen.
+   **Verbinden** tippen. Es erscheint „Worker bereit, noch leer“ → **Sync einschalten**. Oben steht jetzt **☁✓**.
+7. **iPad verbinden:** am Mac im ☁-Fenster **🔗 Kopplungslink kopieren** und dir den Link aufs iPad schicken (AirDrop, Notizen oder Nachricht an dich
+   selbst). Auf dem iPad antippen: ChartAI öffnet sich, übernimmt Adresse und Schlüssel und lädt deinen Stand vom Mac
+   („☁ Stand vom anderen Gerät übernommen“).
+   Nutzt du ChartAI auf dem iPad als App vom Home-Bildschirm, hat diese App einen eigenen Speicher: dort selbst auf **☁** tippen, Adresse und
+   Schlüssel einfügen (am Mac **Schlüssel kopieren**, auf dem iPad einfügen) → **Verbinden** → **Stand vom anderen Gerät laden**.
+
+**So arbeitet der Sync**
+
+- Beim Öffnen von ChartAI holt es zuerst den neuesten Stand (höchstens ein paar Sekunden, ohne Netz startet es einfach mit dem eigenen Stand)
+- Änderungen gehen wenige Sekunden später an den Worker, danach höchstens alle 45 Sekunden und sofort, wenn du ChartAI verlässt oder das iPad sperrst
+- Kommt ein neuer Stand vom anderen Gerät, übernimmt ChartAI ihn, sobald du es wieder nach vorne holst oder etwa 10 Sekunden nichts tippst
+  (die Seite lädt dafür kurz neu)
+- Abgeglichen wird Eintrag für Eintrag (z. B. Chart 1, Alarme, Journal): wer zuletzt geändert hat, gewinnt. Eine Zeichnung am Mac und ein Alarm am iPad
+  bleiben also beide erhalten. Ändern beide Geräte gleichzeitig denselben Chart, gilt die spätere Änderung
+- Der Gratis-Tarif erlaubt 1000 Speichervorgänge und 100.000 Abrufe am Tag, das reicht bei normaler Nutzung locker
+- **Ausschalten:** ☁ → **Sync ausschalten**. Alles bleibt auf dem Gerät. Die Daten im Worker löschst du in Cloudflare unter
+  **Workers KV** → `chartai-sync` → Eintrag `chartai-sync-v1` löschen
+
+**Wenn ☁⚠ erscheint** (Tippen zeigt den Grund):
+
+- „Sync-Schlüssel stimmt nicht“: in ChartAI und in Cloudflare (`SYNC_KEY`) steht nicht derselbe Schlüssel. Schritt 5 mit dem Schlüssel aus ChartAI wiederholen
+- „im Worker fehlt noch der KV-Speicher“: Schritt 3, der Name muss genau `CHARTAI_SYNC` sein
+- „im Worker fehlt noch das Secret SYNC_KEY“: Schritt 5
+- „Worker ist noch die alte Version ohne Sync“: Schritt 1
+
 ## Häufige Fragen
 
 - **„Proxy läuft, erlaubt aber diese Seite nicht“:** ChartAI läuft unter einer anderen Adresse als `https://devi3dave.github.io`. Im Worker oben bei
@@ -47,4 +95,8 @@ Die Adresse wird nur auf dem jeweiligen Gerät gespeichert: auf iPad und iPhone 
 - WebSocket `wss://<worker>/ws.bitmex.com/realtime` wird zu `wss://ws.bitmex.com/realtime` durchgereicht (BitMEX lehnt den Browser auch dort ab)
 - ChartAI schickt KuCoin, BitMEX, Kraken Futures und Binance-Optionen immer über den Proxy, Bitfinex und Bitstamp nur, wenn der direkte Abruf scheitert
   (`shared/proxy.ts`, dessen Hostlisten mit `worker.js` übereinstimmen müssen; ein Test prüft das)
-- Quelle: Cloudflare-Dokumentation zu Workers (fetch-Handler, WebSockets, `cf.cacheTtl`), developers.cloudflare.com/workers
+- Sync: `GET /sync` liefert den gespeicherten Stand (`?rev=` mit aktuellem Stand: nur `{"same":true}`), `POST /sync` mit `{"items":{…}}` führt
+  Eintrag für Eintrag zusammen (neuere Zeit `t` gewinnt). Beides nur mit `Authorization: Bearer <SYNC_KEY>` und von der ChartAI-Seite.
+  Logik der App: `shared/sync.ts` und `src/sync.ts`
+- Quelle: Cloudflare-Dokumentation zu Workers (fetch-Handler, WebSockets, `cf.cacheTtl`, Bindings, Secrets), developers.cloudflare.com/workers,
+  und zu Workers KV (`get`, `put`, Limits), developers.cloudflare.com/kv

@@ -20,6 +20,7 @@ import { CHANGELOG } from "../changelog";
 import { shortcutLabel, useShortcutOverrides, useShortcuts } from "../shortcuts";
 import { TemplatesMenu } from "./TemplatesMenu";
 import { SavedLayoutMenu } from "./LayoutMenu";
+import { SyncButton } from "./SyncDialog";
 
 const SPECIAL_LABELS: Record<string, string> = {
   "1M": "1 Monat",
@@ -452,6 +453,7 @@ export function TopBar({ onOpenIndicators, onOpenSettings, onOpenShortcuts, heat
       <button className="pill" onClick={onOpenSettings} aria-label="Chart-Einstellungen" data-tip={"Chart-Einstellungen\nAchsen, Kurslabel, Countdown, Zeitzone, Gitter"}>
         ⚙
       </button>
+      <SyncButton />
       <DemoButton active={demoOpen} onClick={onToggleDemo} />
       <button className={`pill ${alertsOpen ? "active" : ""}`} onClick={onToggleAlerts} aria-label="Alarme" data-tip={`Alarme${keys("panel.alerts")}\nPreis, Indikator, Linie oder Zone – mit Ton und Hinweis`}>
         <span className="pill-icon">🔔</span>

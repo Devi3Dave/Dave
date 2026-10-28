@@ -14,6 +14,18 @@ export interface Release {
  */
 export const CHANGELOG: Release[] = [
   {
+    version: "0.62.0",
+    date: "2026-10-28",
+    title: "Sync zwischen Mac und iPad",
+    changes: [
+      "Neu oben: ☁ Sync. Charts, Indikatoren, Zeichnungen, Layouts, Vorlagen, Alarme, Watchlisten, Journal, Demo-Konto und Einstellungen gleichen sich automatisch zwischen deinen Geräten ab",
+      "Läuft über deinen eigenen Cloudflare Worker mit einem kleinen Speicher (KV) und einem geheimen Schlüssel; Anleitung Schritt für Schritt in proxy/README.md. Den neuen worker.js-Code dafür einmal in Cloudflare einfügen",
+      "Beim Öffnen holt ChartAI zuerst den neuesten Stand; ein neuer Stand vom anderen Gerät wird übernommen, sobald du ChartAI nach vorne holst oder kurz nichts tippst",
+      "Abgleich Eintrag für Eintrag, die spätere Änderung gewinnt: eine Zeichnung am Mac und ein Alarm am iPad bleiben beide erhalten",
+      "Das iPad verbindest du mit einem Kopplungslink (AirDrop oder Notizen); API-Schlüssel für Claude und Twelve Data bleiben auf dem jeweiligen Gerät",
+    ],
+  },
+  {
     version: "0.61.1",
     date: "2026-10-28",
     title: "EU-Schalter wirkt sofort",
