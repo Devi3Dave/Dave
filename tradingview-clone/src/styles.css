@@ -5129,3 +5129,15 @@ select,
 .asset-tips p {
   margin: 6px 0 0;
 }
+
+.picker-settings-text small {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.picker-settings-note {
+  margin: 0 8px 6px 34px;
+  color: var(--claude);
+  font-size: 12px;
+}
