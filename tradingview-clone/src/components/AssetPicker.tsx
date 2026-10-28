@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { ASSETS, ASSET_CATEGORIES, categoryOfFutures, findAsset, resolveAsset, searchAssets, type AssetCategory, type DataSource, type SearchHit } from "../../shared/assets";
-import { refreshBinanceLists, setCryptoVenue, symbolFor, toggleAssetFavorite, useAssets } from "../assetStore";
+import { refreshBinanceLists, refreshVenueMarkets, setCryptoForm, setCryptoVenue, symbolFor, toggleAssetFavorite, useAssets } from "../assetStore";
 import { useFeedSettings } from "../market/exchangeFeed";
 import { STANDALONE } from "../config";
 import { loadChart, useChartState } from "../store";
 import { formatSpread, parseSpread, SPREAD_OP_LABELS } from "../../shared/spread";
-import { VENUES, venueName } from "../../shared/venues";
+import { KIND_LABEL, parseVenueSymbol, VENUES, venueName } from "../../shared/venues";
+import { marketLabel, searchMarkets } from "../../shared/venueMarkets";
 import { Menu } from "./Menu";
 
 type Tab = "fav" | AssetCategory;
@@ -45,9 +46,9 @@ function readTab(): Tab {
 function useSourceOf() {
   const futuresSet = useAssets((s) => s.futuresSet);
   const feed = useFeedSettings().apiKey.length > 0;
-  const venue = useAssets((s) => s.venue);
+  useAssets((s) => s.venue + s.form); // the exchange and form decide where crypto loads from
   return (hit: SearchHit): DataSource => {
-    if (hit.symbol.includes(":") || (venue !== "BINANCE" && hit.category === "Krypto" && symbolFor(hit.symbol, hit.asset, true).includes(":"))) return "venue";
+    if (hit.symbol.includes(":") || (!hit.fixed && hit.category === "Krypto" && symbolFor(hit.symbol, hit.asset, true).includes(":"))) return "venue";
     if (hit.asset) return resolveAsset(hit.asset, STANDALONE, futuresSet, feed).source;
     return futuresSet?.has(hit.symbol) && hit.category !== "Krypto" ? "binance_futures" : hit.symbol.endsWith("USDT") ? "binance" : STANDALONE ? "demo" : "yahoo";
   };
@@ -58,6 +59,8 @@ function useFavoriteHits(): SearchHit[] {
   const favorites = useAssets((s) => s.favorites);
   const futures = useAssets((s) => s.futures);
   return favorites.map((symbol) => {
+    const inst = parseVenueSymbol(symbol);
+    if (inst) return { symbol, name: `${findAsset(symbol)?.name ?? `${inst.pair.base} / ${inst.pair.quote}`} · ${KIND_LABEL[inst.kind]}`, category: "Krypto" as AssetCategory, fixed: true };
     const asset = ASSETS.find((a) => a.id === symbol);
     if (asset) return { symbol, name: asset.name, category: asset.category, asset };
     const f = futures.find((x) => x.symbol === symbol);
@@ -72,7 +75,7 @@ function AssetRow({ hit, onPick, onSelect }: { hit: SearchHit; onPick: () => voi
   const interval = useChartState((s) => s.interval);
   const fav = useAssets((s) => s.favorites.includes(hit.symbol));
   const source = useSourceOf()(hit);
-  const target = symbolFor(hit.symbol, hit.asset, hit.category === "Krypto");
+  const target = hit.fixed ? hit.symbol : symbolFor(hit.symbol, hit.asset, hit.category === "Krypto");
   const badge = source === "venue" ? { label: venueName(target.split(":")[0]), tip: `Echte Kurse live direkt von ${venueName(target.split(":")[0])}` } : BADGE[source];
   return (
     <div className="asset-row">
@@ -105,9 +108,11 @@ function AssetRow({ hit, onPick, onSelect }: { hit: SearchHit; onPick: () => voi
   );
 }
 
-/** Exchange crypto loads from, like TradingView's exchange filter (BINANCE:BTCUSDT, COINBASE:BTCUSD …). */
+/** Exchange and form crypto loads from, like TradingView's exchange filter (BINANCE:BTCUSDT, COINBASE:BTCUSD, BYBIT:BTCUSDT.P …). */
 function VenueTabs() {
   const venue = useAssets((s) => s.venue);
+  const form = useAssets((s) => s.form);
+  const perps = VENUES.find((v) => v.id === venue)?.perps ?? false;
   return (
     <div className="asset-tabs venue-tabs" role="group" aria-label="Krypto-Börse">
       <span className="venue-label">Börse</span>
@@ -122,6 +127,19 @@ function VenueTabs() {
           {v.name}
         </button>
       ))}
+      <span className="venue-label venue-form-label">Form</span>
+      <button className={form === "spot" || !perps ? "active" : ""} onClick={() => setCryptoForm("spot")} aria-pressed={form === "spot" || !perps} data-tip="Spot-Paar (BTCUSDT)">
+        Spot
+      </button>
+      <button
+        className={form === "perp" && perps ? "active" : ""}
+        onClick={() => setCryptoForm("perp")}
+        disabled={!perps}
+        aria-pressed={form === "perp" && perps}
+        data-tip={perps ? "Perpetual-Kontrakt der Börse (BTCUSDT.P). Futures mit Laufzeit über 🔍 suchen, z. B. „btc futures“" : `${venueName(venue)} hat keine öffentlichen Perpetuals`}
+      >
+        Perp
+      </button>
     </div>
   );
 }
@@ -201,24 +219,43 @@ export function AssetSearchDialog({ onClose, onSelect, title = "Assets suchen" }
   const futures = useAssets((s) => s.futures);
   const favorites = useFavoriteHits();
   const interval = useChartState((s) => s.interval);
+  const venue = useAssets((s) => s.venue);
+  const venueList = useAssets((s) => s.markets[venue]);
+  const [loadingMarkets, setLoadingMarkets] = useState(false);
 
   useEffect(() => {
     void refreshBinanceLists().finally(() => setLoadingLists(false));
   }, []);
+  // Every spot pair, perpetual and future of the chosen exchange, for the search.
+  useEffect(() => {
+    setLoadingMarkets(true);
+    void refreshVenueMarkets(venue)
+      .catch(() => undefined)
+      .finally(() => setLoadingMarkets(false));
+  }, [venue]);
 
   const hits = useMemo(() => searchAssets(query, spot, futures), [query, spot, futures]);
   const q = query.trim().toUpperCase();
+  const marketHits: SearchHit[] = useMemo(
+    () => (q && venueList ? searchMarkets(venueList.markets, query).map((m) => ({ symbol: m.symbol, name: marketLabel(m), category: "Krypto" as AssetCategory, fixed: true })) : []),
+    [q, query, venueList],
+  );
   const favHits = favorites.filter((f) => !q || f.symbol.includes(q) || f.name.toUpperCase().includes(q));
+  const crypto = tab === "all" || tab === "Krypto";
+  const marketsTitle = `Alle Märkte bei ${venueName(venue)}`;
   const sections: [string, SearchHit[]][] =
     tab === "fav"
       ? [["★ Favoriten", favHits]]
       : tab === "all"
         ? [
             ["★ Favoriten", favHits] as [string, SearchHit[]],
+            [marketsTitle, marketHits] as [string, SearchHit[]],
             ...ASSET_CATEGORIES.map((c) => [c, hits.filter((h) => h.category === c)] as [string, SearchHit[]]),
           ].filter(([, list]) => list.length > 0)
-        : [[tab, hits.filter((h) => h.category === tab)]];
-  const exact = hits.some((h) => h.symbol === q) || favHits.some((h) => h.symbol === q);
+        : tab === "Krypto" && marketHits.length
+          ? [[marketsTitle, marketHits], [tab, hits.filter((h) => h.category === tab)]]
+          : [[tab, hits.filter((h) => h.category === tab)]];
+  const exact = hits.some((h) => h.symbol === q) || favHits.some((h) => h.symbol === q) || marketHits.some((h) => h.symbol === q);
   const spread = parseSpread(q);
   const select = (target: string) => (onSelect ? onSelect(target) : void loadChart(target, interval));
 
@@ -234,14 +271,14 @@ export function AssetSearchDialog({ onClose, onSelect, title = "Assets suchen" }
         <input
           autoFocus
           className="search"
-          placeholder="Name oder Symbol, z. B. Gold, Tesla, PEPE, KRAKEN:BTCEUR … oder Spread BTCUSDT/ETHUSDT"
+          placeholder="Name oder Symbol, z. B. Gold, Tesla, btc perp, eth futures, KRAKEN:BTCEUR, BYBIT:BTCUSDT.P …"
           value={query}
           spellCheck={false}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => {
             if (e.key !== "Enter" || !q) return;
             const first = sections[0]?.[1][0];
-            select(spread ? formatSpread(spread) : first ? symbolFor(first.symbol, first.asset, first.category === "Krypto") : q);
+            select(spread ? formatSpread(spread) : first ? (first.fixed ? first.symbol : symbolFor(first.symbol, first.asset, first.category === "Krypto")) : q);
             onClose();
           }}
         />
@@ -296,12 +333,18 @@ export function AssetSearchDialog({ onClose, onSelect, title = "Assets suchen" }
             </section>
           ))}
           {loadingLists && <div className="menu-empty">Lade alle Binance-Märkte …</div>}
+          {crypto && loadingMarkets && !venueList && <div className="menu-empty">Lade alle Märkte von {venueName(venue)} (Spot, Perpetuals, Futures) …</div>}
+          {crypto && q && venueList && venueList.failed.length > 0 && (
+            <div className="menu-empty">
+              {venueName(venue)}: {venueList.failed.length} von den Marktlisten nicht erreichbar, die Suche ist unvollständig. Symbole wie {venue}:BTCUSDT.P lassen sich trotzdem direkt eintippen.
+            </div>
+          )}
         </div>
         <p className="hint">
           {STANDALONE
             ? "iPad-Version: Krypto live von Binance. Gold, Silber, Öl und viele US-Aktien kommen von Binance-Perpetuals (Perp). Für Assets mit „Demo“ gibt es hier keine Datenquelle."
             : "Krypto live von Binance, Aktien, Indizes, Rohstoffe und Forex über Yahoo Finance."}
-          {" Krypto-Börse: oben wählen, ob Krypto von Binance, Coinbase, Kraken, Bybit, OKX, Bitstamp oder Bitfinex kommt, oder direkt eintippen, z. B. COINBASE:BTCUSD oder KRAKEN:ETHEUR."}
+          {" Krypto-Börse: oben wählen, ob Krypto von Binance, Coinbase, Kraken, Bybit, OKX, Bitstamp oder Bitfinex kommt, und ob als Spot oder Perpetual. Die Suche zeigt alle Märkte der gewählten Börse: Spot-Paare, Perpetuals (.P) und Futures mit Laufzeit, z. B. „btc perp“ oder „eth futures“. Direkt eintippen geht auch: COINBASE:BTCUSD, BINANCE:BTCUSDT.P, OKX:BTC-USD-260327."}
           {" Spread-Charts: zwei Symbole mit / - + * verbinden, z. B. BTCUSDT/ETHUSDT oder GC=F / SI=F, oder den Preisunterschied zweier Börsen: COINBASE:BTCUSD - BINANCE:BTCUSDT."}
           {" Mit einem eigenen Twelve-Data-Schlüssel (Aktualitäts-Nachweis → Börsenkurs einrichten) kommen Aktien, Indizes und Forex als Börsenkurs („Börse“)."}
         </p>

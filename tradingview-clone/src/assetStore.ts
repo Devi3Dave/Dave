@@ -2,12 +2,42 @@ import { useSyncExternalStore } from "react";
 import { findAsset, parseFuturesInfo, parseSpotTickers, resolveAsset, type Asset, type FuturesSymbol } from "../shared/assets";
 import { STANDALONE } from "./config";
 import { feedSettings } from "./market/exchangeFeed";
-import { VENUES, venueSymbol, type VenueId } from "../shared/venues";
+import { perpSymbol, VENUES, venueSymbol, type VenueId } from "../shared/venues";
+import { loadVenueMarkets, type Market } from "../shared/venueMarkets";
 
 const FAV_KEY = "chartai.assetFavorites.v1";
 const LISTS_KEY = "chartai.binanceSymbols.v1";
 const LISTS_MAX_AGE = 12 * 3600 * 1000;
 const VENUE_KEY = "chartai.cryptoVenue.v1";
+const FORM_KEY = "chartai.cryptoForm.v1";
+const MARKETS_KEY = "chartai.venueMarkets.v1.";
+
+/** How crypto picked from the catalog trades: spot pair or the exchange's usual perpetual (BTCUSDT.P). */
+export type CryptoForm = "spot" | "perp";
+
+function loadForm(): CryptoForm {
+  try {
+    return localStorage.getItem(FORM_KEY) === "perp" ? "perp" : "spot";
+  } catch {
+    return "spot";
+  }
+}
+
+interface MarketList {
+  time: number;
+  markets: Market[];
+  /** Lists the exchange did not deliver (blocked or down). */
+  failed: string[];
+}
+
+function loadMarketList(venue: VenueId): MarketList | null {
+  try {
+    const v = JSON.parse(localStorage.getItem(MARKETS_KEY + venue) ?? "null") as MarketList | null;
+    return v && Array.isArray(v.markets) ? v : null;
+  } catch {
+    return null;
+  }
+}
 
 function loadVenue(): VenueId {
   try {
@@ -52,6 +82,9 @@ interface AssetState {
   futuresSet: Set<string> | null;
   /** Exchange that crypto picked in the picker loads from (BINANCE: the plain Binance pair). */
   venue: VenueId;
+  form: CryptoForm;
+  /** Every market (spot, perpetual, future) of the exchanges asked so far. */
+  markets: Partial<Record<VenueId, MarketList>>;
 }
 
 const cached = loadLists();
@@ -61,6 +94,8 @@ let state: AssetState = {
   futures: cached?.futures ?? [],
   futuresSet: cached?.futures.length ? new Set(cached.futures.map((f) => f.symbol)) : null,
   venue: loadVenue(),
+  form: loadForm(),
+  markets: {},
 };
 const listeners = new Set<() => void>();
 
@@ -96,6 +131,41 @@ export function setCryptoVenue(venue: VenueId) {
     // not remembered
   }
   set({ venue });
+}
+
+export function setCryptoForm(form: CryptoForm) {
+  try {
+    localStorage.setItem(FORM_KEY, form);
+  } catch {
+    // not remembered
+  }
+  set({ form });
+}
+
+const marketsLoading = new Map<VenueId, Promise<void>>();
+
+/** Loads every market of an exchange for the search (cached for 12 hours). */
+export function refreshVenueMarkets(venue: VenueId): Promise<void> {
+  const have = state.markets[venue] ?? loadMarketList(venue);
+  if (have && !state.markets[venue]) set({ markets: { ...state.markets, [venue]: have } });
+  if (have && Date.now() - have.time < LISTS_MAX_AGE && have.failed.length === 0) return Promise.resolve();
+  let p = marketsLoading.get(venue);
+  if (!p) {
+    p = (async () => {
+      const got = await loadVenueMarkets(venue, (url) => getJson([url]));
+      // A list that failed keeps what was there before.
+      const markets = got.failed.length && have ? [...got.markets, ...have.markets.filter((m) => !got.markets.some((g) => g.symbol === m.symbol))] : got.markets;
+      const next: MarketList = { time: Date.now(), markets, failed: got.failed };
+      set({ markets: { ...state.markets, [venue]: next } });
+      try {
+        localStorage.setItem(MARKETS_KEY + venue, JSON.stringify(next));
+      } catch {
+        // too large or blocked: fetched again next time
+      }
+    })().finally(() => marketsLoading.delete(venue));
+    marketsLoading.set(venue, p);
+  }
+  return p;
 }
 
 async function getJson(urls: string[]): Promise<unknown> {
@@ -143,11 +213,13 @@ export function refreshBinanceLists(): Promise<void> {
 
 /**
  * Symbol to load for a picker entry: catalog assets may switch to their Binance perpetual, and crypto
- * (`crypto`) loads from the exchange chosen in the picker (BTCUSDT → COINBASE:BTCUSD). Symbols that
+ * (`crypto`) loads from the exchange and form chosen in the picker (BTCUSDT → COINBASE:BTCUSD, BYBIT:BTCUSDT.P). Symbols that
  * already name an exchange stay as they are.
  */
 export function symbolFor(symbol: string, asset?: Asset, crypto = false): string {
   if (symbol.includes(":")) return symbol;
+  const perp = crypto && state.form === "perp" ? perpSymbol(state.venue, symbol) : null;
+  if (perp) return perp;
   if (crypto && state.venue !== "BINANCE") return venueSymbol(state.venue, symbol);
   const a = asset ?? findAsset(symbol);
   return a ? resolveAsset(a, STANDALONE, state.futuresSet, feedSettings.active()).symbol : symbol;

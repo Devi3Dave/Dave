@@ -8,7 +8,7 @@ import type { Bar } from "../shared/math";
 import type { PositionInput } from "../shared/position";
 import { barIndexAt, carryReplay, nextReplayStep, randomStart, replayFrame } from "../shared/replay";
 import { loadSpreadData, parseSpread } from "../shared/spread";
-import { parseVenueSymbol, type VenueSymbol } from "../shared/venues";
+import { parseVenueSymbol, type Instrument } from "../shared/venues";
 import type { IndicatorSourceRef } from "../shared/indicators";
 import { addTrades, isTradeInterval, MAX_TRADE_BARS, parseTradeInterval } from "../shared/tickBars";
 import type { CHART_TYPES, CustomInterval, INTERVALS, TradeIntervalCode } from "../shared/tools";
@@ -785,12 +785,13 @@ function connectTradeLive(chart: ChartStore, json: MarketData, current: () => bo
   return ws;
 }
 
-/** Trades from another crypto exchange's WebSocket (shared/venues.ts), folded into the chart's candles. */
-function connectVenueLive(chart: ChartStore, { venue, pair }: VenueSymbol, interval: Interval, current: () => boolean, onData: () => void): WebSocket {
+/** Trades of an exchange's market (shared/venues.ts: spot, perpetual or future), folded into the chart's candles. */
+function connectVenueLive(chart: ChartStore, inst: Instrument, interval: Interval, current: () => boolean, onData: () => void): WebSocket {
+  const venue = inst.feed;
   const ws = new WebSocket(venue.wsUrl);
   let ping: number | undefined;
   ws.onopen = () => {
-    ws.send(venue.subscribe(pair));
+    ws.send(venue.subscribe(inst.wsNative ?? inst.native));
     if (venue.ping) {
       const { everyMs, message } = venue.ping;
       ping = window.setInterval(() => (ws.readyState === WebSocket.OPEN ? ws.send(message) : window.clearInterval(ping)), everyMs);

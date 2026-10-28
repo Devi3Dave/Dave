@@ -97,6 +97,11 @@ und zusammen mit der Fill & Sign-App auf GitHub Pages veröffentlicht.
   Krypto kommt; ohne Präfix oder mit `BINANCE:` bleibt es Binance. Ein Paar, das die Börse nicht listet,
   zeigt einen Fehler statt fremder Kurse. Preisunterschied zweier Börsen als Spread:
   `COINBASE:BTCUSD - BINANCE:BTCUSDT`. Orderbuch, Liquidationen und Footprint bleiben Binance-only.
+- Perpetuals und Futures: `.P` wie bei TradingView (`BINANCE:BTCUSDT.P`, `BINANCE:BTCUSD.P` für COIN-M,
+  `BYBIT:BTCUSDT.P`, `OKX:BTCUSDT.P`, `KRAKEN:BTCUSD.P`, `BITFINEX:BTCUSDT.P`), Futures mit Laufzeit unter dem
+  Namen der Börse (`BINANCE:BTCUSDT_260327`, `OKX:BTC-USD-260327`, `BYBIT:BTCUSDT-27MAR26`). In der
+  Asset-Auswahl schaltet „Spot / Perp“ die Form um; die Suche listet alle Märkte der gewählten Börse
+  (`shared/venueMarkets.ts`), z. B. „btc perp“ oder „eth futures“.
 - Asset-Auswahl in der Kopfzeile: Drop-down mit gängigen Assets nach Rubriken (Krypto, Aktien,
   Indizes & ETFs, Edelmetalle, Rohstoffe, Forex) und Favoriten; 🔍 öffnet die Suche über alle
   Binance-Märkte, ebenfalls nach Rubriken, mit ☆ zum Speichern von Favoriten. Jede Zeile zeigt die
