@@ -65,12 +65,23 @@ async function checkInstrument(form: string, inst: Instrument, deps: CheckDeps):
   return steps;
 }
 
+const STEP_TIMEOUT_MS = 30_000;
+
+/** A step that hangs (slow network, a request without answer) ends as failed instead of keeping the test running. */
+function withTimeout(p: Promise<CheckStep[]>): Promise<CheckStep[]> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const late = new Promise<CheckStep[]>((resolve) => {
+    timer = setTimeout(() => resolve([{ label: "Test", state: "fail", detail: "keine Antwort nach 30 s" }]), STEP_TIMEOUT_MS);
+  });
+  return Promise.race([p, late]).finally(() => clearTimeout(timer));
+}
+
 /** Tests BTC spot (and the BTC perpetual where the exchange has one) plus the exchange's market lists. */
 export async function checkVenue(id: VenueId, deps: CheckDeps): Promise<CheckStep[]> {
   const venue = getVenue(id);
   if (!venue) return [{ label: id, state: "fail", detail: "unbekannte Börse" }];
   const forms: [string, string | null][] = [
-    ["Spot", venueSymbol(id, "BTCUSDT")],
+    ["Spot", venue.noSpot ? null : venueSymbol(id, "BTCUSDT")],
     ["Perp", perpSymbol(id, "BTCUSDT")],
   ];
   const runs = forms.map(async ([form, symbol]): Promise<CheckStep[]> => {
@@ -97,6 +108,7 @@ export async function checkVenue(id: VenueId, deps: CheckDeps): Promise<CheckSte
       detail: `${got.failed.length} Liste(n) blockiert: ${got.failed.map((u) => new URL(u).host).join(", ")}${got.markets.length ? ` · ${got.markets.length} Märkte aus den übrigen` : ""}`,
     };
   })();
-  const parts = await Promise.all([...runs, lists.then((s) => [s])]);
-  return parts.flat();
+  const parts = await Promise.all([...runs, lists.then((s) => [s])].map((p) => withTimeout(p)));
+  const steps = parts.flat();
+  return venue.noSpot ? [{ label: "Spot", state: "skip", detail: venue.noSpot }, ...steps] : steps;
 }

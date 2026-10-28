@@ -252,7 +252,8 @@ describe("Bitget, KuCoin, Deribit, BitMEX and options", () => {
     expect(p("DERIBIT:BTCUSD.P")).toEqual({ kind: "perp", native: "BTC-PERPETUAL", inverse: true, quote: "USD" });
     expect(p("DERIBIT:SOLUSDC.P")).toEqual({ kind: "perp", native: "SOL_USDC-PERPETUAL", inverse: false, quote: "USDC" });
     expect(p("DERIBIT:BTC-27MAR26")).toEqual({ kind: "future", native: "BTC-27MAR26", inverse: true, quote: "USD" });
-    expect(p("DERIBIT:BTCUSDC")).toEqual({ kind: "spot", native: "BTC_USDC", inverse: false, quote: "USDC" });
+    // Deribit routes spot to Coinbase and has no candles for it.
+    expect(parseVenueSymbol("DERIBIT:BTCUSDC")).toBeNull();
     expect(p("BITMEX:BTCUSD.P")).toEqual({ kind: "perp", native: "XBTUSD", inverse: true, quote: "USD" });
     expect(p("BITMEX:BTCUSDT.P")).toEqual({ kind: "perp", native: "XBTUSDT", inverse: false, quote: "USDT" });
     expect(p("BITMEX:XBTZ26")).toEqual({ kind: "future", native: "XBTZ26", inverse: true, quote: "USD" });

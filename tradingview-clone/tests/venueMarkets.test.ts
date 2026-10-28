@@ -203,7 +203,6 @@ describe("more exchanges and options", () => {
       ["DERIBIT:ETHUSDC.P", "perp"],
       ["DERIBIT:BTC-27MAR26", "future"],
       ["DERIBIT:BTC-27MAR26-100000-C", "option"],
-      ["DERIBIT:BTCUSDC", "spot"],
     ]);
     expect(deribit[3]).toMatchObject({ strike: 100000, right: "C", expiry: "2026-03-27" });
     const bitmex = parseBitmex([

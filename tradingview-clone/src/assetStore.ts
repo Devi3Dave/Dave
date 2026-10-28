@@ -293,7 +293,9 @@ export function refreshBinanceLists(): Promise<void> {
  */
 export function symbolFor(symbol: string, asset?: Asset, crypto = false): string {
   if (symbol.includes(":")) return symbol;
-  const perp = crypto && state.form === "perp" ? perpSymbol(state.venue, symbol) : null;
+  // Exchanges without spot charts (Deribit) load the perpetual in either form.
+  const noSpot = !!VENUES.find((v) => v.id === state.venue)?.noSpot;
+  const perp = crypto && (state.form === "perp" || noSpot) ? perpSymbol(state.venue, symbol) : null;
   if (perp) return perp;
   const eu = crypto && state.form === "spot" ? euSymbol(symbol) : null;
   if (eu) return eu;

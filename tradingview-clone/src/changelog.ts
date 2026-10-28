@@ -14,6 +14,17 @@ export interface Release {
  */
 export const CHANGELOG: Release[] = [
   {
+    version: "0.57.0",
+    date: "2026-10-28",
+    title: "Börsen nach dem Verbindungstest: Bitfinex über WebSocket, Sperren markiert",
+    changes: [
+      "Bitfinex lädt die Kerzen über den WebSocket, wenn der Browser den Abruf sperrt (nur die neuesten Kerzen)",
+      "⛔ an der Börse in der Asset-Auswahl: KuCoin und BitMEX lassen sich im Browser nicht laden, bei Kraken die Perpetuals nicht (CORS-Sperre der Börse, laut Verbindungstest in Safari)",
+      "Deribit ohne Spot: Deribit leitet Spot an Coinbase weiter und liefert dafür keine Kerzen, die Auswahl lädt bei Deribit die Perpetuals",
+      "🩺 Test bricht einen hängenden Schritt nach 30 Sekunden ab, statt bei „Teste …“ stehen zu bleiben",
+    ],
+  },
+  {
     version: "0.56.0",
     date: "2026-10-28",
     title: "„Load failed“ bei manchen Börsen: WebSocket-Ausweg und Verbindungstest",

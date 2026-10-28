@@ -5,7 +5,7 @@ import { useFeedSettings } from "../market/exchangeFeed";
 import { STANDALONE } from "../config";
 import { loadChart, useChartState } from "../store";
 import { formatSpread, parseSpread, SPREAD_OP_LABELS } from "../../shared/spread";
-import { KIND_LABEL, parseVenueSymbol, VENUES, venueName, venueSymbol } from "../../shared/venues";
+import { KIND_LABEL, parseVenueSymbol, perpSymbol, VENUES, venueName, venueSymbol } from "../../shared/venues";
 import { marketLabel, searchMarkets } from "../../shared/venueMarkets";
 import { availabilityIn, EU_QUOTES, isEea, MICA, MICA_STATUS_ICON, MICA_STATUS_LABEL } from "../../shared/mica";
 import { Menu } from "./Menu";
@@ -116,7 +116,10 @@ function VenueTabs() {
   const euMode = useAssets((s) => s.euMode);
   const country = useAssets((s) => s.country);
   const onlyAllowed = useAssets((s) => s.onlyAllowed);
-  const perps = VENUES.find((v) => v.id === venue)?.perps ?? false;
+  const info = VENUES.find((v) => v.id === venue);
+  const perps = info?.perps ?? false;
+  const noSpot = info?.noSpot;
+  const spotOn = (form === "spot" || !perps) && !noSpot;
   // The EU mode picks the EUR or USDC pair from the exchange's market list.
   useEffect(() => {
     if (euMode) void refreshVenueMarkets(venue).catch(() => undefined);
@@ -128,15 +131,18 @@ function VenueTabs() {
       <span className="venue-label">Börse</span>
       {shown.map((v) => {
         const status = MICA[v.id].status;
+        // Charts the browser blocks (CORS), as the connection test showed.
+        const blocked = v.spotBlocked && (v.perpBlocked || !v.perps) ? "Charts lädt der Browser hier nicht (CORS-Sperre der Börse)" : v.perpBlocked ? "Perpetuals lädt der Browser hier nicht (CORS-Sperre der Börse)" : "";
         return (
           <button
             key={v.id}
             className={venue === v.id ? "active" : ""}
             onClick={() => setCryptoVenue(v.id)}
             aria-pressed={venue === v.id}
-            data-tip={`${v.id === "BINANCE" ? "Krypto von Binance (wie bisher)" : `Krypto direkt von ${v.name} laden, z. B. ${venueSymbol(v.id, "BTCUSDT")}`}\n${MICA_STATUS_ICON[status]} ${MICA_STATUS_LABEL[status]}`}
+            data-tip={`${v.id === "BINANCE" ? "Krypto von Binance (wie bisher)" : `Krypto direkt von ${v.name} laden, z. B. ${v.noSpot ? perpSymbol(v.id, "BTCUSDT") : venueSymbol(v.id, "BTCUSDT")}`}${blocked ? `\n⛔ ${blocked}` : ""}\n${MICA_STATUS_ICON[status]} ${MICA_STATUS_LABEL[status]}`}
           >
             {v.name}
+            {blocked && <span className="venue-blocked" aria-label={blocked}>⛔</span>}
             <span className={`mica-dot ${status}`} aria-label={MICA_STATUS_LABEL[status]}>
               {MICA_STATUS_ICON[status]}
             </span>
@@ -145,14 +151,14 @@ function VenueTabs() {
       })}
       {filter && shown.length < VENUES.length && <span className="venue-label">+{VENUES.length - shown.length} ausgeblendet</span>}
       <span className="venue-label venue-form-label">Form</span>
-      <button className={form === "spot" || !perps ? "active" : ""} onClick={() => setCryptoForm("spot")} aria-pressed={form === "spot" || !perps} data-tip="Spot-Paar (BTCUSDT)">
+      <button className={spotOn ? "active" : ""} onClick={() => setCryptoForm("spot")} disabled={!!noSpot} aria-pressed={spotOn} data-tip={noSpot ?? "Spot-Paar (BTCUSDT)"}>
         Spot
       </button>
       <button
-        className={form === "perp" && perps ? "active" : ""}
+        className={(form === "perp" || noSpot) && perps ? "active" : ""}
         onClick={() => setCryptoForm("perp")}
         disabled={!perps}
-        aria-pressed={form === "perp" && perps}
+        aria-pressed={(form === "perp" || !!noSpot) && perps}
         data-tip={perps ? "Perpetual-Kontrakt der Börse (BTCUSDT.P). Futures mit Laufzeit über 🔍 suchen, z. B. „btc futures“" : `${venueName(venue)} hat keine öffentlichen Perpetuals`}
       >
         Perp
