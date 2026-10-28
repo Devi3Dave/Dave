@@ -6,7 +6,7 @@ import { fetchVia } from "../shared/proxy";
 import "./proxySettings";
 import { perpSymbol, pickerPerps, pickerVenues, plainSymbol, splitPair, VENUES, venueSymbol, type VenueId } from "../shared/venues";
 import { loadVenueMarkets, type Market } from "../shared/venueMarkets";
-import { euMarket, EEA_COUNTRIES, OTHER_COUNTRIES } from "../shared/mica";
+import { euMarket, EEA_COUNTRIES, EU_QUOTES, OTHER_COUNTRIES } from "../shared/mica";
 
 const FAV_KEY = "chartai.assetFavorites.v1";
 const LISTS_KEY = "chartai.binanceSymbols.v1";
@@ -324,6 +324,10 @@ function euSymbol(symbol: string): string | null {
   if (!state.euMode) return null;
   const pair = splitPair(plainSymbol(symbol));
   const list = state.markets[state.venue];
-  if (!pair || pair.quote !== "USDT" || !list) return null;
-  return euMarket(list.markets, pair.base)?.symbol ?? null;
+  if (!pair || pair.quote !== "USDT") return null;
+  const found = list ? euMarket(list.markets, pair.base)?.symbol : undefined;
+  if (found) return found;
+  // Binance: the spot list of the picker knows the pairs even when the full market list did not load.
+  if (state.venue === "BINANCE") return EU_QUOTES.map((q) => pair.base + q).find((s) => state.spot.includes(s)) ?? null;
+  return null;
 }

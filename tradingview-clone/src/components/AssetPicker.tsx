@@ -5,10 +5,11 @@ import { useFeedSettings } from "../market/exchangeFeed";
 import { STANDALONE } from "../config";
 import { loadChart, useChartState } from "../store";
 import { formatSpread, parseSpread, SPREAD_OP_LABELS } from "../../shared/spread";
-import { isBlockedSymbol, KIND_LABEL, marketTag, parseVenueSymbol, pickerPerps, pickerVenues, VENUES, venueName, type VenueId } from "../../shared/venues";
+import { isBlockedSymbol, KIND_LABEL, marketTag, parseVenueSymbol, pickerPerps, pickerVenues, plainSymbol, splitPair, VENUES, venueName, type VenueId } from "../../shared/venues";
 import { marketLabel, searchMarkets } from "../../shared/venueMarkets";
 import { isCryptoSymbol } from "../../shared/marketData";
 import { availabilityIn, EU_QUOTES, isEea } from "../../shared/mica";
+import type { Interval } from "../store";
 import { useProxyUrl } from "../proxySettings";
 import { Menu } from "./Menu";
 
@@ -180,17 +181,56 @@ function MarketBar() {
   );
 }
 
+/**
+ * Turns the EU mode on or off and moves the loaded crypto spot pair along (BTCUSDT → BTCEUR and back), so the switch
+ * shows at once. Returns a line saying what happened, or why nothing changed.
+ */
+async function switchEuMode(next: boolean, symbol: string, interval: Interval, venue: VenueId, form: string): Promise<string> {
+  setEuMode(next);
+  const inst = parseVenueSymbol(symbol);
+  const crypto = inst ? inst.kind : isCryptoSymbol(symbol) ? "spot" : null;
+  const what = next ? "EUR- und USDC-Paare an" : "Wieder USDT-Paare";
+  if (!crypto) return `${what}. Gilt nur für Krypto-Spot: wähle unter Krypto ein Asset, es lädt dann z. B. als BTC/EUR.`;
+  if (crypto !== "spot" || form === "perp") return `${what}. Perps und Futures laufen in USDT oder USD, dafür gibt es keine EUR-Paare; die Umstellung wirkt unter Spot.`;
+  if ((inst ? inst.venue.id : "BINANCE") !== venue) return `${what} für ${venueName(venue)}. Das geladene Paar ist von einer anderen Börse und bleibt.`;
+  await Promise.all([refreshVenueMarkets(venue).catch(() => undefined), refreshBinanceLists().catch(() => undefined)]);
+  const base = (inst ? inst.pair : splitPair(symbol))?.base;
+  if (!base) return what;
+  const target = symbolFor(`${base}USDT`, undefined, true);
+  const pair = splitPair(plainSymbol(target));
+  const label = pair ? `${pair.base}/${pair.quote}` : target;
+  if (next && pair && !EU_QUOTES.includes(pair.quote)) return `${what}, aber ${venueName(venue)} hat für ${base} kein EUR- oder USDC-Paar; der Chart bleibt bei ${label}.`;
+  if (target !== symbol) await loadChart(target, interval);
+  return `${what}: Chart zeigt jetzt ${label} bei ${venueName(venue)}.`;
+}
+
 /** ⚙ next to the categories: rarely used settings, so the picker itself stays calm. */
 function PickerSettings({ onAction }: { onAction: () => void }) {
   const euMode = useAssets((s) => s.euMode);
   const showDemo = useAssets((s) => s.showDemo);
+  const venue = useAssets((s) => s.venue);
+  const form = useAssets((s) => s.form);
+  const symbol = useChartState((s) => s.symbol);
+  const interval = useChartState((s) => s.interval);
+  const [euNote, setEuNote] = useState<string | null>(null);
   return (
     <div className="picker-settings">
-      <button className="menu-item" onClick={() => setEuMode(!euMode)} aria-pressed={euMode}>
+      <button
+        className="menu-item"
+        onClick={() => {
+          setEuNote("Stelle um …");
+          void switchEuMode(!euMode, symbol, interval, venue, form).then(setEuNote, () => setEuNote(null));
+        }}
+        aria-pressed={euMode}
+      >
         <span className="menu-icon">🇪🇺</span>
-        <span className="picker-settings-text">EUR- und USDC-Paare statt USDT (MiCA)</span>
+        <span className="picker-settings-text">
+          EUR- und USDC-Paare statt USDT (MiCA)
+          <small>Krypto-Spot lädt das Euro-Paar, sonst USDC, z. B. BTC/EUR statt BTC/USDT</small>
+        </span>
         <span className="picker-settings-check">{euMode ? "✓" : ""}</span>
       </button>
+      {euNote && <div className="picker-settings-note">{euNote}</div>}
       <button
         className="menu-item"
         onClick={() => {

@@ -14,6 +14,16 @@ export interface Release {
  */
 export const CHANGELOG: Release[] = [
   {
+    version: "0.61.1",
+    date: "2026-10-28",
+    title: "EU-Schalter wirkt sofort",
+    changes: [
+      "⚙ → EUR- und USDC-Paare stellt jetzt auch den geladenen Chart um: aus BTC/USDT wird z. B. BTC/EUR, beim Ausschalten wieder BTC/USDT. Bisher galt der Schalter nur für das nächste Asset, das du auswählst",
+      "Unter dem Schalter steht, was passiert ist oder warum nicht: z. B. dass Perps und Futures keine EUR-Paare haben oder dass die Börse für die Münze kein EUR- oder USDC-Paar führt",
+      "Bei Binance findet der EU-Modus die Euro-Paare auch dann, wenn die vollständige Marktliste nicht lädt",
+    ],
+  },
+  {
     version: "0.61.0",
     date: "2026-10-28",
     title: "Aufgeräumte Asset-Suche",
