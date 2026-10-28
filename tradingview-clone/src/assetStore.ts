@@ -17,6 +17,7 @@ const MARKETS_KEY = "chartai.venueMarkets.v1.";
 const EU_KEY = "chartai.euMode.v1";
 const COUNTRY_KEY = "chartai.residence.v1";
 const ONLY_ALLOWED_KEY = "chartai.onlyAllowedVenues.v1";
+const SHOW_DEMO_KEY = "chartai.showDemoAssets.v1";
 
 function loadFlag(key: string): boolean {
   try {
@@ -127,6 +128,8 @@ interface AssetState {
   micaOpen: boolean;
   /** The connection test of the crypto exchanges is open. */
   checkOpen: boolean;
+  /** iPad version: also list assets that only have demo data (hidden by default). */
+  showDemo: boolean;
 }
 
 const cached = loadLists();
@@ -143,6 +146,7 @@ let state: AssetState = {
   onlyAllowed: loadFlag(ONLY_ALLOWED_KEY),
   micaOpen: false,
   checkOpen: false,
+  showDemo: loadFlag(SHOW_DEMO_KEY),
 };
 const listeners = new Set<() => void>();
 
@@ -205,6 +209,11 @@ export function setCheckOpen(checkOpen: boolean) {
 export function setOnlyAllowedVenues(onlyAllowed: boolean) {
   saveFlag(ONLY_ALLOWED_KEY, onlyAllowed);
   set({ onlyAllowed });
+}
+
+export function setShowDemo(showDemo: boolean) {
+  saveFlag(SHOW_DEMO_KEY, showDemo);
+  set({ showDemo });
 }
 
 /** Country of residence; picking an EEA country the first time turns the EU mode on. */

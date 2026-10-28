@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { ASSETS, ASSET_CATEGORIES, categoryOfFutures, findAsset, resolveAsset, searchAssets, type AssetCategory, type DataSource, type SearchHit } from "../../shared/assets";
-import { refreshBinanceLists, refreshVenueMarkets, setCryptoForm, setCryptoVenue, setCheckOpen, setEuMode, setMicaOpen, symbolFor, toggleAssetFavorite, useAssets } from "../assetStore";
+import { refreshBinanceLists, refreshVenueMarkets, setCryptoForm, setCryptoVenue, setCheckOpen, setEuMode, setMicaOpen, setShowDemo, symbolFor, toggleAssetFavorite, useAssets } from "../assetStore";
 import { useFeedSettings } from "../market/exchangeFeed";
 import { STANDALONE } from "../config";
 import { loadChart, useChartState } from "../store";
 import { formatSpread, parseSpread, SPREAD_OP_LABELS } from "../../shared/spread";
-import { isBlockedSymbol, KIND_LABEL, marketTag, parseVenueSymbol, perpSymbol, pickerPerps, pickerVenues, VENUES, venueName, venueSymbol } from "../../shared/venues";
+import { isBlockedSymbol, KIND_LABEL, marketTag, parseVenueSymbol, pickerPerps, pickerVenues, VENUES, venueName, type VenueId } from "../../shared/venues";
 import { marketLabel, searchMarkets } from "../../shared/venueMarkets";
 import { isCryptoSymbol } from "../../shared/marketData";
-import { availabilityIn, EU_QUOTES, isEea, MICA, MICA_STATUS_ICON, MICA_STATUS_LABEL } from "../../shared/mica";
+import { availabilityIn, EU_QUOTES, isEea } from "../../shared/mica";
 import { useProxyUrl } from "../proxySettings";
 import { Menu } from "./Menu";
 
@@ -57,6 +57,16 @@ function useSourceOf() {
   };
 }
 
+/**
+ * Whether a picker entry gets real prices. On the iPad, assets without a data source only show demo
+ * candles; they stay hidden unless „Demo-Assets zeigen“ is on.
+ */
+function useLoadable() {
+  const sourceOf = useSourceOf();
+  const showDemo = useAssets((s) => s.showDemo);
+  return (hit: SearchHit) => showDemo || sourceOf(hit) !== "demo";
+}
+
 /** Favorites as search hits; pairs not in the catalog are found in the Binance lists. */
 function useFavoriteHits(): SearchHit[] {
   const favorites = useAssets((s) => s.favorites);
@@ -90,7 +100,10 @@ function AssetRow({ hit, onPick, onSelect }: { hit: SearchHit; onPick: () => voi
           onPick();
         }}
       >
-        <strong>{hit.name}</strong>
+        <strong>
+          {target === symbol && <span className="asset-check" aria-label="Gewählt">✓ </span>}
+          {hit.name}
+        </strong>
         <span>{target === hit.symbol || target.includes(":") ? target : `${hit.symbol} · ${target}`}</span>
         {/* Hints open to the left so they never cover the stars of the rows below. */}
         <em className={`asset-badge ${source}`} data-tip={badge.tip} data-tip-placement="left">
@@ -111,8 +124,8 @@ function AssetRow({ hit, onPick, onSelect }: { hit: SearchHit; onPick: () => voi
   );
 }
 
-/** Exchange and form crypto loads from, like TradingView's exchange filter (BINANCE:BTCUSDT, COINBASE:BTCUSD, BYBIT:BTCUSDT.P …), with the MiCA status of each exchange. */
-function VenueTabs() {
+/** Exchange and form crypto loads from, like TradingView's source filter: one drop-down and Spot / Perp. */
+function MarketBar() {
   const venue = useAssets((s) => s.venue);
   const form = useAssets((s) => s.form);
   const euMode = useAssets((s) => s.euMode);
@@ -120,75 +133,119 @@ function VenueTabs() {
   const onlyAllowed = useAssets((s) => s.onlyAllowed);
   // A relay set or cleared changes which exchanges are offered.
   useProxyUrl();
-  const offered = pickerVenues();
   const info = VENUES.find((v) => v.id === venue);
   const perps = pickerPerps(venue);
   const noSpot = info?.noSpot;
   const spotOn = (form === "spot" || !perps) && !noSpot;
+  const perpOn = (form === "perp" || !!noSpot) && perps;
   // The EU mode picks the EUR or USDC pair from the exchange's market list.
   useEffect(() => {
     if (euMode) void refreshVenueMarkets(venue).catch(() => undefined);
   }, [euMode, venue]);
+  // Only exchanges this browser can load (blocked ones need the own proxy), and in the EEA optionally only allowed ones.
   const filter = onlyAllowed && isEea(country);
-  const shown = offered.filter((v) => !filter || v.id === venue || availabilityIn(country, v.id).spot === "yes");
+  const shown = pickerVenues().filter((v) => !filter || v.id === venue || availabilityIn(country, v.id).spot === "yes");
   return (
-    <div className="asset-tabs venue-tabs" role="group" aria-label="Krypto-Börse">
-      <span className="venue-label">Börse</span>
-      {shown.map((v) => {
-        const status = MICA[v.id].status;
-        return (
-          <button
-            key={v.id}
-            className={venue === v.id ? "active" : ""}
-            onClick={() => setCryptoVenue(v.id)}
-            aria-pressed={venue === v.id}
-            data-tip={`${v.id === "BINANCE" ? "Krypto von Binance (wie bisher)" : `Krypto direkt von ${v.name} laden, z. B. ${v.noSpot ? perpSymbol(v.id, "BTCUSDT") : venueSymbol(v.id, "BTCUSDT")}`}\n${MICA_STATUS_ICON[status]} ${MICA_STATUS_LABEL[status]}`}
-          >
-            {v.name}
-            <span className={`mica-dot ${status}`} aria-label={MICA_STATUS_LABEL[status]}>
-              {MICA_STATUS_ICON[status]}
-            </span>
-          </button>
-        );
-      })}
-      {filter && shown.length < offered.length && <span className="venue-label">+{offered.length - shown.length} ausgeblendet</span>}
-      <span className="venue-label venue-form-label">Form</span>
-      <button className={spotOn ? "active" : ""} onClick={() => setCryptoForm("spot")} disabled={!!noSpot} aria-pressed={spotOn} data-tip={noSpot ?? "Spot-Paar (BTCUSDT)"}>
-        Spot
-      </button>
-      <button
-        className={(form === "perp" || noSpot) && perps ? "active" : ""}
-        onClick={() => setCryptoForm("perp")}
-        disabled={!perps}
-        aria-pressed={(form === "perp" || !!noSpot) && perps}
-        data-tip={perps ? "Perpetual-Kontrakt der Börse (BTCUSDT.P). Futures mit Laufzeit über 🔍 suchen, z. B. „btc futures“" : info?.perpBlocked ? `${venueName(venue)}-Perpetuals lassen sich im Browser nicht laden` : `${venueName(venue)} hat keine öffentlichen Perpetuals`}
-      >
-        Perp
-      </button>
-      <span className="venue-label venue-form-label">EU</span>
-      <button
-        className={euMode ? "active" : ""}
-        onClick={() => setEuMode(!euMode)}
-        aria-pressed={euMode}
-        data-tip={euMode ? "EU-Modus an: EUR- und USDC-Paare statt USDT (MiCA)" : "EU-Modus: EUR- und USDC-Paare statt USDT bevorzugen (MiCA)"}
-      >
-        🇪🇺 EUR/USDC
-      </button>
-      <button onClick={() => setMicaOpen(true)} data-tip="Welche Börse ist MiCA-lizenziert, was ist in deinem Land erlaubt">
-        MiCA-Info
-      </button>
-      <button onClick={() => setCheckOpen(true)} data-tip="Prüfen, welche Börse sich aus diesem Browser laden lässt (Kerzen, Live-Kurse, Marktliste)">
-        🩺 Test
-      </button>
+    <div className="market-bar" role="group" aria-label="Krypto-Börse">
+      <label className="market-venue" data-tip="Von welcher Börse Krypto kommt">
+        <span>Börse</span>
+        <select value={venue} onChange={(e) => setCryptoVenue(e.target.value as VenueId)}>
+          {shown.map((v) => (
+            <option key={v.id} value={v.id}>
+              {v.name}
+            </option>
+          ))}
+        </select>
+      </label>
+      <div className="segmented">
+        <button className={spotOn ? "active" : ""} onClick={() => setCryptoForm("spot")} disabled={!!noSpot} aria-pressed={spotOn} data-tip={noSpot ?? "Spot-Paar (BTCUSDT)"}>
+          Spot
+        </button>
+        <button
+          className={perpOn ? "active" : ""}
+          onClick={() => setCryptoForm("perp")}
+          disabled={!perps}
+          aria-pressed={perpOn}
+          data-tip={perps ? "Perpetual-Kontrakt der Börse (BTCUSDT.P). Futures mit Laufzeit über die Suche, z. B. „btc futures“" : `${venueName(venue)} hat hier keine ladbaren Perpetuals`}
+        >
+          Perp
+        </button>
+      </div>
+      {euMode && (
+        <span className="market-eu" data-tip="EU-Modus an: EUR- und USDC-Paare statt USDT (⚙ zum Ausschalten)">
+          🇪🇺 EUR/USDC
+        </span>
+      )}
     </div>
   );
+}
+
+/** ⚙ next to the categories: rarely used settings, so the picker itself stays calm. */
+function PickerSettings({ onAction }: { onAction: () => void }) {
+  const euMode = useAssets((s) => s.euMode);
+  const showDemo = useAssets((s) => s.showDemo);
+  return (
+    <div className="picker-settings">
+      <button className="menu-item" onClick={() => setEuMode(!euMode)} aria-pressed={euMode}>
+        <span className="menu-icon">🇪🇺</span>
+        <span className="picker-settings-text">EUR- und USDC-Paare statt USDT (MiCA)</span>
+        <span className="picker-settings-check">{euMode ? "✓" : ""}</span>
+      </button>
+      <button
+        className="menu-item"
+        onClick={() => {
+          onAction();
+          setMicaOpen(true);
+        }}
+      >
+        <span className="menu-icon">ℹ️</span>
+        <span className="picker-settings-text">MiCA-Info: Lizenzen der Börsen, Wohnsitzland</span>
+      </button>
+      <button
+        className="menu-item"
+        onClick={() => {
+          onAction();
+          setCheckOpen(true);
+        }}
+      >
+        <span className="menu-icon">🩺</span>
+        <span className="picker-settings-text">Verbindungstest und eigener Proxy</span>
+      </button>
+      {STANDALONE && (
+        <button className="menu-item" onClick={() => setShowDemo(!showDemo)} aria-pressed={showDemo}>
+          <span className="menu-icon">🧪</span>
+          <span className="picker-settings-text">Demo-Assets zeigen (ohne echte Kurse)</span>
+          <span className="picker-settings-check">{showDemo ? "✓" : ""}</span>
+        </button>
+      )}
+    </div>
+  );
+}
+
+function GearButton({ open, onToggle }: { open: boolean; onToggle: () => void }) {
+  return (
+    <button className={`picker-gear ${open ? "active" : ""}`} onClick={onToggle} aria-expanded={open} aria-label="Weitere Einstellungen" data-tip="EU-Paare, MiCA-Info, Verbindungstest und Proxy">
+      ⚙
+    </button>
+  );
+}
+
+/** Categories that have at least one loadable asset (on the iPad some only have demo data). */
+function useCategories(): AssetCategory[] {
+  const loadable = useLoadable();
+  return ASSET_CATEGORIES.filter((c) => c === "Krypto" || ASSETS.some((a) => a.category === c && loadable({ symbol: a.id, name: a.name, category: a.category, asset: a })));
 }
 
 /** Drop-down next to the chart: popular assets by category plus favorites. */
 export function AssetMenu({ onOpenSearch }: { onOpenSearch: () => void }) {
   const symbol = useChartState((s) => s.symbol);
-  const [tab, setTab] = useState<Tab>(readTab);
+  const [stored, setTab] = useState<Tab>(readTab);
+  const [gear, setGear] = useState(false);
   const favorites = useFavoriteHits();
+  const loadable = useLoadable();
+  const categories = useCategories();
+  // A category without loadable assets is hidden; fall back to crypto.
+  const tab: Tab = stored === "fav" || categories.includes(stored) ? stored : "Krypto";
   const name = findAsset(symbol)?.name;
   // Exchange and form of what is loaded, so the choice is clear at a glance (Kraken · Spot · BTC/USD).
   const tag = marketTag(symbol)?.split(" · ").slice(0, 2).join(" · ") ?? (isCryptoSymbol(symbol) ? "Binance · Spot" : null);
@@ -202,8 +259,9 @@ export function AssetMenu({ onOpenSearch }: { onOpenSearch: () => void }) {
       // not remembered
     }
   };
-  const hits: SearchHit[] =
-    tab === "fav" ? favorites : ASSETS.filter((a) => a.category === tab).map((a) => ({ symbol: a.id, name: a.name, category: a.category, asset: a }));
+  const hits: SearchHit[] = (
+    tab === "fav" ? favorites : ASSETS.filter((a) => a.category === tab).map((a) => ({ symbol: a.id, name: a.name, category: a.category, asset: a }))
+  ).filter(loadable);
   return (
     <Menu
       label={
@@ -220,31 +278,35 @@ export function AssetMenu({ onOpenSearch }: { onOpenSearch: () => void }) {
     >
       {(close) => (
         <>
-          <div className="asset-tabs">
-            <button className={tab === "fav" ? "active" : ""} onClick={() => pick("fav")} aria-label="Favoriten">
-              ★
-            </button>
-            {ASSET_CATEGORIES.map((c) => (
-              <button key={c} className={tab === c ? "active" : ""} onClick={() => pick(c)}>
-                {SHORT[c]}
-              </button>
-            ))}
-          </div>
-          {(tab === "Krypto" || tab === "fav") && <VenueTabs />}
-          {tab === "fav" && hits.length === 0 && <div className="menu-empty">Noch keine Favoriten. Mit ☆ neben einem Asset speichern.</div>}
-          {hits.map((h) => (
-            <AssetRow key={h.symbol} hit={h} onPick={close} />
-          ))}
           <button
-            className="menu-item asset-search-link"
+            className="asset-search-field"
             onClick={() => {
               close();
               onOpenSearch();
             }}
           >
             <span className="menu-icon">🔍</span>
-            Alle Assets durchsuchen …
+            Suchen …
           </button>
+          <div className="asset-tabs-bar">
+            <div className="asset-tabs">
+              <button className={tab === "fav" ? "active" : ""} onClick={() => pick("fav")} aria-label="Favoriten">
+                ★
+              </button>
+              {categories.map((c) => (
+                <button key={c} className={tab === c ? "active" : ""} onClick={() => pick(c)}>
+                  {SHORT[c]}
+                </button>
+              ))}
+            </div>
+            <GearButton open={gear} onToggle={() => setGear(!gear)} />
+          </div>
+          {gear && <PickerSettings onAction={close} />}
+          {(tab === "Krypto" || tab === "fav") && <MarketBar />}
+          {tab === "fav" && hits.length === 0 && <div className="menu-empty">Noch keine Favoriten. Mit ☆ neben einem Asset speichern.</div>}
+          {hits.map((h) => (
+            <AssetRow key={h.symbol} hit={h} onPick={close} />
+          ))}
         </>
       )}
     </Menu>
@@ -266,6 +328,12 @@ export function AssetSearchDialog({ onClose, onSelect, title = "Assets suchen" }
   const venueList = useAssets((s) => s.markets[venue]);
   const euMode = useAssets((s) => s.euMode);
   const [loadingMarkets, setLoadingMarkets] = useState(false);
+  const [gear, setGear] = useState(false);
+  const loadable = useLoadable();
+  const categories = useCategories();
+  const symbol = useChartState((s) => s.symbol);
+  const current = findAsset(symbol)?.name;
+  const currentTag = marketTag(symbol)?.split(" · ").slice(0, 2).join(" · ") ?? (isCryptoSymbol(symbol) ? "Binance · Spot" : null);
 
   useEffect(() => {
     void refreshBinanceLists().finally(() => setLoadingLists(false));
@@ -278,14 +346,15 @@ export function AssetSearchDialog({ onClose, onSelect, title = "Assets suchen" }
       .finally(() => setLoadingMarkets(false));
   }, [venue]);
 
-  const hits = useMemo(() => searchAssets(query, spot, futures), [query, spot, futures]);
+  const found = useMemo(() => searchAssets(query, spot, futures), [query, spot, futures]);
+  const hits = found.filter(loadable);
   const q = query.trim().toUpperCase();
   const proxyUrl = useProxyUrl();
   const marketHits: SearchHit[] = useMemo(
     () => (q && venueList ? searchMarkets(venueList.markets, query, euMode ? EU_QUOTES : undefined).filter((m) => !isBlockedSymbol(m.symbol)).map((m) => ({ symbol: m.symbol, name: marketLabel(m), category: "Krypto" as AssetCategory, fixed: true })) : []),
     [q, query, venueList, euMode, proxyUrl],
   );
-  const favHits = favorites.filter((f) => !q || f.symbol.includes(q) || f.name.toUpperCase().includes(q));
+  const favHits = favorites.filter((f) => loadable(f) && (!q || f.symbol.includes(q) || f.name.toUpperCase().includes(q)));
   const crypto = tab === "all" || tab === "Krypto";
   const marketsTitle = `Alle Märkte bei ${venueName(venue)}`;
   const sections: [string, SearchHit[]][] =
@@ -295,12 +364,13 @@ export function AssetSearchDialog({ onClose, onSelect, title = "Assets suchen" }
         ? [
             ["★ Favoriten", favHits] as [string, SearchHit[]],
             [marketsTitle, marketHits] as [string, SearchHit[]],
-            ...ASSET_CATEGORIES.map((c) => [c, hits.filter((h) => h.category === c)] as [string, SearchHit[]]),
+            ...categories.map((c) => [c, hits.filter((h) => h.category === c)] as [string, SearchHit[]]),
           ].filter(([, list]) => list.length > 0)
         : tab === "Krypto" && marketHits.length
           ? [[marketsTitle, marketHits], [tab, hits.filter((h) => h.category === tab)]]
           : [[tab, hits.filter((h) => h.category === tab)]];
-  const exact = hits.some((h) => h.symbol === q) || favHits.some((h) => h.symbol === q) || marketHits.some((h) => h.symbol === q);
+  const ownHit: SearchHit = { symbol: q, name: `„${q}“ direkt laden`, category: "Krypto" };
+  const exact = found.some((h) => h.symbol === q) || favHits.some((h) => h.symbol === q) || marketHits.some((h) => h.symbol === q);
   const spread = parseSpread(q);
   const select = (target: string) => (onSelect ? onSelect(target) : void loadChart(target, interval));
 
@@ -313,10 +383,16 @@ export function AssetSearchDialog({ onClose, onSelect, title = "Assets suchen" }
             ✕
           </button>
         </div>
+        <div className="asset-current" aria-label="Gewähltes Asset">
+          <span className="asset-check">✓</span>
+          <strong>{symbol}</strong>
+          {current && <span>{current}</span>}
+          {currentTag && <span className="asset-market">{currentTag}</span>}
+        </div>
         <input
           autoFocus
           className="search"
-          placeholder="Name oder Symbol, z. B. Gold, Tesla, btc perp, eth futures, KRAKEN:BTCEUR, BYBIT:BTCUSDT.P …"
+          placeholder="Name oder Symbol, z. B. Gold, Tesla, btc perp"
           value={query}
           spellCheck={false}
           onChange={(e) => setQuery(e.target.value)}
@@ -327,20 +403,24 @@ export function AssetSearchDialog({ onClose, onSelect, title = "Assets suchen" }
             onClose();
           }}
         />
-        <div className="asset-tabs wide">
-          <button className={tab === "all" ? "active" : ""} onClick={() => setTab("all")}>
-            Alle
-          </button>
-          <button className={tab === "fav" ? "active" : ""} onClick={() => setTab("fav")}>
-            ★ Favoriten
-          </button>
-          {ASSET_CATEGORIES.map((c) => (
-            <button key={c} className={tab === c ? "active" : ""} onClick={() => setTab(c)}>
-              {c}
+        <div className="asset-tabs-bar">
+          <div className="asset-tabs scroll wide">
+            <button className={tab === "all" ? "active" : ""} onClick={() => setTab("all")}>
+              Alle
             </button>
-          ))}
+            <button className={tab === "fav" ? "active" : ""} onClick={() => setTab("fav")}>
+              ★ Favoriten
+            </button>
+            {categories.map((c) => (
+              <button key={c} className={tab === c ? "active" : ""} onClick={() => setTab(c)}>
+                {c}
+              </button>
+            ))}
+          </div>
+          <GearButton open={gear} onToggle={() => setGear(!gear)} />
         </div>
-        {(tab === "all" || tab === "fav" || tab === "Krypto") && <VenueTabs />}
+        {gear && <PickerSettings onAction={onClose} />}
+        {(tab === "all" || tab === "fav" || tab === "Krypto") && <MarketBar />}
         <div className="indicator-list">
           {spread && (
             <section>
@@ -359,10 +439,10 @@ export function AssetSearchDialog({ onClose, onSelect, title = "Assets suchen" }
               </div>
             </section>
           )}
-          {q && !exact && !spread && (
+          {q && !exact && !spread && loadable(ownHit) && (
             <section>
               <h3>Eigenes Symbol</h3>
-              <AssetRow hit={{ symbol: q, name: `„${q}“ direkt laden`, category: "Krypto" }} onPick={onClose} onSelect={onSelect} />
+              <AssetRow hit={ownHit} onPick={onClose} onSelect={onSelect} />
             </section>
           )}
           {sections.map(([title, list]) => (
@@ -377,22 +457,30 @@ export function AssetSearchDialog({ onClose, onSelect, title = "Assets suchen" }
               {list.length > SECTION_LIMIT && <div className="menu-empty">… {list.length - SECTION_LIMIT} weitere, Suche verfeinern</div>}
             </section>
           ))}
+          {q && found.length > hits.length && (
+            <div className="menu-empty">
+              {found.length - hits.length} ohne echte Kurse ausgeblendet ({found.filter((h) => !loadable(h)).slice(0, 3).map((h) => h.name).join(", ")}). Zeigen: ⚙ → Demo-Assets zeigen, oder unter Aktualitäts-Nachweis einen Börsenkurs einrichten.
+            </div>
+          )}
           {loadingLists && <div className="menu-empty">Lade alle Binance-Märkte …</div>}
           {crypto && loadingMarkets && !venueList && <div className="menu-empty">Lade alle Märkte von {venueName(venue)} (Spot, Perpetuals, Futures) …</div>}
           {crypto && q && venueList && venueList.failed.length > 0 && (
             <div className="menu-empty">
-              {venueName(venue)}: {venueList.failed.length} von den Marktlisten nicht erreichbar, die Suche ist unvollständig. Symbole wie {venue}:BTCUSDT.P lassen sich trotzdem direkt eintippen.
+              Nicht alle Marktlisten von {venueName(venue)} sind erreichbar, manche Märkte fehlen in der Suche.
             </div>
           )}
         </div>
-        <p className="hint">
+        <details className="hint asset-tips">
+          <summary>Suchtipps</summary>
+          <p>
           {STANDALONE
-            ? "iPad-Version: Krypto live von Binance. Gold, Silber, Öl und viele US-Aktien kommen von Binance-Perpetuals (Perp). Für Assets mit „Demo“ gibt es hier keine Datenquelle."
+            ? "iPad-Version: Krypto live von Binance. Gold, Silber, Öl und viele US-Aktien kommen von Binance-Perpetuals (Perp). Assets ohne Datenquelle sind ausgeblendet (⚙ → Demo-Assets zeigen)."
             : "Krypto live von Binance, Aktien, Indizes, Rohstoffe und Forex über Yahoo Finance."}
-          {" Krypto-Börse: oben wählen, von welcher Börse Krypto kommt (Binance, Coinbase, Kraken, Bybit, OKX, Bitstamp, Bitfinex, Bitget, KuCoin, Deribit, BitMEX) und ob als Spot oder Perpetual. ✓/⏳/✕ zeigt, ob die Börse MiCA-lizenziert ist (MiCA-Info: Wohnsitzland, Quellen, Stand). 🇪🇺 EUR/USDC lädt statt USDT das Euro- oder USDC-Paar. Die Suche zeigt alle Märkte der gewählten Börse: Spot-Paare, Perpetuals (.P), Futures mit Laufzeit und Optionen (Deribit, OKX, Binance), z. B. „btc perp“, „eth futures“ oder „btc call 100000“. Direkt eintippen geht auch: COINBASE:BTCUSD, BINANCE:BTCUSDT.P, OKX:BTC-USD-260327, DERIBIT:BTC-27MAR26-100000-C."}
+          {" Krypto: oben Börse und Spot oder Perp wählen; ⚙ hat EUR/USDC-Paare, MiCA-Info und den Verbindungstest mit Proxy. Die Suche zeigt alle Märkte der gewählten Börse: Spot-Paare, Perpetuals (.P), Futures mit Laufzeit und Optionen (Deribit, OKX, Binance), z. B. „btc perp“, „eth futures“ oder „btc call 100000“. Direkt eintippen geht auch: COINBASE:BTCUSD, BINANCE:BTCUSDT.P, OKX:BTC-USD-260327, DERIBIT:BTC-27MAR26-100000-C."}
           {" Spread-Charts: zwei Symbole mit / - + * verbinden, z. B. BTCUSDT/ETHUSDT oder GC=F / SI=F, oder den Preisunterschied zweier Börsen: COINBASE:BTCUSD - BINANCE:BTCUSDT."}
           {" Mit einem eigenen Twelve-Data-Schlüssel (Aktualitäts-Nachweis → Börsenkurs einrichten) kommen Aktien, Indizes und Forex als Börsenkurs („Börse“)."}
-        </p>
+          </p>
+        </details>
       </div>
     </div>
   );

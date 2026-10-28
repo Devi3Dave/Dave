@@ -14,6 +14,18 @@ export interface Release {
  */
 export const CHANGELOG: Release[] = [
   {
+    version: "0.61.0",
+    date: "2026-10-28",
+    title: "Aufgeräumte Asset-Suche",
+    changes: [
+      "Asset-Auswahl ruhiger wie die Symbolsuche von TradingView: oben ein Suchfeld, darunter die Rubriken und für Krypto nur noch eine Zeile mit Börse (Auswahlliste) und Spot / Perp",
+      "Selten Gebrauchtes steckt im ⚙ neben den Rubriken: EUR- und USDC-Paare (EU-Modus), MiCA-Info, Verbindungstest mit eigenem Proxy und Demo-Assets zeigen",
+      "Was auf dem iPad keine echten Kurse hat (Demo-Daten), ist ausgeblendet, auch ganze Rubriken wie Forex; mit einem Twelve-Data-Schlüssel oder ⚙ → Demo-Assets zeigen erscheinen sie wieder. Börsen, die der Browser sperrt, bleiben ohne funktionierenden Proxy weiter ausgeblendet",
+      "Das gewählte Asset ist markiert (✓ und hinterlegt) und steht oben in der Suche mit Börse und Form",
+      "Der lange Hilfetext der Suche ist unter „Suchtipps“ zusammengeklappt, die MiCA-Punkte an den Börsen sind in die MiCA-Info gewandert",
+    ],
+  },
+  {
     version: "0.60.1",
     date: "2026-10-28",
     title: "Proxy: Startseite statt Fehler 403",

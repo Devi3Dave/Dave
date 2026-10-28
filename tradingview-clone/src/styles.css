@@ -369,11 +369,6 @@ textarea {
   color: var(--muted);
 }
 
-.asset-search-link {
-  border-top: 1px solid var(--border);
-  margin-top: 4px;
-}
-
 .asset-dialog {
   height: 80vh;
   height: 80dvh;
@@ -4970,4 +4965,167 @@ select,
   color: var(--claude);
   font-size: 11px;
   white-space: nowrap;
+}
+
+/* ---------- Asset picker: calm layout like TradingView's symbol search ---------- */
+
+.asset-search-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  margin-bottom: 6px;
+  padding: 7px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel-2);
+  color: var(--muted);
+  text-align: left;
+}
+
+.asset-tabs-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
+}
+
+.asset-tabs-bar .asset-tabs {
+  border-bottom: none;
+  margin-bottom: 0;
+  flex: 1;
+  min-width: 0;
+}
+
+/* One row that scrolls sideways instead of wrapping into several rows. */
+.asset-tabs.scroll {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.asset-tabs.scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.asset-tabs.scroll button {
+  flex-shrink: 0;
+}
+
+.picker-gear {
+  flex-shrink: 0;
+  width: 30px;
+  height: 28px;
+  margin-bottom: 4px;
+  border-radius: 14px;
+  color: var(--muted);
+  font-size: 15px;
+}
+
+.picker-gear.active {
+  background: var(--panel-2);
+  color: var(--text);
+}
+
+.picker-settings {
+  margin-bottom: 6px;
+  padding: 2px 0;
+  border-radius: 6px;
+  background: var(--panel-2);
+  font-size: 13px;
+}
+
+.picker-settings-text {
+  flex: 1;
+}
+
+.picker-settings-check {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.market-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 2px 2px 6px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
+  font-size: 12px;
+}
+
+.market-venue {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+}
+
+.market-venue select {
+  padding: 4px 6px;
+  font-size: 13px;
+}
+
+.segmented {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.segmented button {
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
+.segmented button.active {
+  background: var(--accent);
+  color: #fff;
+}
+
+.segmented button:disabled {
+  opacity: 0.4;
+}
+
+.market-eu {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+/* The loaded asset: marked in the list and named at the top of the search. */
+.asset-item.active {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  border-radius: 6px;
+}
+
+.asset-check {
+  color: var(--accent);
+}
+
+.asset-current {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+  font-size: 13px;
+}
+
+.asset-current > span:not(.asset-check):not(.asset-market) {
+  color: var(--muted);
+}
+
+.asset-current .asset-market {
+  color: var(--claude);
+  font-size: 11px;
+}
+
+.asset-tips summary {
+  cursor: pointer;
+}
+
+.asset-tips p {
+  margin: 6px 0 0;
 }
