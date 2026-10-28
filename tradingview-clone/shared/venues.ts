@@ -803,6 +803,38 @@ export const VENUES: { id: VenueId; name: string; perps: boolean; noSpot?: strin
   perpBlocked: blockedFeed(v, v.perpQuote ? `BTC${v.perpQuote}.P` : null),
 }));
 
+/**
+ * The exchanges the picker offers: those whose charts load in the browser. KuCoin and BitMEX are left out
+ * (Devi: what cannot load only clutters the choice); their code stays for symbols typed by hand.
+ */
+export const PICKER_VENUES = VENUES.filter((v) => !(v.noSpot || v.spotBlocked) || (v.perps && !v.perpBlocked));
+
+/** Perpetuals the picker offers at this exchange: it has them and the browser can load them (not Kraken's). */
+export const pickerPerps = (id: string) => !!PICKER_VENUES.find((v) => v.id === id && v.perps && !v.perpBlocked);
+
+/** A market the browser cannot load (blocked feed); search leaves these out. */
+export function isBlockedSymbol(symbol: string): boolean {
+  return !!parseVenueSymbol(symbol)?.feed.blocked;
+}
+
+const KIND_SHORT: Record<MarketKind, string> = { spot: "Spot", perp: "Perp", future: "Future", option: "Option" };
+
+/** Exchange, form and pair of an exchange symbol for headers: KRAKEN:BTCUSD → "Kraken · Spot · BTC/USD". */
+export function marketTag(symbol: string): string | null {
+  const inst = parseVenueSymbol(symbol);
+  return inst ? `${inst.venue.name} · ${KIND_SHORT[inst.kind]} · ${inst.pair.base}/${inst.pair.quote}` : null;
+}
+
+/** The same for what the chart loaded: plain Binance spot and USDⓈ-M perpetuals included. */
+export function loadedMarketTag(symbol: string, source: string | null | undefined): string | null {
+  if (source === "venue") return marketTag(symbol);
+  const pair = splitPair(plainSymbol(symbol));
+  const pairText = pair ? `${pair.base}/${pair.quote}` : plainSymbol(symbol);
+  if (source === "binance") return `Binance · Spot · ${pairText}`;
+  if (source === "binance_futures") return `Binance · Perp · ${pairText}`;
+  return null;
+}
+
 export function getVenue(id: string): Venue | undefined {
   return ALL.find((v) => v.id === id.toUpperCase());
 }

@@ -251,7 +251,7 @@ textarea {
   display: flex;
   align-items: baseline;
   gap: 6px;
-  max-width: 240px;
+  max-width: 320px;
 }
 
 .asset-button .asset-name {
@@ -4966,7 +4966,8 @@ select,
   font-weight: 600;
 }
 
-.venue-blocked {
-  font-size: 10px;
-  margin-left: 2px;
+.asset-button .asset-market {
+  color: var(--claude);
+  font-size: 11px;
+  white-space: nowrap;
 }

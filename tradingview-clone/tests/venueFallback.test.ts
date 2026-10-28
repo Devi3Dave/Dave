@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { isNetworkError, loadMarketData } from "../shared/marketData";
 import { checkVenue } from "../shared/venueCheck";
-import { VENUES } from "../shared/venues";
+import { isBlockedSymbol, loadedMarketTag, marketTag, PICKER_VENUES, pickerPerps, VENUES } from "../shared/venues";
 
 /** A WebSocket that answers each sent message with `reply(msg)` (nothing for null). */
 function fakeWebSocket(reply: (msg: unknown, url: string) => unknown | null, sent: unknown[] = []) {
@@ -155,5 +155,27 @@ describe("connection test", () => {
     expect(by("Perp KRAKEN:BTCUSD.P: Kerzen über WebSocket")?.state).toBe("skip");
     expect(by("Perp KRAKEN:BTCUSD.P: Live-Kurse")?.state).toBe("fail");
     expect(by("Marktliste")?.state).toBe("fail");
+  });
+});
+
+describe("picker shows only what loads", () => {
+  it("leaves out KuCoin and BitMEX and Kraken's perpetuals", () => {
+    expect(PICKER_VENUES.map((v) => v.id)).toEqual(["BINANCE", "COINBASE", "KRAKEN", "BYBIT", "OKX", "BITSTAMP", "BITFINEX", "BITGET", "DERIBIT"]);
+    expect(pickerPerps("KRAKEN")).toBe(false);
+    expect(pickerPerps("BYBIT")).toBe(true);
+    expect(pickerPerps("DERIBIT")).toBe(true);
+    expect(isBlockedSymbol("KRAKEN:BTCUSD.P")).toBe(true);
+    expect(isBlockedSymbol("BINANCE:BTC-260327-100000-C")).toBe(true);
+    expect(isBlockedSymbol("KRAKEN:BTCUSD")).toBe(false);
+  });
+
+  it("names exchange, form and pair of the loaded market", () => {
+    expect(marketTag("KRAKEN:BTCUSD")).toBe("Kraken · Spot · BTC/USD");
+    expect(marketTag("BYBIT:ETHUSDT.P")).toBe("Bybit · Perp · ETH/USDT");
+    expect(marketTag("BTCUSDT")).toBeNull();
+    expect(loadedMarketTag("BTCUSDT", "binance")).toBe("Binance · Spot · BTC/USDT");
+    expect(loadedMarketTag("XAUUSDT", "binance_futures")).toBe("Binance · Perp · XAU/USDT");
+    expect(loadedMarketTag("OKX:BTCUSDT.P", "venue")).toBe("OKX · Perp · BTC/USDT");
+    expect(loadedMarketTag("AAPL", "yahoo")).toBeNull();
   });
 });

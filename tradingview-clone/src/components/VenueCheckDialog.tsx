@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { setCheckOpen, setCryptoVenue, useAssets } from "../assetStore";
 import { fetchJson, isNetworkError, wsRequest } from "../../shared/marketData";
 import { checkVenue, type CheckState, type CheckStep } from "../../shared/venueCheck";
-import { VENUES, type VenueId } from "../../shared/venues";
+import { PICKER_VENUES as VENUES, type VenueId } from "../../shared/venues";
 
 const ICON: Record<CheckState, string> = { ok: "✓", fail: "✕", skip: "–" };
 

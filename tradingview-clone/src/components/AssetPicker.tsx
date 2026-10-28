@@ -5,8 +5,9 @@ import { useFeedSettings } from "../market/exchangeFeed";
 import { STANDALONE } from "../config";
 import { loadChart, useChartState } from "../store";
 import { formatSpread, parseSpread, SPREAD_OP_LABELS } from "../../shared/spread";
-import { KIND_LABEL, parseVenueSymbol, perpSymbol, VENUES, venueName, venueSymbol } from "../../shared/venues";
+import { isBlockedSymbol, KIND_LABEL, marketTag, parseVenueSymbol, perpSymbol, PICKER_VENUES, pickerPerps, VENUES, venueName, venueSymbol } from "../../shared/venues";
 import { marketLabel, searchMarkets } from "../../shared/venueMarkets";
+import { isCryptoSymbol } from "../../shared/marketData";
 import { availabilityIn, EU_QUOTES, isEea, MICA, MICA_STATUS_ICON, MICA_STATUS_LABEL } from "../../shared/mica";
 import { Menu } from "./Menu";
 
@@ -117,7 +118,7 @@ function VenueTabs() {
   const country = useAssets((s) => s.country);
   const onlyAllowed = useAssets((s) => s.onlyAllowed);
   const info = VENUES.find((v) => v.id === venue);
-  const perps = info?.perps ?? false;
+  const perps = pickerPerps(venue);
   const noSpot = info?.noSpot;
   const spotOn = (form === "spot" || !perps) && !noSpot;
   // The EU mode picks the EUR or USDC pair from the exchange's market list.
@@ -125,31 +126,28 @@ function VenueTabs() {
     if (euMode) void refreshVenueMarkets(venue).catch(() => undefined);
   }, [euMode, venue]);
   const filter = onlyAllowed && isEea(country);
-  const shown = VENUES.filter((v) => !filter || v.id === venue || availabilityIn(country, v.id).spot === "yes");
+  const shown = PICKER_VENUES.filter((v) => !filter || v.id === venue || availabilityIn(country, v.id).spot === "yes");
   return (
     <div className="asset-tabs venue-tabs" role="group" aria-label="Krypto-Börse">
       <span className="venue-label">Börse</span>
       {shown.map((v) => {
         const status = MICA[v.id].status;
-        // Charts the browser blocks (CORS), as the connection test showed.
-        const blocked = v.spotBlocked && (v.perpBlocked || !v.perps) ? "Charts lädt der Browser hier nicht (CORS-Sperre der Börse)" : v.perpBlocked ? "Perpetuals lädt der Browser hier nicht (CORS-Sperre der Börse)" : "";
         return (
           <button
             key={v.id}
             className={venue === v.id ? "active" : ""}
             onClick={() => setCryptoVenue(v.id)}
             aria-pressed={venue === v.id}
-            data-tip={`${v.id === "BINANCE" ? "Krypto von Binance (wie bisher)" : `Krypto direkt von ${v.name} laden, z. B. ${v.noSpot ? perpSymbol(v.id, "BTCUSDT") : venueSymbol(v.id, "BTCUSDT")}`}${blocked ? `\n⛔ ${blocked}` : ""}\n${MICA_STATUS_ICON[status]} ${MICA_STATUS_LABEL[status]}`}
+            data-tip={`${v.id === "BINANCE" ? "Krypto von Binance (wie bisher)" : `Krypto direkt von ${v.name} laden, z. B. ${v.noSpot ? perpSymbol(v.id, "BTCUSDT") : venueSymbol(v.id, "BTCUSDT")}`}\n${MICA_STATUS_ICON[status]} ${MICA_STATUS_LABEL[status]}`}
           >
             {v.name}
-            {blocked && <span className="venue-blocked" aria-label={blocked}>⛔</span>}
             <span className={`mica-dot ${status}`} aria-label={MICA_STATUS_LABEL[status]}>
               {MICA_STATUS_ICON[status]}
             </span>
           </button>
         );
       })}
-      {filter && shown.length < VENUES.length && <span className="venue-label">+{VENUES.length - shown.length} ausgeblendet</span>}
+      {filter && shown.length < PICKER_VENUES.length && <span className="venue-label">+{PICKER_VENUES.length - shown.length} ausgeblendet</span>}
       <span className="venue-label venue-form-label">Form</span>
       <button className={spotOn ? "active" : ""} onClick={() => setCryptoForm("spot")} disabled={!!noSpot} aria-pressed={spotOn} data-tip={noSpot ?? "Spot-Paar (BTCUSDT)"}>
         Spot
@@ -159,7 +157,7 @@ function VenueTabs() {
         onClick={() => setCryptoForm("perp")}
         disabled={!perps}
         aria-pressed={(form === "perp" || !!noSpot) && perps}
-        data-tip={perps ? "Perpetual-Kontrakt der Börse (BTCUSDT.P). Futures mit Laufzeit über 🔍 suchen, z. B. „btc futures“" : `${venueName(venue)} hat keine öffentlichen Perpetuals`}
+        data-tip={perps ? "Perpetual-Kontrakt der Börse (BTCUSDT.P). Futures mit Laufzeit über 🔍 suchen, z. B. „btc futures“" : info?.perpBlocked ? `${venueName(venue)}-Perpetuals lassen sich im Browser nicht laden` : `${venueName(venue)} hat keine öffentlichen Perpetuals`}
       >
         Perp
       </button>
@@ -188,6 +186,8 @@ export function AssetMenu({ onOpenSearch }: { onOpenSearch: () => void }) {
   const [tab, setTab] = useState<Tab>(readTab);
   const favorites = useFavoriteHits();
   const name = findAsset(symbol)?.name;
+  // Exchange and form of what is loaded, so the choice is clear at a glance (Kraken · Spot · BTC/USD).
+  const tag = marketTag(symbol)?.split(" · ").slice(0, 2).join(" · ") ?? (isCryptoSymbol(symbol) ? "Binance · Spot" : null);
   // The list of Binance perpetuals decides where stocks and metals load from on the iPad.
   useEffect(() => void refreshBinanceLists().catch(() => undefined), []);
   const pick = (t: Tab) => {
@@ -206,6 +206,7 @@ export function AssetMenu({ onOpenSearch }: { onOpenSearch: () => void }) {
         <>
           <strong>{symbol}</strong>
           {name && <span className="asset-name">{name}</span>}
+          {tag && <span className="asset-market">{tag}</span>}
           <span className="caret">▾</span>
         </>
       }
@@ -276,7 +277,7 @@ export function AssetSearchDialog({ onClose, onSelect, title = "Assets suchen" }
   const hits = useMemo(() => searchAssets(query, spot, futures), [query, spot, futures]);
   const q = query.trim().toUpperCase();
   const marketHits: SearchHit[] = useMemo(
-    () => (q && venueList ? searchMarkets(venueList.markets, query, euMode ? EU_QUOTES : undefined).map((m) => ({ symbol: m.symbol, name: marketLabel(m), category: "Krypto" as AssetCategory, fixed: true })) : []),
+    () => (q && venueList ? searchMarkets(venueList.markets, query, euMode ? EU_QUOTES : undefined).filter((m) => !isBlockedSymbol(m.symbol)).map((m) => ({ symbol: m.symbol, name: marketLabel(m), category: "Krypto" as AssetCategory, fixed: true })) : []),
     [q, query, venueList, euMode],
   );
   const favHits = favorites.filter((f) => !q || f.symbol.includes(q) || f.name.toUpperCase().includes(q));

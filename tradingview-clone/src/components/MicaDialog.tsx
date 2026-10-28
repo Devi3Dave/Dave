@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { refreshVenueMarkets, setCryptoVenue, setEuMode, setMicaOpen, setOnlyAllowedVenues, setResidence, useAssets } from "../assetStore";
 import { availabilityIn, countryName, EEA_COUNTRIES, isEea, MICA, MICA_AS_OF, MICA_REGISTER_URL, MICA_STATUS_ICON, MICA_STATUS_LABEL, OTHER_COUNTRIES, type Availability } from "../../shared/mica";
-import { VENUES } from "../../shared/venues";
+import { PICKER_VENUES as VENUES } from "../../shared/venues";
 
 const AVAIL: Record<Availability, { icon: string; label: string }> = {
   yes: { icon: "✓", label: "erlaubt" },
