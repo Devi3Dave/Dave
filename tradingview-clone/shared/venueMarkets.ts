@@ -244,10 +244,8 @@ export function parseDeribit(json: Json): Market[] {
       const name = i.instrument_name;
       const perp = /^([A-Z0-9]+)(?:_(USDC|USDT))?-PERPETUAL$/.exec(name);
       if (perp) return market(`DERIBIT:${perp[1]}${perp[2] ?? "USD"}.P`, "perp", {}, name);
-      if (i.kind === "spot") {
-        const [base, quote] = name.split("_");
-        return market(`DERIBIT:${base}${quote}`, "spot", {}, name) ?? market(`DERIBIT:${name}`, "spot");
-      }
+      // Spot is routed to Coinbase and has no candles at Deribit.
+      if (i.kind === "spot") return null;
       const expiry = isoDay(i.expiration_timestamp ?? 0);
       if (i.kind === "option") return market(`DERIBIT:${name}`, "option", opt(expiry, i.strike, i.option_type ?? ""));
       return market(`DERIBIT:${name}`, "future", { expiry });

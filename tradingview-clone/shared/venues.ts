@@ -50,6 +50,11 @@ export interface Feed {
   candlesUrl(native: string, code: string, limit: number, endSec?: number): string;
   /** Candles in ascending time; throws the exchange's error text. */
   parseCandles(json: unknown): Bar[];
+  /**
+   * The browser blocks its REST calls (no CORS headers) and there is no WebSocket way around it,
+   * as Devi's connection test in Safari showed on 2026-10-28. Loading is still tried, the picker warns.
+   */
+  blocked?: boolean;
   /** None: the chart reloads over REST instead of streaming (KuCoin). */
   wsUrl?: string;
   subscribe(native: string): string;
@@ -95,6 +100,8 @@ export interface Venue {
   defaultQuote: string;
   /** Quote of the usual perpetual (BTCUSDT.P); none for exchanges without public perpetuals. */
   perpQuote?: string;
+  /** No spot charts: why (Deribit routes spot to Coinbase and serves no candles for it). The picker then loads perpetuals. */
+  noSpot?: string;
   /** The market behind the part of a symbol after "VENUE:", or null if this exchange has no such market. */
   resolve(rest: string): Instrument | null;
 }
@@ -267,6 +274,7 @@ const krakenSpot: Feed = {
 const KRAKEN_FUTURES_STEP: Record<string, number> = { "1m": 60, "5m": 300, "15m": 900, "30m": 1800, "1h": 3600, "4h": 14400, "12h": 43200, "1d": 86400, "1w": 604800 };
 
 const krakenFutures: Feed = {
+  blocked: true,
   intervals: Object.fromEntries(Object.keys(KRAKEN_FUTURES_STEP).map((i) => [i, i])),
   maxLimit: 2000,
   paging: true,
@@ -447,8 +455,10 @@ function bitfinexSymbol(p: VenuePair): string {
   return `t${p.base}${p.base.length > 3 || quote.length > 3 ? ":" : ""}${quote}`;
 }
 
+const bitfinexIntervals: Record<string, string> = { "1m": "1m", "5m": "5m", "15m": "15m", "30m": "30m", "1h": "1h", "3h": "3h", "6h": "6h", "12h": "12h", "1d": "1D", "1w": "1W", "1M": "1M" };
+
 const bitfinexFeed: Feed = {
-  intervals: { "1m": "1m", "5m": "5m", "15m": "15m", "30m": "30m", "1h": "1h", "3h": "3h", "6h": "6h", "12h": "12h", "1d": "1D", "1w": "1W", "1M": "1M" },
+  intervals: bitfinexIntervals,
   maxLimit: 1000,
   paging: true,
   candlesUrl: (native, code, limit, endSec) => `https://api-pub.bitfinex.com/v2/candles/trade:${code}:${native}/hist?limit=${limit}&sort=-1${endSec ? `&end=${endSec * 1000 - 1}` : ""}`,
@@ -464,6 +474,22 @@ const bitfinexFeed: Feed = {
     if (!Array.isArray(msg) || msg[1] !== "te" || !Array.isArray(msg[2])) return [];
     const [, mts, amount, price] = msg[2] as number[];
     return [{ price, size: Math.abs(amount), timeMs: mts }];
+  },
+  // "candles" channel: the first message is a snapshot of the newest candles (https://docs.bitfinex.com/reference/ws-public-candles).
+  wsHistory: {
+    paging: false,
+    request: (native, interval) => JSON.stringify({ event: "subscribe", channel: "candles", key: `trade:${bitfinexIntervals[interval]}:${native}` }),
+    parse(msg) {
+      if (!Array.isArray(msg)) {
+        const m = msg as { event?: string; msg?: string };
+        if (m.event === "error") fail("Bitfinex", m.msg ?? "Abo abgelehnt");
+        return null;
+      }
+      // [chanId, [[MTS, OPEN, CLOSE, HIGH, LOW, VOLUME], …]], newest first; updates carry a single candle.
+      const rows = msg[1];
+      if (!Array.isArray(rows) || !Array.isArray(rows[0])) return null;
+      return (rows as number[][]).map((r) => ({ time: Math.floor(r[0] / 1000), open: r[1], close: r[2], high: r[3], low: r[4], volume: r[5] })).sort((a, b) => a.time - b.time);
+    },
   },
 };
 
@@ -562,6 +588,7 @@ const KUCOIN_SPOT_TYPE: Record<string, [string, number]> = {
 const KUCOIN_SPOT_STEP = Object.fromEntries(Object.values(KUCOIN_SPOT_TYPE));
 
 const kucoinSpot: Feed = {
+  blocked: true,
   intervals: Object.fromEntries(Object.entries(KUCOIN_SPOT_TYPE).map(([k, [code]]) => [k, code])),
   maxLimit: 1500,
   paging: true,
@@ -582,6 +609,7 @@ const kucoinSpot: Feed = {
 const KUCOIN_FUTURES_MIN: Record<string, number> = { "1m": 1, "5m": 5, "15m": 15, "30m": 30, "1h": 60, "2h": 120, "4h": 240, "8h": 480, "12h": 720, "1d": 1440, "1w": 10080 };
 
 const kucoinFutures: Feed = {
+  blocked: true,
   intervals: Object.fromEntries(Object.entries(KUCOIN_FUTURES_MIN).map(([k, m]) => [k, String(m)])),
   maxLimit: 500,
   paging: true,
@@ -676,8 +704,9 @@ const deribit: Venue = {
   name: "Deribit",
   defaultQuote: "USDC",
   perpQuote: "USD",
+  noSpot: "Deribit leitet Spot an Coinbase weiter und liefert dafür keine Kerzen",
   resolve(rest) {
-    // Deribit's own names: BTC-PERPETUAL (inverse), BTC_USDC-PERPETUAL, BTC-27MAR26, BTC-27MAR26-100000-C, BTC_USDC (spot).
+    // Deribit's own names: BTC-PERPETUAL (inverse), BTC_USDC-PERPETUAL, BTC-27MAR26, BTC-27MAR26-100000-C. No spot (see noSpot).
     // Decimal strikes are written with a "d" (0d625); symbols arrive upper-cased.
     const own = new RegExp(`^([A-Z0-9]+)(?:_(USDC|USDT))?-(PERPETUAL|${DERIBIT_DAY})(-\\d+(?:D\\d+)?-[CP])?$`).exec(rest.toUpperCase());
     if (own) {
@@ -686,8 +715,6 @@ const deribit: Venue = {
       const native = rest.toUpperCase().replace(/(\d)D(\d)/, "$1d$2");
       return { venue: deribit, kind, pair: { base: own[1], quote }, native, inverse: quote === "USD", feed: deribitFeed };
     }
-    const spot = /^([A-Z0-9]+)_(USDC|USDT|EURR)$/.exec(rest);
-    if (spot) return { venue: deribit, kind: "spot", pair: { base: spot[1], quote: spot[2] }, native: rest, feed: deribitFeed };
     const perp = PERP.exec(rest);
     const pair = splitPair(perp?.[1] ?? rest);
     if (!pair || (!perp && !/^[A-Z0-9]+$/.test(rest))) return null;
@@ -695,7 +722,7 @@ const deribit: Venue = {
       if (pair.quote === "USD") return { venue: deribit, kind: "perp", pair, native: `${pair.base}-PERPETUAL`, inverse: true, feed: deribitFeed };
       return pair.quote === "USDC" || pair.quote === "USDT" ? { venue: deribit, kind: "perp", pair, native: `${pair.base}_${pair.quote}-PERPETUAL`, feed: deribitFeed } : null;
     }
-    return pair.quote === "USDC" || pair.quote === "USDT" ? { venue: deribit, kind: "spot", pair, native: `${pair.base}_${pair.quote}`, feed: deribitFeed } : null;
+    return null;
   },
 };
 
@@ -703,7 +730,9 @@ const deribit: Venue = {
 
 const BITMEX_BIN: Record<string, number> = { "1m": 60, "5m": 300, "1h": 3600, "1d": 86400 };
 
+// BitMEX's WebSocket failed in the same test too.
 const bitmexFeed: Feed = {
+  blocked: true,
   intervals: Object.fromEntries(Object.keys(BITMEX_BIN).map((k) => [k, k])),
   maxLimit: 1000,
   paging: true,
@@ -755,7 +784,20 @@ const bitmex: Venue = {
 
 const ALL: Venue[] = [binance, coinbase, kraken, bybit, okx, bitstamp, bitfinex, bitget, kucoin, deribit, bitmex];
 
-export const VENUES: { id: VenueId; name: string; perps: boolean }[] = ALL.map((v) => ({ id: v.id, name: v.name, perps: !!v.perpQuote }));
+const blockedFeed = (v: Venue, rest: string | null) => (rest ? !!v.resolve(rest)?.feed.blocked : false);
+
+/**
+ * The exchanges for the picker. `spotBlocked` / `perpBlocked`: the browser blocks BTC's spot or perpetual feed there
+ * (Binance spot loads over the app's own path); `noSpot`: why there are no spot charts.
+ */
+export const VENUES: { id: VenueId; name: string; perps: boolean; noSpot?: string; spotBlocked: boolean; perpBlocked: boolean }[] = ALL.map((v) => ({
+  id: v.id,
+  name: v.name,
+  perps: !!v.perpQuote,
+  noSpot: v.noSpot,
+  spotBlocked: blockedFeed(v, v.noSpot ? null : `BTC${v.defaultQuote}`),
+  perpBlocked: blockedFeed(v, v.perpQuote ? `BTC${v.perpQuote}.P` : null),
+}));
 
 export function getVenue(id: string): Venue | undefined {
   return ALL.find((v) => v.id === id.toUpperCase());

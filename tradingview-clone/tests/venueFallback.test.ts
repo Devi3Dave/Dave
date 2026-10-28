@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { isNetworkError, loadMarketData } from "../shared/marketData";
 import { checkVenue } from "../shared/venueCheck";
+import { VENUES } from "../shared/venues";
 
 /** A WebSocket that answers each sent message with `reply(msg)` (nothing for null). */
 function fakeWebSocket(reply: (msg: unknown, url: string) => unknown | null, sent: unknown[] = []) {
@@ -92,6 +93,31 @@ describe("blocked REST (CORS)", () => {
     const data = await loadMarketData("BITGET:BTCUSDT.P", "1h", 10);
     expect(sent[0].args?.[0]).toMatchObject({ channel: "candle1H", instType: "USDT-FUTURES" });
     expect(data.bars.map((b) => b.time)).toEqual([3600, 7200]);
+  });
+
+  it("loads Bitfinex candles from the candles channel snapshot", async () => {
+    const sent: { channel?: string; key?: string }[] = [];
+    vi.stubGlobal("fetch", blocked);
+    vi.stubGlobal(
+      "WebSocket",
+      fakeWebSocket(
+        // Bitfinex answers with info and subscribed events first; the snapshot is newest first.
+        () => [17, [[7_200_000, 2, 2.5, 3, 1, 9], [3_600_000, 1, 2, 2, 1, 8]]],
+        sent,
+      ),
+    );
+    const data = await loadMarketData("BITFINEX:BTCUSD", "1h", 10);
+    expect(sent[0]).toEqual({ event: "subscribe", channel: "candles", key: "trade:1h:tBTCUSD" });
+    expect(data.bars.map((b) => [b.time, b.close])).toEqual([[3600, 2], [7200, 2.5]]);
+  });
+
+  it("marks exchanges whose feeds the browser blocks and Deribit without spot", () => {
+    const v = (id: string) => VENUES.find((x) => x.id === id)!;
+    expect(v("KUCOIN")).toMatchObject({ spotBlocked: true, perpBlocked: true });
+    expect(v("BITMEX")).toMatchObject({ spotBlocked: true, perpBlocked: true });
+    expect(v("KRAKEN")).toMatchObject({ spotBlocked: false, perpBlocked: true });
+    expect(v("BITFINEX")).toMatchObject({ spotBlocked: false, perpBlocked: false });
+    expect(v("DERIBIT").noSpot).toContain("Coinbase");
   });
 
   it("names the exchange instead of Safari's 'Load failed' where no WebSocket helps", async () => {
