@@ -5,7 +5,7 @@ import { useFeedSettings } from "../market/exchangeFeed";
 import { STANDALONE } from "../config";
 import { loadChart, useChartState } from "../store";
 import { formatSpread, parseSpread, SPREAD_OP_LABELS } from "../../shared/spread";
-import { KIND_LABEL, parseVenueSymbol, VENUES, venueName } from "../../shared/venues";
+import { KIND_LABEL, parseVenueSymbol, VENUES, venueName, venueSymbol } from "../../shared/venues";
 import { marketLabel, searchMarkets } from "../../shared/venueMarkets";
 import { Menu } from "./Menu";
 
@@ -122,7 +122,7 @@ function VenueTabs() {
           className={venue === v.id ? "active" : ""}
           onClick={() => setCryptoVenue(v.id)}
           aria-pressed={venue === v.id}
-          data-tip={v.id === "BINANCE" ? "Krypto von Binance (wie bisher)" : `Krypto direkt von ${v.name} laden, z. B. ${v.id}:BTC${v.id === "BYBIT" || v.id === "OKX" ? "USDT" : "USD"}`}
+          data-tip={v.id === "BINANCE" ? "Krypto von Binance (wie bisher)" : `Krypto direkt von ${v.name} laden, z. B. ${venueSymbol(v.id, "BTCUSDT")}`}
         >
           {v.name}
         </button>
@@ -344,7 +344,7 @@ export function AssetSearchDialog({ onClose, onSelect, title = "Assets suchen" }
           {STANDALONE
             ? "iPad-Version: Krypto live von Binance. Gold, Silber, Öl und viele US-Aktien kommen von Binance-Perpetuals (Perp). Für Assets mit „Demo“ gibt es hier keine Datenquelle."
             : "Krypto live von Binance, Aktien, Indizes, Rohstoffe und Forex über Yahoo Finance."}
-          {" Krypto-Börse: oben wählen, ob Krypto von Binance, Coinbase, Kraken, Bybit, OKX, Bitstamp oder Bitfinex kommt, und ob als Spot oder Perpetual. Die Suche zeigt alle Märkte der gewählten Börse: Spot-Paare, Perpetuals (.P) und Futures mit Laufzeit, z. B. „btc perp“ oder „eth futures“. Direkt eintippen geht auch: COINBASE:BTCUSD, BINANCE:BTCUSDT.P, OKX:BTC-USD-260327."}
+          {" Krypto-Börse: oben wählen, von welcher Börse Krypto kommt (Binance, Coinbase, Kraken, Bybit, OKX, Bitstamp, Bitfinex, Bitget, KuCoin, Deribit, BitMEX) und ob als Spot oder Perpetual. Die Suche zeigt alle Märkte der gewählten Börse: Spot-Paare, Perpetuals (.P), Futures mit Laufzeit und Optionen (Deribit, OKX, Binance), z. B. „btc perp“, „eth futures“ oder „btc call 100000“. Direkt eintippen geht auch: COINBASE:BTCUSD, BINANCE:BTCUSDT.P, OKX:BTC-USD-260327, DERIBIT:BTC-27MAR26-100000-C."}
           {" Spread-Charts: zwei Symbole mit / - + * verbinden, z. B. BTCUSDT/ETHUSDT oder GC=F / SI=F, oder den Preisunterschied zweier Börsen: COINBASE:BTCUSD - BINANCE:BTCUSDT."}
           {" Mit einem eigenen Twelve-Data-Schlüssel (Aktualitäts-Nachweis → Börsenkurs einrichten) kommen Aktien, Indizes und Forex als Börsenkurs („Börse“)."}
         </p>
