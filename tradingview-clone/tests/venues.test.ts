@@ -146,7 +146,7 @@ describe("venue candles", () => {
       const i = parseVenueSymbol(symbol)!;
       return { url: i.feed.wsUrl, msg: JSON.parse(i.feed.subscribe(i.wsNative ?? i.native)) };
     };
-    expect(sub("BINANCE:BTCUSDT.P")).toEqual({ url: "wss://fstream.binance.com/ws", msg: { method: "SUBSCRIBE", params: ["btcusdt@aggTrade"], id: 1 } });
+    expect(sub("BINANCE:BTCUSDT.P")).toEqual({ url: "wss://fstream.binance.com/market/ws", msg: { method: "SUBSCRIBE", params: ["btcusdt@aggTrade"], id: 1 } });
     expect(sub("BINANCE:BTCUSD.P").url).toBe("wss://dstream.binance.com/ws");
     expect(sub("BYBIT:BTCUSDT.P")).toEqual({ url: "wss://stream.bybit.com/v5/public/linear", msg: { op: "subscribe", args: ["publicTrade.BTCUSDT"] } });
     expect(sub("KRAKEN:BTCUSD").msg.params.symbol).toEqual(["BTC/USD"]);

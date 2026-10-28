@@ -712,7 +712,8 @@ function connectLive(chart: ChartStore, symbol: string, interval: Interval, futu
   // Quarter and year candles follow the monthly stream, 5 s the 1 s stream, 45 m the 15 m one …; `seen` is the last source kline, for volume deltas.
   const merge = stream !== interval && interval !== "all";
   let seen: Bar | null = null;
-  const host = futures ? "wss://fstream.binance.com" : "wss://stream.binance.com:9443";
+  // USDⓈ-M klines only arrive on the routed /market path.
+  const host = futures ? "wss://fstream.binance.com/market" : "wss://stream.binance.com:9443";
   const ws = new WebSocket(`${host}/ws/${symbol.toLowerCase()}@kline_${stream}`);
   ws.onmessage = (ev) => {
     if (!current()) return;
@@ -765,7 +766,7 @@ function connectTradeLive(chart: ChartStore, json: MarketData, current: () => bo
   const tickSize = json.tickSize ?? 0.01;
   // Trades already in the loaded bars are skipped.
   let lastId = json.lastTradeId ?? -1;
-  const host = json.source === "binance_futures" ? "wss://fstream.binance.com" : "wss://stream.binance.com:9443";
+  const host = json.source === "binance_futures" ? "wss://fstream.binance.com/market" : "wss://stream.binance.com:9443";
   const ws = new WebSocket(`${host}/ws/${json.symbol.toLowerCase()}@aggTrade`);
   ws.onmessage = (ev) => {
     if (!current()) return;
