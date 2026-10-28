@@ -2,7 +2,7 @@ import { useSyncExternalStore } from "react";
 import { findAsset, parseFuturesInfo, parseSpotTickers, resolveAsset, type Asset, type FuturesSymbol } from "../shared/assets";
 import { STANDALONE } from "./config";
 import { feedSettings } from "./market/exchangeFeed";
-import { perpSymbol, plainSymbol, splitPair, VENUES, venueSymbol, type VenueId } from "../shared/venues";
+import { perpSymbol, pickerPerps, PICKER_VENUES, plainSymbol, splitPair, VENUES, venueSymbol, type VenueId } from "../shared/venues";
 import { loadVenueMarkets, type Market } from "../shared/venueMarkets";
 import { euMarket, EEA_COUNTRIES, OTHER_COUNTRIES } from "../shared/mica";
 
@@ -71,7 +71,8 @@ function loadMarketList(venue: VenueId): MarketList | null {
 function loadVenue(): VenueId {
   try {
     const v = localStorage.getItem(VENUE_KEY);
-    if (VENUES.some((x) => x.id === v)) return v as VenueId;
+    // An exchange the picker no longer offers (KuCoin, BitMEX) falls back to Binance.
+    if (PICKER_VENUES.some((x) => x.id === v)) return v as VenueId;
   } catch {
     // default
   }
@@ -295,7 +296,7 @@ export function symbolFor(symbol: string, asset?: Asset, crypto = false): string
   if (symbol.includes(":")) return symbol;
   // Exchanges without spot charts (Deribit) load the perpetual in either form.
   const noSpot = !!VENUES.find((v) => v.id === state.venue)?.noSpot;
-  const perp = crypto && (state.form === "perp" || noSpot) ? perpSymbol(state.venue, symbol) : null;
+  const perp = crypto && (state.form === "perp" || noSpot) && pickerPerps(state.venue) ? perpSymbol(state.venue, symbol) : null;
   if (perp) return perp;
   const eu = crypto && state.form === "spot" ? euSymbol(symbol) : null;
   if (eu) return eu;

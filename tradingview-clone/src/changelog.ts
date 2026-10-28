@@ -14,6 +14,16 @@ export interface Release {
  */
 export const CHANGELOG: Release[] = [
   {
+    version: "0.59.0",
+    date: "2026-10-28",
+    title: "Übersichtlichere Börsenauswahl",
+    changes: [
+      "Was der Browser nicht laden kann, ist aus der Auswahl verschwunden: KuCoin und BitMEX, die Perpetuals von Kraken und die Binance-Optionen; auch die Suche zeigt sie nicht mehr",
+      "Klar sichtbar, was geladen ist: der Asset-Knopf zeigt Börse und Form (z. B. Kraken · Spot), die Chart-Legende Börse, Form und Paar (Kraken · Spot · BTC/USD)",
+      "War KuCoin oder BitMEX gewählt, startet die Auswahl wieder bei Binance",
+    ],
+  },
+  {
     version: "0.58.0",
     date: "2026-10-28",
     title: "Binance-Perps wieder live",

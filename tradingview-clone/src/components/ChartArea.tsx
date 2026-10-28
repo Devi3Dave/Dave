@@ -20,6 +20,7 @@ import { OPEN_GOTO_EVENT } from "./GoToDateDialog";
 import { cloneDrawing, hasMovableAnchors, moveAnchor, shiftDrawing } from "../drawingOps";
 import { DrawingMenu, type MenuTarget } from "./DrawingMenu";
 import { FreshnessBadge } from "./FreshnessBadge";
+import { loadedMarketTag } from "../../shared/venues";
 import { publishCrosshair } from "../crosshair";
 import { lastPositionDefaults } from "./PositionDialog";
 import { ReplayBar } from "./ReplayBar";
@@ -630,7 +631,8 @@ export function ChartArea({ chart, onEngine, magnet, onEditIndicator, onEditPosi
           {i === 0 && (
             <div className="legend-row main">
               <span className="legend-symbol">
-                {symbol} · {interval} · {source === "demo" ? "DEMO-DATEN" : source === "binance_futures" ? "BINANCE PERP" : source === "venue" ? "BÖRSE DIREKT" : source?.toUpperCase()}
+                {loadedMarketTag(symbol, source) ?? symbol} · {interval}
+                {source === "demo" ? " · DEMO-DATEN" : loadedMarketTag(symbol, source) ? "" : ` · ${source?.toUpperCase() ?? ""}`}
               </span>
               <FreshnessBadge chart={chart} />
               {replaying && <span className="legend-replay">REPLAY</span>}
