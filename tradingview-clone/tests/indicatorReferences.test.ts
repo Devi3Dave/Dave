@@ -19,6 +19,7 @@ describe("indicator references", () => {
 
   it("marks the Percoco approximations and the liquidation estimate", () => {
     expect(INDICATOR_REFERENCES.sessions.kind).toBe("approx");
+    expect(INDICATOR_REFERENCES.fvgnephew.kind).toBe("approx");
     expect(INDICATOR_REFERENCES.rsicloud.kind).toBe("approx");
     expect(INDICATOR_REFERENCES.liqheatmap.kind).toBe("estimate");
   });

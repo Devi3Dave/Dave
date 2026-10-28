@@ -17,6 +17,8 @@ export interface OrderBlock {
   label?: string;
   /** Dashed line at 50 % (FVG "consequential encroachment"). */
   mid?: boolean;
+  /** Fixed box length: drawn only up to this time while the zone holds (null/absent = to the right edge). */
+  until?: number;
 }
 
 export interface OrderBlockSignal {
@@ -58,7 +60,7 @@ interface TfBar extends Bar {
 }
 
 /** Completed higher-time-frame candles built from the chart bars (the running one is left out to avoid repainting). */
-export function resample(bars: Bar[], seconds: number): TfBar[] {
+export function resample(bars: Bar[], seconds: number, keepForming = false): TfBar[] {
   const shift = seconds === 604800 ? 3 * 86400 : 0; // weeks start on Monday
   const out: TfBar[] = [];
   let key: number | null = null;
@@ -77,9 +79,9 @@ export function resample(bars: Bar[], seconds: number): TfBar[] {
       cur.last = i;
     }
   }
-  // The newest bucket is still forming unless the next chart bar would start a new one.
+  // The newest bucket is still forming unless the next chart bar would start a new one; dropped unless keepForming.
   const lastBar = bars[bars.length - 1];
-  if (out.length && lastBar) {
+  if (!keepForming && out.length && lastBar) {
     const step = barSeconds(bars);
     if (Math.floor((lastBar.time + step + shift) / seconds) === key) out.pop();
   }

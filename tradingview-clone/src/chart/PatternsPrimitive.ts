@@ -126,7 +126,8 @@ export class PatternsPrimitive implements ISeriesPrimitive<Time> {
       const yTop = this.series?.priceToCoordinate(z.top) ?? null;
       const yBottom = this.series?.priceToCoordinate(z.bottom) ?? null;
       if (x1 === null || yTop === null || yBottom === null) continue;
-      const x2 = z.end !== null ? (this.timeToX(z.end) ?? width) : width;
+      const stop = z.end ?? z.until ?? null;
+      const x2 = stop !== null ? (this.timeToX(stop) ?? width) : width;
       if (x2 < 0 || x1 > width) continue;
       const broken = z.end !== null;
       const color = z.side === "bull" ? COLORS.bullish : COLORS.bearish;

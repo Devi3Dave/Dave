@@ -14,6 +14,18 @@ export interface Release {
  */
 export const CHANGELOG: Release[] = [
   {
+    version: "0.52.0",
+    date: "2026-10-28",
+    title: "FVG im Stil von Nephew_Sam_",
+    changes: [
+      "Neuer Indikator „FVG (Nephew_Sam_)“ unter Muster, zusätzlich zum bisherigen FVG",
+      "Nachbau nach der öffentlichen Beschreibung des TradingView-Indikators, da dessen Code nicht öffentlich ist (Quelle: Annäherung)",
+      "Einfache Drei-Kerzen-Lücke ohne Zusatzfilter, Chart-Zeitrahmen plus bis zu drei höhere Zeitrahmen",
+      "Gefüllt per Docht oder Schlusskurs an der fernen Kante; gefüllte Lücken löschen oder grau stehen lassen",
+      "Feste Länge in Kerzen, „Auf Kerzenschluss warten“ für höhere Zeitrahmen, Labels ein- und ausblendbar, Alarm bei neuer Lücke",
+    ],
+  },
+  {
     version: "0.51.2",
     date: "2026-10-27",
     title: "Fadenkreuz-Sync mit dem Finger",
