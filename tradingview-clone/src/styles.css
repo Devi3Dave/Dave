@@ -353,6 +353,14 @@ textarea {
   margin-right: 2px;
 }
 
+.venue-form-label {
+  margin-left: 8px;
+}
+
+.venue-tabs button:disabled {
+  opacity: 0.4;
+}
+
 .asset-badge.binance_futures {
   color: #f7c948;
 }

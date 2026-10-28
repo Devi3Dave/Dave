@@ -14,6 +14,18 @@ export interface Release {
  */
 export const CHANGELOG: Release[] = [
   {
+    version: "0.53.0",
+    date: "2026-10-28",
+    title: "Krypto: alle Handelspaare, Perpetuals und Futures",
+    changes: [
+      "Perpetuals wie bei TradingView mit „.P“: BINANCE:BTCUSDT.P (USDⓈ-M), BINANCE:BTCUSD.P (COIN-M), BYBIT, OKX, KRAKEN (PF_), BITFINEX (F0)",
+      "Futures mit Laufzeit unter dem Namen der Börse, z. B. BINANCE:BTCUSDT_260327, OKX:BTC-USD-260327, BYBIT:BTCUSDT-27MAR26, KRAKEN:FF_XBTUSD_260327",
+      "Asset-Auswahl: neben der Börse jetzt „Spot“ oder „Perp“; Coinbase und Bitstamp haben keine öffentlichen Perpetuals",
+      "Suche zeigt alle Märkte der gewählten Börse (Spot-Paare aller Quoten, Perpetuals, Futures), z. B. „btc perp“ oder „eth futures“",
+      "Kerzen und Live-Trades kommen direkt von der jeweiligen Börse; Markt-Listen werden 12 Stunden zwischengespeichert",
+    ],
+  },
+  {
     version: "0.52.0",
     date: "2026-10-28",
     title: "FVG im Stil von Nephew_Sam_",

@@ -1,7 +1,7 @@
 /** Asset catalog for the symbol picker: popular assets by category and where their prices come from. */
 
 import { feedSymbol } from "./exchangeFeed.js";
-import { splitPair } from "./venues.js";
+import { parseVenueSymbol } from "./venues.js";
 
 export type AssetCategory = "Krypto" | "Aktien" | "Indizes & ETFs" | "Edelmetalle" | "Rohstoffe" | "Forex";
 
@@ -164,12 +164,13 @@ export function parseSpotTickers(json: unknown): string[] {
 const BY_ID = new Map(ASSETS.map((a) => [a.id, a]));
 const BY_PERP = new Map(ASSETS.filter((a) => a.perp).map((a) => [a.perp!, a]));
 
-/** Catalog entry for a loaded symbol (its id, its perpetual, or the coin on another exchange such as COINBASE:BTCUSD). */
+/** Catalog entry for a loaded symbol (its id, its perpetual, or the coin on an exchange such as COINBASE:BTCUSD or BYBIT:BTCUSDT.P). */
 export function findAsset(symbol: string): Asset | undefined {
   const known = BY_ID.get(symbol) ?? BY_PERP.get(symbol);
   const m = known ? null : /^[A-Z]+:(.+)$/.exec(symbol);
   if (!m) return known;
-  const pair = splitPair(m[1]);
+  // Spot, perpetual or future of a coin: the coin's entry when it is quoted in dollars (BTCUSD, BTCUSDT.P, BTC-USD-260327).
+  const pair = parseVenueSymbol(symbol)?.pair;
   const coin = pair && ["USD", "USDT", "USDC"].includes(pair.quote) ? BY_ID.get(`${pair.base}USDT`) : undefined;
   return coin?.category === "Krypto" ? coin : BY_ID.get(m[1]);
 }
@@ -208,6 +209,8 @@ export interface SearchHit {
   category: AssetCategory;
   /** Set for catalog entries; extra Binance pairs have none. */
   asset?: Asset;
+  /** A market from an exchange's list (BYBIT:BTCUSDT.P, ETHBTC): loaded as it is, not mapped to the picker's exchange or form. */
+  fixed?: boolean;
 }
 
 const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9äöüß]/g, "");

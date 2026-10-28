@@ -1,13 +1,13 @@
 import type { Bar } from "./math.js";
 import { addTrades, demoTrades, isTradeInterval, parseTradeInterval, tickSizeFromPrices, type Trade, type TradeInterval } from "./tickBars.js";
-import { parseVenueSymbol, stripBinance, type Venue, type VenuePair } from "./venues.js";
+import { isVenuePrefixed, KIND_LABEL, parseVenueSymbol, stripBinance, type Feed, type Instrument } from "./venues.js";
 
 export interface MarketData {
   symbol: string;
   interval: string;
   /** twelvedata: exchange prices with the user's own key (src/market/exchangeFeed.ts). */
   /** spread: computed from two symbols (shared/spread.ts), reloaded like Yahoo. */
-  /** venue: another crypto exchange, the symbol names it (COINBASE:BTCUSD, shared/venues.ts). */
+  /** venue: a crypto market named by its exchange (COINBASE:BTCUSD, BINANCE:BTCUSDT.P, shared/venues.ts). */
   source: "binance" | "binance_futures" | "yahoo" | "twelvedata" | "spread" | "venue" | "demo";
   bars: Bar[];
   /** Tick and range charts (shared/tickBars.ts): the minimum price change and the last aggregate trade id, so the live stream continues them. */
@@ -199,7 +199,7 @@ async function binanceKlines(urls: string[], symbol: string, interval: string, l
 }
 
 /** The exchange candle to merge a time frame from: its own when listed, months for quarters/years, else the largest that divides it. */
-function venueBase(venue: Venue, interval: string): string | null {
+function venueBase(venue: Feed, interval: string): string | null {
   const codes = Object.keys(venue.intervals);
   if (codes.includes(interval)) return interval;
   if (isCalendarInterval(interval)) return codes.includes("1M") ? "1M" : "1d";
@@ -212,9 +212,10 @@ function venueBase(venue: Venue, interval: string): string | null {
 const MONDAY = 4 * 86400;
 
 /** Candles of another crypto exchange, paged back and merged like Binance's. */
-async function fromVenue(venue: Venue, pair: VenuePair, interval: string, limit: number, endTime?: number): Promise<Bar[]> {
+async function fromVenue(inst: Instrument, interval: string, limit: number, endTime?: number): Promise<Bar[]> {
+  const venue = inst.feed;
   const base = venueBase(venue, interval);
-  if (!base) throw new Error(`${venue.name} hat keine Kerzen für ${interval}`);
+  if (!base) throw new Error(`${inst.venue.name} hat keine Kerzen für ${interval}`);
   const code = venue.intervals[base];
   const merged = base !== interval && interval !== "all";
   const ratio = merged && !isCalendarInterval(interval) ? intervalSeconds(interval) / intervalSeconds(base) : 1;
@@ -225,7 +226,7 @@ async function fromVenue(venue: Venue, pair: VenuePair, interval: string, limit:
   let bars: Bar[] = [];
   for (let page = 0; page < pages; page++) {
     const end = bars.length ? bars[0].time : endTime ? Math.floor(endTime) : undefined;
-    const chunk = venue.parseCandles(await fetchJson(venue.candlesUrl(pair, code, perRequest, end))).filter((b) => end === undefined || b.time < end);
+    const chunk = venue.parseCandles(await fetchJson(venue.candlesUrl(inst.native, code, perRequest, end))).filter((b) => end === undefined || b.time < end);
     bars = [...chunk, ...bars];
     if (chunk.length < perRequest * 0.9) break;
   }
@@ -418,11 +419,13 @@ export async function loadMarketData(rawSymbol: string, interval: string, limit 
   // Another exchange is asked on its own: a pair it does not list is an error, not Binance's or demo prices.
   const venue = parseVenueSymbol(symbol);
   if (venue) {
-    if (intervalSeconds(interval) < 60) throw new Error(`${venue.venue.name}: Sekunden-Kerzen gibt es nur bei Binance`);
-    const bars = await fromVenue(venue.venue, venue.pair, interval, limit, endTime);
-    if (bars.length === 0) throw new Error(`${venue.venue.name}: keine Kerzen für ${venue.pair.base}/${venue.pair.quote}`);
+    const what = `${venue.venue.name} ${KIND_LABEL[venue.kind]} ${venue.native}`;
+    if (intervalSeconds(interval) < 60) throw new Error(`${what}: Sekunden-Kerzen gibt es nur bei Binance Spot`);
+    const bars = await fromVenue(venue, interval, limit, endTime);
+    if (bars.length === 0) throw new Error(`${what}: keine Kerzen`);
     return { symbol, interval, source: "venue", bars };
   }
+  if (isVenuePrefixed(symbol)) throw new Error(`${symbol}: diesen Markt gibt es bei der Börse nicht (oder nicht öffentlich)`);
   const spot: [MarketData["source"], () => Promise<Bar[]>] = ["binance", () => fromBinance(symbol, interval, limit, endTime)];
   const futures: [MarketData["source"], () => Promise<Bar[]>] = ["binance_futures", () => fromBinanceFutures(symbol, interval, limit, endTime)];
   const yahoo: [MarketData["source"], () => Promise<Bar[]>] = ["yahoo", () => fromYahoo(symbol, interval, limit)];
@@ -443,7 +446,7 @@ export async function loadMarketData(rawSymbol: string, interval: string, limit 
 
 /** Tick and range bars from Binance trades (spot, then USDⓈ-M futures); other symbols show demo trades. */
 async function loadTradeData(symbol: string, interval: string, spec: TradeInterval, limit: number): Promise<MarketData> {
-  if (parseVenueSymbol(symbol)) throw new Error("Ticks und Bereiche gibt es nur mit Binance-Kursen");
+  if (isVenuePrefixed(symbol)) throw new Error("Ticks und Bereiche gibt es nur mit Binance-Spot- und USDⓈ-M-Kursen");
   if (isCryptoSymbol(symbol)) {
     for (const futures of [false, true]) {
       const source = futures ? "binance_futures" : "binance";
