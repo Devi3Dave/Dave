@@ -340,15 +340,15 @@ export async function loadVenueMarkets(venue: VenueId, fetchJson: (url: string) 
 
 const KIND_ORDER: Record<MarketKind, number> = { spot: 0, perp: 1, future: 2, option: 3 };
 const QUOTE_ORDER = ["USDT", "USD", "USDC", "FDUSD", "EUR"];
-const quoteRank = (q: string) => (QUOTE_ORDER.includes(q) ? QUOTE_ORDER.indexOf(q) : QUOTE_ORDER.length);
 
 /**
  * Markets matching a search ("btc", "BTCUSDT", "eth perp", "BYBIT:BTCUSDT.P", "btc call 100000"): the pair or symbol must
  * start with the text, "perp"/"future"/"spot"/"option"/"call"/"put" in the query narrows the kind, a number the strike.
  * Options (thousands per exchange) only show when asked for or when the text has digits (an expiry or strike).
- * Sorted by kind, then quote, then expiry and strike.
+ * Sorted by kind, then quote (`quoteOrder`: the EU mode puts EUR and USDC first), then expiry and strike.
  */
-export function searchMarkets(markets: Market[], query: string): Market[] {
+export function searchMarkets(markets: Market[], query: string, quoteOrder: string[] = QUOTE_ORDER): Market[] {
+  const quoteRank = (q: string) => (quoteOrder.includes(q) ? quoteOrder.indexOf(q) : quoteOrder.length);
   const words = query.toUpperCase().split(/\s+/).filter(Boolean);
   const kinds = new Set<MarketKind>();
   const rest: string[] = [];

@@ -2,8 +2,9 @@ import { useSyncExternalStore } from "react";
 import { findAsset, parseFuturesInfo, parseSpotTickers, resolveAsset, type Asset, type FuturesSymbol } from "../shared/assets";
 import { STANDALONE } from "./config";
 import { feedSettings } from "./market/exchangeFeed";
-import { perpSymbol, VENUES, venueSymbol, type VenueId } from "../shared/venues";
+import { perpSymbol, plainSymbol, splitPair, VENUES, venueSymbol, type VenueId } from "../shared/venues";
 import { loadVenueMarkets, type Market } from "../shared/venueMarkets";
+import { euMarket, EEA_COUNTRIES, OTHER_COUNTRIES } from "../shared/mica";
 
 const FAV_KEY = "chartai.assetFavorites.v1";
 const LISTS_KEY = "chartai.binanceSymbols.v1";
@@ -11,6 +12,34 @@ const LISTS_MAX_AGE = 12 * 3600 * 1000;
 const VENUE_KEY = "chartai.cryptoVenue.v1";
 const FORM_KEY = "chartai.cryptoForm.v1";
 const MARKETS_KEY = "chartai.venueMarkets.v1.";
+const EU_KEY = "chartai.euMode.v1";
+const COUNTRY_KEY = "chartai.residence.v1";
+const ONLY_ALLOWED_KEY = "chartai.onlyAllowedVenues.v1";
+
+function loadFlag(key: string): boolean {
+  try {
+    return localStorage.getItem(key) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function saveFlag(key: string, on: boolean) {
+  try {
+    localStorage.setItem(key, on ? "1" : "0");
+  } catch {
+    // not remembered
+  }
+}
+
+function loadCountry(): string | null {
+  try {
+    const c = localStorage.getItem(COUNTRY_KEY);
+    return c && (c in EEA_COUNTRIES || c in OTHER_COUNTRIES) ? c : null;
+  } catch {
+    return null;
+  }
+}
 
 /** How crypto picked from the catalog trades: spot pair or the exchange's usual perpetual (BTCUSDT.P). */
 export type CryptoForm = "spot" | "perp";
@@ -85,6 +114,14 @@ interface AssetState {
   form: CryptoForm;
   /** Every market (spot, perpetual, future) of the exchanges asked so far. */
   markets: Partial<Record<VenueId, MarketList>>;
+  /** EU mode: crypto from the catalog loads its EUR or USDC pair instead of USDT (MiCA). */
+  euMode: boolean;
+  /** Country of residence (ISO code) for the MiCA hints, null until chosen. */
+  country: string | null;
+  /** Show only exchanges allowed in that country in the exchange row. */
+  onlyAllowed: boolean;
+  /** The MiCA and country dialog is open. */
+  micaOpen: boolean;
 }
 
 const cached = loadLists();
@@ -96,6 +133,10 @@ let state: AssetState = {
   venue: loadVenue(),
   form: loadForm(),
   markets: {},
+  euMode: loadFlag(EU_KEY),
+  country: loadCountry(),
+  onlyAllowed: loadFlag(ONLY_ALLOWED_KEY),
+  micaOpen: false,
 };
 const listeners = new Set<() => void>();
 
@@ -140,6 +181,33 @@ export function setCryptoForm(form: CryptoForm) {
     // not remembered
   }
   set({ form });
+}
+
+export function setEuMode(euMode: boolean) {
+  saveFlag(EU_KEY, euMode);
+  set({ euMode });
+}
+
+export function setMicaOpen(micaOpen: boolean) {
+  set({ micaOpen });
+}
+
+export function setOnlyAllowedVenues(onlyAllowed: boolean) {
+  saveFlag(ONLY_ALLOWED_KEY, onlyAllowed);
+  set({ onlyAllowed });
+}
+
+/** Country of residence; picking an EEA country the first time turns the EU mode on. */
+export function setResidence(country: string | null) {
+  try {
+    if (country) localStorage.setItem(COUNTRY_KEY, country);
+    else localStorage.removeItem(COUNTRY_KEY);
+  } catch {
+    // not remembered
+  }
+  const first = state.country === null;
+  set({ country });
+  if (first && country && country in EEA_COUNTRIES && !state.euMode) setEuMode(true);
 }
 
 const marketsLoading = new Map<VenueId, Promise<void>>();
@@ -220,7 +288,21 @@ export function symbolFor(symbol: string, asset?: Asset, crypto = false): string
   if (symbol.includes(":")) return symbol;
   const perp = crypto && state.form === "perp" ? perpSymbol(state.venue, symbol) : null;
   if (perp) return perp;
+  const eu = crypto && state.form === "spot" ? euSymbol(symbol) : null;
+  if (eu) return eu;
   if (crypto && state.venue !== "BINANCE") return venueSymbol(state.venue, symbol);
   const a = asset ?? findAsset(symbol);
   return a ? resolveAsset(a, STANDALONE, state.futuresSet, feedSettings.active()).symbol : symbol;
+}
+
+/**
+ * EU mode: a USDT pair becomes the coin's EUR pair on the chosen exchange, else USDC, EURC or USD (BTCUSDT → KRAKEN:BTCEUR,
+ * BINANCE:BTCUSDC). Needs the exchange's market list; until it is loaded (or when none of these quotes is listed) the pair stays.
+ */
+function euSymbol(symbol: string): string | null {
+  if (!state.euMode) return null;
+  const pair = splitPair(plainSymbol(symbol));
+  const list = state.markets[state.venue];
+  if (!pair || pair.quote !== "USDT" || !list) return null;
+  return euMarket(list.markets, pair.base)?.symbol ?? null;
 }

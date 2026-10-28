@@ -105,6 +105,11 @@ und zusammen mit der Fill & Sign-App auf GitHub Pages veröffentlicht.
 - Weitere Börsen: Bitget, KuCoin (lädt jede Minute neu, kein öffentlicher Stream), Deribit, BitMEX (`BITMEX:BTCUSD.P`
   = XBTUSD). Optionen als Chart von Deribit (`DERIBIT:BTC-27MAR26-100000-C`), OKX (`OKX:BTC-USD-260327-100000-C`) und
   Binance (`BINANCE:BTC-260327-100000-C`); Suche z. B. „btc call 100000“.
+- EU-Modus und MiCA-Info: „🇪🇺 EUR/USDC“ in der Asset-Auswahl lädt statt USDT das Euro-Paar der Börse
+  (`KRAKEN:BTCEUR`), sonst USDC, EURC oder USD. „MiCA-Info“ zeigt pro Börse, ob sie eine MiCA-Lizenz hat
+  (Gesellschaft, Land, Behörde, Datum, Dienste, Derivate nach MiFID II, Quellen) und mit gewähltem
+  Wohnsitzland, was dort erlaubt ist; auf Wunsch blendet die Börsenzeile nicht erlaubte Börsen aus
+  (`shared/mica.ts`, Stand-Datum im Code). Nur ein Hinweis, keine Rechtsberatung; verbindlich ist das ESMA-Register.
 - Asset-Auswahl in der Kopfzeile: Drop-down mit gängigen Assets nach Rubriken (Krypto, Aktien,
   Indizes & ETFs, Edelmetalle, Rohstoffe, Forex) und Favoriten; 🔍 öffnet die Suche über alle
   Binance-Märkte, ebenfalls nach Rubriken, mit ☆ zum Speichern von Favoriten. Jede Zeile zeigt die
