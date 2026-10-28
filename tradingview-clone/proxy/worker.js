@@ -38,6 +38,12 @@ function limited(ip, now = Date.now()) {
   return h.count > RATE_LIMIT;
 }
 
+const WELCOME = `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ChartAI-Proxy</title>
+<body style="font-family:system-ui,sans-serif;max-width:34rem;margin:3rem auto;padding:0 1rem;line-height:1.5">
+<h1>✓ ChartAI-Proxy läuft</h1>
+<p>Diese Adresse ist richtig eingerichtet. Kopiere sie aus der Adresszeile und trage sie in ChartAI ein: Asset-Auswahl → 🩺 Test → „Eigener Proxy für gesperrte Börsen“ → Speichern.</p>
+<p>Kurse gibt der Proxy nur an die ChartAI-Seite heraus, darum zeigt ein direkter Aufruf anderer Adressen hier „origin not allowed“ (403). Das ist gewollt.</p>`;
+
 function cors(origin) {
   return {
     "Access-Control-Allow-Origin": origin,
@@ -82,6 +88,8 @@ export default {
     const url = new URL(request.url);
     const origin = request.headers.get("Origin");
     const allowed = origin !== null && ALLOWED_ORIGINS.includes(origin);
+    // Opened in a browser tab (no Origin header): a short page instead of an error.
+    if (url.pathname === "/" && request.method === "GET" && origin === null) return new Response(WELCOME, { headers: { "Content-Type": "text/html; charset=utf-8" } });
     // Says only whether the relay runs and accepts the asking page, so any page may read it.
     if (url.pathname === "/health" && request.method === "GET") return reply(200, { ok: true, service: "chartai-proxy", allowed }, "*");
     if (!allowed) return reply(403, { error: "origin not allowed", service: "chartai-proxy" }, null);
