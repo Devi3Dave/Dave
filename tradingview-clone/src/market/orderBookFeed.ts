@@ -19,7 +19,8 @@ const ENDPOINTS: Record<BookMarket, { rest: string[]; ws: string }> = {
     rest: ["https://api.binance.com/api/v3/depth", "https://data-api.binance.vision/api/v3/depth"],
     ws: "wss://stream.binance.com:9443/ws",
   },
-  futures: { rest: ["https://fapi.binance.com/fapi/v1/depth"], ws: "wss://fstream.binance.com/ws" },
+  // USDⓈ-M depth streams are on the routed /public path.
+  futures: { rest: ["https://fapi.binance.com/fapi/v1/depth"], ws: "wss://fstream.binance.com/public/ws" },
 };
 
 // UI refresh rate; the stream itself delivers every 100 ms.

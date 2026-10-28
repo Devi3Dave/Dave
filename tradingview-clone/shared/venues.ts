@@ -150,8 +150,12 @@ function binanceFeed(rest: string, ws: string): Feed {
   };
 }
 
-const binanceUsdm = binanceFeed("https://fapi.binance.com/fapi/v1/klines", "wss://fstream.binance.com/ws");
+// USDⓈ-M streams are routed: trades and klines only arrive on /market, a plain /ws stays silent
+// (https://developers.binance.com/docs/derivatives/usds-margined-futures/websocket-market-streams).
+const binanceUsdm = binanceFeed("https://fapi.binance.com/fapi/v1/klines", "wss://fstream.binance.com/market/ws");
+// eapi.binance.com sends no CORS headers: blocked in the browser (Devi's connection test, 2026-10-28).
 const binanceOptions: Feed = {
+  blocked: true,
   ...binanceFeed("https://eapi.binance.com/eapi/v1/klines", "wss://nbstream.binance.com/eoptions/ws"),
   intervals: Object.fromEntries(["1m", "3m", "5m", "15m", "30m", "1h", "2h", "4h", "6h", "12h", "1d", "3d", "1w"].map((i) => [i, i])),
   maxLimit: 1500,

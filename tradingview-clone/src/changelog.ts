@@ -14,6 +14,15 @@ export interface Release {
  */
 export const CHANGELOG: Release[] = [
   {
+    version: "0.58.0",
+    date: "2026-10-28",
+    title: "Binance-Perps wieder live",
+    changes: [
+      "Binance hat die Futures-Streams aufgeteilt: Trades, Kerzen und Liquidationen kommen nur noch über fstream.binance.com/market, das Orderbuch über /public. Live-Kurse der Binance-Perps (auch Gold, Öl und Aktien-Perps) laufen damit wieder",
+      "Binance-Optionen (eapi.binance.com) sperrt der Browser (CORS); sie sind jetzt als gesperrt markiert",
+    ],
+  },
+  {
     version: "0.57.0",
     date: "2026-10-28",
     title: "Börsen nach dem Verbindungstest: Bitfinex über WebSocket, Sperren markiert",

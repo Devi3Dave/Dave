@@ -57,7 +57,7 @@ class LiquidationFeed {
   }
 
   private connect(symbol: string) {
-    const ws = new WebSocket(`wss://fstream.binance.com/ws/${symbol.toLowerCase()}@forceOrder`);
+    const ws = new WebSocket(`wss://fstream.binance.com/market/ws/${symbol.toLowerCase()}@forceOrder`);
     this.ws = ws;
     ws.onopen = () => {
       this.retry = 0;
