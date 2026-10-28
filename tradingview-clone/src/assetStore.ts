@@ -122,6 +122,8 @@ interface AssetState {
   onlyAllowed: boolean;
   /** The MiCA and country dialog is open. */
   micaOpen: boolean;
+  /** The connection test of the crypto exchanges is open. */
+  checkOpen: boolean;
 }
 
 const cached = loadLists();
@@ -137,6 +139,7 @@ let state: AssetState = {
   country: loadCountry(),
   onlyAllowed: loadFlag(ONLY_ALLOWED_KEY),
   micaOpen: false,
+  checkOpen: false,
 };
 const listeners = new Set<() => void>();
 
@@ -190,6 +193,10 @@ export function setEuMode(euMode: boolean) {
 
 export function setMicaOpen(micaOpen: boolean) {
   set({ micaOpen });
+}
+
+export function setCheckOpen(checkOpen: boolean) {
+  set({ checkOpen });
 }
 
 export function setOnlyAllowedVenues(onlyAllowed: boolean) {

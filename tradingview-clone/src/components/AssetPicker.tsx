@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { ASSETS, ASSET_CATEGORIES, categoryOfFutures, findAsset, resolveAsset, searchAssets, type AssetCategory, type DataSource, type SearchHit } from "../../shared/assets";
-import { refreshBinanceLists, refreshVenueMarkets, setCryptoForm, setCryptoVenue, setEuMode, setMicaOpen, symbolFor, toggleAssetFavorite, useAssets } from "../assetStore";
+import { refreshBinanceLists, refreshVenueMarkets, setCryptoForm, setCryptoVenue, setCheckOpen, setEuMode, setMicaOpen, symbolFor, toggleAssetFavorite, useAssets } from "../assetStore";
 import { useFeedSettings } from "../market/exchangeFeed";
 import { STANDALONE } from "../config";
 import { loadChart, useChartState } from "../store";
@@ -168,6 +168,9 @@ function VenueTabs() {
       </button>
       <button onClick={() => setMicaOpen(true)} data-tip="Welche Börse ist MiCA-lizenziert, was ist in deinem Land erlaubt">
         MiCA-Info
+      </button>
+      <button onClick={() => setCheckOpen(true)} data-tip="Prüfen, welche Börse sich aus diesem Browser laden lässt (Kerzen, Live-Kurse, Marktliste)">
+        🩺 Test
       </button>
     </div>
   );

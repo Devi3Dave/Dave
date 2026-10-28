@@ -110,6 +110,10 @@ und zusammen mit der Fill & Sign-App auf GitHub Pages veröffentlicht.
   (Gesellschaft, Land, Behörde, Datum, Dienste, Derivate nach MiFID II, Quellen) und mit gewähltem
   Wohnsitzland, was dort erlaubt ist; auf Wunsch blendet die Börsenzeile nicht erlaubte Börsen aus
   (`shared/mica.ts`, Stand-Datum im Code). Nur ein Hinweis, keine Rechtsberatung; verbindlich ist das ESMA-Register.
+- Gesperrte Abrufe: Börsen ohne CORS-Freigabe blockiert der Browser (Safari: „Load failed“). Dann laden Kraken
+  (Spot), Bitget und Deribit die Kerzen über ihren WebSocket (`Feed.wsHistory`, ohne CORS); Kraken und Bitget
+  liefern so nur die neuesten Kerzen. Sonst nennt der Fehler die Börse. „🩺 Test“ in der Asset-Auswahl prüft pro
+  Börse REST-Kerzen, WebSocket-Ausweg, Live-Kurse und Marktliste (`shared/venueCheck.ts`).
 - Asset-Auswahl in der Kopfzeile: Drop-down mit gängigen Assets nach Rubriken (Krypto, Aktien,
   Indizes & ETFs, Edelmetalle, Rohstoffe, Forex) und Favoriten; 🔍 öffnet die Suche über alle
   Binance-Märkte, ebenfalls nach Rubriken, mit ☆ zum Speichern von Favoriten. Jede Zeile zeigt die

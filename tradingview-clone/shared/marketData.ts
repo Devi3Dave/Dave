@@ -134,7 +134,7 @@ export function isCryptoSymbol(symbol: string): boolean {
   return CRYPTO_QUOTES.test(symbol);
 }
 
-async function fetchJson(url: string): Promise<unknown> {
+export async function fetchJson(url: string): Promise<unknown> {
   const res = await fetch(url, {
     // Browsers set their own User-Agent; only the Node server needs one for Yahoo.
     headers: typeof window === "undefined" ? { "User-Agent": "Mozilla/5.0 (tradingview-claude)" } : undefined,
@@ -142,6 +142,58 @@ async function fetchJson(url: string): Promise<unknown> {
   });
   if (!res.ok) throw new Error(`${url} -> HTTP ${res.status}`);
   return res.json();
+}
+
+/**
+ * The request never got an answer: blocked by the browser (CORS: Safari says "Load failed",
+ * Chrome "Failed to fetch", Firefox "NetworkError …"), offline, or timed out.
+ */
+export function isNetworkError(e: unknown): boolean {
+  if (e instanceof TypeError) return true;
+  const name = (e as { name?: string } | null)?.name;
+  if (name === "TimeoutError" || name === "AbortError") return true;
+  return /load failed|failed to fetch|networkerror/i.test(String((e as Error | null)?.message ?? e));
+}
+
+/** German message for an exchange whose REST data the browser cannot reach. */
+export function blockedMessage(venueName: string): string {
+  return `${venueName} lässt den Abruf aus dem Browser nicht zu (CORS) oder ist gerade nicht erreichbar`;
+}
+
+/** One request over a WebSocket: send, wait for the first message `parse` accepts, close. */
+export function wsRequest<T>(url: string, message: string, parse: (msg: unknown) => T | null, timeoutMs = 10_000): Promise<T> {
+  return new Promise((resolve, reject) => {
+    if (typeof WebSocket === "undefined") return reject(new Error("WebSocket nicht verfügbar"));
+    const ws = new WebSocket(url);
+    const done = (fn: () => void) => {
+      clearTimeout(timer);
+      ws.onopen = ws.onmessage = ws.onerror = ws.onclose = null;
+      try {
+        ws.close();
+      } catch {
+        // already closed
+      }
+      fn();
+    };
+    const timer = setTimeout(() => done(() => reject(new Error("WebSocket: keine Antwort"))), timeoutMs);
+    ws.onopen = () => ws.send(message);
+    ws.onmessage = (ev) => {
+      let msg: unknown;
+      try {
+        msg = JSON.parse(String(ev.data));
+      } catch {
+        return; // "pong" and other plain text
+      }
+      try {
+        const out = parse(msg);
+        if (out !== null) done(() => resolve(out));
+      } catch (e) {
+        done(() => reject(e));
+      }
+    };
+    ws.onerror = () => done(() => reject(new Error("WebSocket-Verbindung fehlgeschlagen")));
+    ws.onclose = () => done(() => reject(new Error("WebSocket geschlossen")));
+  });
 }
 
 // data-api.binance.vision is Binance's public market-data mirror; it also
@@ -224,9 +276,30 @@ async function fromVenue(inst: Instrument, interval: string, limit: number, endT
   // A watchlist quote needs two candles, not a full page.
   const perRequest = pages > 1 ? venue.maxLimit : Math.min(venue.maxLimit, Math.ceil(wanted) + 2);
   let bars: Bar[] = [];
-  for (let page = 0; page < pages; page++) {
+  // Once REST was blocked, the remaining pages go over the WebSocket too.
+  let viaWs = false;
+  const page = async (end: number | undefined): Promise<Bar[]> => {
+    const ws = venue.wsHistory;
+    if (!viaWs) {
+      try {
+        return venue.parseCandles(await fetchJson(venue.candlesUrl(inst.native, code, perRequest, end)));
+      } catch (e) {
+        if (!isNetworkError(e)) throw e;
+        if (!ws || !venue.wsUrl) throw new Error(blockedMessage(inst.venue.name));
+        viaWs = true;
+      }
+    }
+    // Kraken and Bitget only send their newest candles over the WebSocket: no older history.
+    if (end !== undefined && !ws!.paging) return [];
+    try {
+      return await wsRequest(venue.wsUrl!, ws!.request(inst.wsNative ?? inst.native, base, perRequest, end), ws!.parse);
+    } catch (e) {
+      throw isNetworkError(e) || /WebSocket/.test(String((e as Error).message)) ? new Error(blockedMessage(inst.venue.name)) : e;
+    }
+  };
+  for (let p = 0; p < pages; p++) {
     const end = bars.length ? bars[0].time : endTime ? Math.floor(endTime) : undefined;
-    const chunk = venue.parseCandles(await fetchJson(venue.candlesUrl(inst.native, code, perRequest, end))).filter((b) => end === undefined || b.time < end);
+    const chunk = (await page(end)).filter((b) => end === undefined || b.time < end);
     bars = [...chunk, ...bars];
     if (chunk.length < perRequest * 0.9) break;
   }
