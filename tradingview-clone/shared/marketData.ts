@@ -1,5 +1,6 @@
 import type { Bar } from "./math.js";
 import { addTrades, demoTrades, isTradeInterval, parseTradeInterval, tickSizeFromPrices, type Trade, type TradeInterval } from "./tickBars.js";
+import { fetchVia, proxiedUrl, wsVia } from "./proxy.js";
 import { isVenuePrefixed, KIND_LABEL, parseVenueSymbol, stripBinance, type Feed, type Instrument } from "./venues.js";
 
 export interface MarketData {
@@ -135,11 +136,12 @@ export function isCryptoSymbol(symbol: string): boolean {
 }
 
 export async function fetchJson(url: string): Promise<unknown> {
-  const res = await fetch(url, {
+  // Exchanges that refuse the browser go through the own relay when one is set (shared/proxy.ts).
+  const res = await fetchVia(url, () => ({
     // Browsers set their own User-Agent; only the Node server needs one for Yahoo.
     headers: typeof window === "undefined" ? { "User-Agent": "Mozilla/5.0 (tradingview-claude)" } : undefined,
     signal: AbortSignal.timeout(10_000),
-  });
+  }));
   if (!res.ok) throw new Error(`${url} -> HTTP ${res.status}`);
   return res.json();
 }
@@ -156,7 +158,8 @@ export function isNetworkError(e: unknown): boolean {
 }
 
 /** German message for an exchange whose REST data the browser cannot reach. */
-export function blockedMessage(venueName: string): string {
+export function blockedMessage(venueName: string, url?: string): string {
+  if (url && proxiedUrl(url)) return `${venueName} ist auch über deinen Proxy nicht erreichbar (Proxy-Adresse und Worker prüfen)`;
   return `${venueName} lässt den Abruf aus dem Browser nicht zu (CORS) oder ist gerade nicht erreichbar`;
 }
 
@@ -281,18 +284,19 @@ async function fromVenue(inst: Instrument, interval: string, limit: number, endT
   const page = async (end: number | undefined): Promise<Bar[]> => {
     const ws = venue.wsHistory;
     if (!viaWs) {
+      const url = venue.candlesUrl(inst.native, code, perRequest, end);
       try {
-        return venue.parseCandles(await fetchJson(venue.candlesUrl(inst.native, code, perRequest, end)));
+        return venue.parseCandles(await fetchJson(url));
       } catch (e) {
         if (!isNetworkError(e)) throw e;
-        if (!ws || !venue.wsUrl) throw new Error(blockedMessage(inst.venue.name));
+        if (!ws || !venue.wsUrl) throw new Error(blockedMessage(inst.venue.name, url));
         viaWs = true;
       }
     }
     // Kraken and Bitget only send their newest candles over the WebSocket: no older history.
     if (end !== undefined && !ws!.paging) return [];
     try {
-      return await wsRequest(venue.wsUrl!, ws!.request(inst.wsNative ?? inst.native, base, perRequest, end), ws!.parse);
+      return await wsRequest(wsVia(venue.wsUrl!), ws!.request(inst.wsNative ?? inst.native, base, perRequest, end), ws!.parse);
     } catch (e) {
       throw isNetworkError(e) || /WebSocket/.test(String((e as Error).message)) ? new Error(blockedMessage(inst.venue.name)) : e;
     }

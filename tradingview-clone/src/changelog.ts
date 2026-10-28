@@ -14,6 +14,17 @@ export interface Release {
  */
 export const CHANGELOG: Release[] = [
   {
+    version: "0.60.0",
+    date: "2026-10-28",
+    title: "Gesperrte Börsen über deinen eigenen Proxy",
+    changes: [
+      "Eigener Proxy (kostenloser Cloudflare Worker, Anleitung unter 🩺 Test): damit laden auch KuCoin, BitMEX, die Kraken-Perps und die Binance-Optionen, die der Browser sonst sperrt",
+      "Der Proxy reicht nur öffentliche Kurse weiter: nur Lesen, nur die Börsen-Adressen, nur von deiner ChartAI-Seite, ohne Login und ohne Schlüssel",
+      "Mit Proxy erscheinen KuCoin und BitMEX wieder in der Börsenauswahl, bei Kraken lässt sich Perp wählen; Bitfinex und Bitstamp laden ihre Marktlisten über den Proxy, wenn der direkte Abruf scheitert",
+      "🩺 Test zeigt, ob der Proxy läuft, und markiert, was „über Proxy“ kommt",
+    ],
+  },
+  {
     version: "0.59.0",
     date: "2026-10-28",
     title: "Übersichtlichere Börsenauswahl",

@@ -2,7 +2,9 @@ import { useSyncExternalStore } from "react";
 import { findAsset, parseFuturesInfo, parseSpotTickers, resolveAsset, type Asset, type FuturesSymbol } from "../shared/assets";
 import { STANDALONE } from "./config";
 import { feedSettings } from "./market/exchangeFeed";
-import { perpSymbol, pickerPerps, PICKER_VENUES, plainSymbol, splitPair, VENUES, venueSymbol, type VenueId } from "../shared/venues";
+import { fetchVia } from "../shared/proxy";
+import "./proxySettings";
+import { perpSymbol, pickerPerps, pickerVenues, plainSymbol, splitPair, VENUES, venueSymbol, type VenueId } from "../shared/venues";
 import { loadVenueMarkets, type Market } from "../shared/venueMarkets";
 import { euMarket, EEA_COUNTRIES, OTHER_COUNTRIES } from "../shared/mica";
 
@@ -71,8 +73,8 @@ function loadMarketList(venue: VenueId): MarketList | null {
 function loadVenue(): VenueId {
   try {
     const v = localStorage.getItem(VENUE_KEY);
-    // An exchange the picker no longer offers (KuCoin, BitMEX) falls back to Binance.
-    if (PICKER_VENUES.some((x) => x.id === v)) return v as VenueId;
+    // An exchange the picker does not offer without the relay (KuCoin, BitMEX) falls back to Binance.
+    if (pickerVenues().some((x) => x.id === v)) return v as VenueId;
   } catch {
     // default
   }
@@ -248,7 +250,7 @@ async function getJson(urls: string[]): Promise<unknown> {
   let lastError: unknown;
   for (const url of urls) {
     try {
-      const res = await fetch(url, { signal: AbortSignal.timeout(15_000) });
+      const res = await fetchVia(url, () => ({ signal: AbortSignal.timeout(15_000) }));
       if (res.ok) return await res.json();
       lastError = new Error(`${url} -> HTTP ${res.status}`);
     } catch (err) {

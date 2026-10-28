@@ -8,6 +8,7 @@ import type { Bar } from "../shared/math";
 import type { PositionInput } from "../shared/position";
 import { barIndexAt, carryReplay, nextReplayStep, randomStart, replayFrame } from "../shared/replay";
 import { loadSpreadData, parseSpread } from "../shared/spread";
+import { wsVia } from "../shared/proxy";
 import { parseVenueSymbol, type Instrument } from "../shared/venues";
 import type { IndicatorSourceRef } from "../shared/indicators";
 import { addTrades, isTradeInterval, MAX_TRADE_BARS, parseTradeInterval } from "../shared/tickBars";
@@ -790,7 +791,7 @@ function connectTradeLive(chart: ChartStore, json: MarketData, current: () => bo
 /** Trades of an exchange's market (shared/venues.ts: spot, perpetual or future), folded into the chart's candles. */
 function connectVenueLive(chart: ChartStore, inst: Instrument, interval: Interval, current: () => boolean, onData: () => void): WebSocket {
   const venue = inst.feed;
-  const ws = new WebSocket(venue.wsUrl!);
+  const ws = new WebSocket(wsVia(venue.wsUrl!));
   let ping: number | undefined;
   ws.onopen = () => {
     ws.send(venue.subscribe(inst.wsNative ?? inst.native));

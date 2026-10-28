@@ -5,10 +5,11 @@ import { useFeedSettings } from "../market/exchangeFeed";
 import { STANDALONE } from "../config";
 import { loadChart, useChartState } from "../store";
 import { formatSpread, parseSpread, SPREAD_OP_LABELS } from "../../shared/spread";
-import { isBlockedSymbol, KIND_LABEL, marketTag, parseVenueSymbol, perpSymbol, PICKER_VENUES, pickerPerps, VENUES, venueName, venueSymbol } from "../../shared/venues";
+import { isBlockedSymbol, KIND_LABEL, marketTag, parseVenueSymbol, perpSymbol, pickerPerps, pickerVenues, VENUES, venueName, venueSymbol } from "../../shared/venues";
 import { marketLabel, searchMarkets } from "../../shared/venueMarkets";
 import { isCryptoSymbol } from "../../shared/marketData";
 import { availabilityIn, EU_QUOTES, isEea, MICA, MICA_STATUS_ICON, MICA_STATUS_LABEL } from "../../shared/mica";
+import { useProxyUrl } from "../proxySettings";
 import { Menu } from "./Menu";
 
 type Tab = "fav" | AssetCategory;
@@ -117,6 +118,9 @@ function VenueTabs() {
   const euMode = useAssets((s) => s.euMode);
   const country = useAssets((s) => s.country);
   const onlyAllowed = useAssets((s) => s.onlyAllowed);
+  // A relay set or cleared changes which exchanges are offered.
+  useProxyUrl();
+  const offered = pickerVenues();
   const info = VENUES.find((v) => v.id === venue);
   const perps = pickerPerps(venue);
   const noSpot = info?.noSpot;
@@ -126,7 +130,7 @@ function VenueTabs() {
     if (euMode) void refreshVenueMarkets(venue).catch(() => undefined);
   }, [euMode, venue]);
   const filter = onlyAllowed && isEea(country);
-  const shown = PICKER_VENUES.filter((v) => !filter || v.id === venue || availabilityIn(country, v.id).spot === "yes");
+  const shown = offered.filter((v) => !filter || v.id === venue || availabilityIn(country, v.id).spot === "yes");
   return (
     <div className="asset-tabs venue-tabs" role="group" aria-label="Krypto-Börse">
       <span className="venue-label">Börse</span>
@@ -147,7 +151,7 @@ function VenueTabs() {
           </button>
         );
       })}
-      {filter && shown.length < PICKER_VENUES.length && <span className="venue-label">+{PICKER_VENUES.length - shown.length} ausgeblendet</span>}
+      {filter && shown.length < offered.length && <span className="venue-label">+{offered.length - shown.length} ausgeblendet</span>}
       <span className="venue-label venue-form-label">Form</span>
       <button className={spotOn ? "active" : ""} onClick={() => setCryptoForm("spot")} disabled={!!noSpot} aria-pressed={spotOn} data-tip={noSpot ?? "Spot-Paar (BTCUSDT)"}>
         Spot
@@ -276,9 +280,10 @@ export function AssetSearchDialog({ onClose, onSelect, title = "Assets suchen" }
 
   const hits = useMemo(() => searchAssets(query, spot, futures), [query, spot, futures]);
   const q = query.trim().toUpperCase();
+  const proxyUrl = useProxyUrl();
   const marketHits: SearchHit[] = useMemo(
     () => (q && venueList ? searchMarkets(venueList.markets, query, euMode ? EU_QUOTES : undefined).filter((m) => !isBlockedSymbol(m.symbol)).map((m) => ({ symbol: m.symbol, name: marketLabel(m), category: "Krypto" as AssetCategory, fixed: true })) : []),
-    [q, query, venueList, euMode],
+    [q, query, venueList, euMode, proxyUrl],
   );
   const favHits = favorites.filter((f) => !q || f.symbol.includes(q) || f.name.toUpperCase().includes(q));
   const crypto = tab === "all" || tab === "Krypto";

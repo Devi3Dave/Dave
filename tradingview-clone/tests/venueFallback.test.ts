@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { isNetworkError, loadMarketData } from "../shared/marketData";
 import { checkVenue } from "../shared/venueCheck";
-import { isBlockedSymbol, loadedMarketTag, marketTag, PICKER_VENUES, pickerPerps, VENUES } from "../shared/venues";
+import { isBlockedSymbol, loadedMarketTag, marketTag, pickerPerps, pickerVenues, VENUES } from "../shared/venues";
 
 /** A WebSocket that answers each sent message with `reply(msg)` (nothing for null). */
 function fakeWebSocket(reply: (msg: unknown, url: string) => unknown | null, sent: unknown[] = []) {
@@ -160,7 +160,7 @@ describe("connection test", () => {
 
 describe("picker shows only what loads", () => {
   it("leaves out KuCoin and BitMEX and Kraken's perpetuals", () => {
-    expect(PICKER_VENUES.map((v) => v.id)).toEqual(["BINANCE", "COINBASE", "KRAKEN", "BYBIT", "OKX", "BITSTAMP", "BITFINEX", "BITGET", "DERIBIT"]);
+    expect(pickerVenues().map((v) => v.id)).toEqual(["BINANCE", "COINBASE", "KRAKEN", "BYBIT", "OKX", "BITSTAMP", "BITFINEX", "BITGET", "DERIBIT"]);
     expect(pickerPerps("KRAKEN")).toBe(false);
     expect(pickerPerps("BYBIT")).toBe(true);
     expect(pickerPerps("DERIBIT")).toBe(true);

@@ -27,6 +27,7 @@
  * - Binance options: developers.binance.com European options (GET /eapi/v1/klines; stream <symbol>@trade)
  */
 import type { Bar } from "./math.js";
+import { proxyActive } from "./proxy.js";
 
 export type VenueId = "BINANCE" | "COINBASE" | "KRAKEN" | "BYBIT" | "OKX" | "BITSTAMP" | "BITFINEX" | "BITGET" | "KUCOIN" | "DERIBIT" | "BITMEX";
 export type MarketKind = "spot" | "perp" | "future" | "option";
@@ -52,7 +53,7 @@ export interface Feed {
   parseCandles(json: unknown): Bar[];
   /**
    * The browser blocks its REST calls (no CORS headers) and there is no WebSocket way around it,
-   * as Devi's connection test in Safari showed on 2026-10-28. Loading is still tried, the picker warns.
+   * as Devi's connection test in Safari showed on 2026-10-28. With an own relay set (shared/proxy.ts) it loads through that.
    */
   blocked?: boolean;
   /** None: the chart reloads over REST instead of streaming (KuCoin). */
@@ -804,17 +805,19 @@ export const VENUES: { id: VenueId; name: string; perps: boolean; noSpot?: strin
 }));
 
 /**
- * The exchanges the picker offers: those whose charts load in the browser. KuCoin and BitMEX are left out
- * (Devi: what cannot load only clutters the choice); their code stays for symbols typed by hand.
+ * The exchanges the picker offers: those whose charts load in the browser. Without a relay KuCoin and BitMEX are left out
+ * (Devi: what cannot load only clutters the choice); with one (shared/proxy.ts) every exchange is offered.
  */
-export const PICKER_VENUES = VENUES.filter((v) => !(v.noSpot || v.spotBlocked) || (v.perps && !v.perpBlocked));
+export function pickerVenues(): typeof VENUES {
+  return proxyActive() ? VENUES : VENUES.filter((v) => !(v.noSpot || v.spotBlocked) || (v.perps && !v.perpBlocked));
+}
 
-/** Perpetuals the picker offers at this exchange: it has them and the browser can load them (not Kraken's). */
-export const pickerPerps = (id: string) => !!PICKER_VENUES.find((v) => v.id === id && v.perps && !v.perpBlocked);
+/** Perpetuals the picker offers at this exchange: it has them and the browser can load them (Kraken's only through the relay). */
+export const pickerPerps = (id: string) => !!pickerVenues().find((v) => v.id === id && v.perps && (!v.perpBlocked || proxyActive()));
 
-/** A market the browser cannot load (blocked feed); search leaves these out. */
+/** A market the browser cannot load (blocked feed, no relay); search leaves these out. */
 export function isBlockedSymbol(symbol: string): boolean {
-  return !!parseVenueSymbol(symbol)?.feed.blocked;
+  return !proxyActive() && !!parseVenueSymbol(symbol)?.feed.blocked;
 }
 
 const KIND_SHORT: Record<MarketKind, string> = { spot: "Spot", perp: "Perp", future: "Future", option: "Option" };
