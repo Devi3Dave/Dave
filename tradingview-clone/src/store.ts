@@ -243,7 +243,8 @@ function createChartStore(slot: number): ChartStore {
       ws = connectLive(chart, json.symbol, interval, json.source === "binance_futures", current, onData);
     } else if (json.source === "venue") {
       const v = parseVenueSymbol(json.symbol);
-      if (!v) return;
+      // Exchanges without a public stream (KuCoin) are reloaded every minute by the watchdog.
+      if (!v?.feed.wsUrl) return;
       ws = connectVenueLive(chart, v, interval, current, onData);
     } else return;
     ws.onclose = () => {
@@ -353,7 +354,7 @@ function createChartStore(slot: number): ChartStore {
     watchdog() {
       // A replay shows the past on purpose; polling would only disturb it.
       if (!started || state.loading || state.replay || !state.source || state.source === "demo") return;
-      let live = state.source === "binance" || state.source === "binance_futures" || state.source === "venue";
+      let live = state.source === "binance" || state.source === "binance_futures" || (state.source === "venue" && !!parseVenueSymbol(state.symbol)?.feed.wsUrl);
       if (state.source === "twelvedata") {
         // Exchange prices only move while the exchange trades; reloading a closed market would only use up the plan's credits.
         if (!marketNow(referenceMarket(state.symbol, state.source), Math.floor(Date.now() / 1000)).open) return;
@@ -788,7 +789,7 @@ function connectTradeLive(chart: ChartStore, json: MarketData, current: () => bo
 /** Trades of an exchange's market (shared/venues.ts: spot, perpetual or future), folded into the chart's candles. */
 function connectVenueLive(chart: ChartStore, inst: Instrument, interval: Interval, current: () => boolean, onData: () => void): WebSocket {
   const venue = inst.feed;
-  const ws = new WebSocket(venue.wsUrl);
+  const ws = new WebSocket(venue.wsUrl!);
   let ping: number | undefined;
   ws.onopen = () => {
     ws.send(venue.subscribe(inst.wsNative ?? inst.native));

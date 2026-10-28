@@ -102,6 +102,9 @@ und zusammen mit der Fill & Sign-App auf GitHub Pages veröffentlicht.
   Namen der Börse (`BINANCE:BTCUSDT_260327`, `OKX:BTC-USD-260327`, `BYBIT:BTCUSDT-27MAR26`). In der
   Asset-Auswahl schaltet „Spot / Perp“ die Form um; die Suche listet alle Märkte der gewählten Börse
   (`shared/venueMarkets.ts`), z. B. „btc perp“ oder „eth futures“.
+- Weitere Börsen: Bitget, KuCoin (lädt jede Minute neu, kein öffentlicher Stream), Deribit, BitMEX (`BITMEX:BTCUSD.P`
+  = XBTUSD). Optionen als Chart von Deribit (`DERIBIT:BTC-27MAR26-100000-C`), OKX (`OKX:BTC-USD-260327-100000-C`) und
+  Binance (`BINANCE:BTC-260327-100000-C`); Suche z. B. „btc call 100000“.
 - Asset-Auswahl in der Kopfzeile: Drop-down mit gängigen Assets nach Rubriken (Krypto, Aktien,
   Indizes & ETFs, Edelmetalle, Rohstoffe, Forex) und Favoriten; 🔍 öffnet die Suche über alle
   Binance-Märkte, ebenfalls nach Rubriken, mit ☆ zum Speichern von Favoriten. Jede Zeile zeigt die

@@ -5,6 +5,9 @@
  * - Coinbase: /products · Kraken: /0/public/AssetPairs, futures /derivatives/api/v3/instruments
  * - Bybit: /v5/market/instruments-info?category=spot|linear|inverse · OKX: /api/v5/public/instruments?instType=SPOT|SWAP|FUTURES
  * - Bitstamp: /api/v2/trading-pairs-info/ · Bitfinex: /v2/conf/pub:list:pair:exchange and pub:list:pair:futures
+ * - Bitget: /api/v2/spot/public/symbols, /api/v2/mix/market/contracts · KuCoin: /api/v2/symbols, futures /api/v1/contracts/active
+ * - Deribit: /api/v2/public/get_instruments?currency=any&kind=spot|future|option · BitMEX: /api/v1/instrument/active
+ * - Options: Binance /eapi/v1/exchangeInfo, OKX /api/v5/public/instruments?instType=OPTION&instFamily=BTC-USD|ETH-USD, Deribit
  */
 import { krakenCoin, parseVenueSymbol, splitPair, type MarketKind, type VenueId } from "./venues.js";
 
@@ -18,16 +21,22 @@ export interface Market {
   expiry?: string;
   /** Coin-margined contract. */
   inverse?: boolean;
+  /** Options: strike price and call or put. */
+  strike?: number;
+  right?: "C" | "P";
 }
 
 type Json = unknown;
 
-/** Keeps only markets whose symbol loads back to the same coin and kind (guards against odd exchange names). */
-function market(symbol: string, kind: MarketKind, extra: Partial<Market> = {}): Market | null {
+/**
+ * Keeps only markets whose symbol loads back to the same kind (and, with `native`, the same exchange
+ * instrument): guards against odd exchange names.
+ */
+function market(symbol: string, kind: MarketKind, extra: Partial<Market> = {}, native?: string): Market | null {
   const plainSpot = !symbol.includes(":");
   const pair = plainSpot ? splitPair(symbol) : parseVenueSymbol(symbol)?.pair;
   const inst = plainSpot ? null : parseVenueSymbol(symbol);
-  if (!pair || (inst && inst.kind !== kind)) return null;
+  if (!pair || (inst && inst.kind !== kind) || (native && inst?.native !== native)) return null;
   return { symbol, base: pair.base, quote: pair.quote, kind, ...(inst?.inverse ? { inverse: true } : {}), ...extra };
 }
 
@@ -170,6 +179,95 @@ export function parseBitfinex(json: Json, futures: boolean): Market[] {
   );
 }
 
+/** Option fields from strike and call/put. */
+const opt = (expiry: string | undefined, strike: unknown, right: string): Partial<Market> => ({ expiry, strike: Number(strike), right: /^c/i.test(right) ? "C" : "P" });
+
+export function parseBinanceOptions(json: Json): Market[] {
+  const list = (json as { optionSymbols?: { symbol: string; strikePrice?: string; side?: string; expiryDate?: number; status?: string }[] })?.optionSymbols ?? [];
+  return compact(list.filter((o) => (o.status ?? "TRADING") === "TRADING").map((o) => market(`BINANCE:${o.symbol}`, "option", opt(isoDay(o.expiryDate ?? 0), o.strikePrice, o.side ?? ""))));
+}
+
+export function parseOkxOptions(json: Json): Market[] {
+  const list = ((json as { data?: { instId: string; state?: string; stk?: string; optType?: string; expTime?: string }[] })?.data ?? []).filter((i) => i.state === "live");
+  return compact(list.map((i) => market(`OKX:${i.instId}`, "option", opt(isoDay(i.expTime ?? 0), i.stk, i.optType ?? ""))));
+}
+
+export function parseBitgetSpot(json: Json): Market[] {
+  const list = ((json as { data?: { baseCoin: string; quoteCoin: string; status?: string }[] })?.data ?? []).filter((i) => i.status === "online");
+  return compact(list.map((i) => market(`BITGET:${i.baseCoin}${i.quoteCoin}`, "spot")));
+}
+
+export function parseBitgetContracts(json: Json, product: "USDT-FUTURES" | "USDC-FUTURES" | "COIN-FUTURES"): Market[] {
+  const list = ((json as { data?: { symbol: string; baseCoin: string; symbolType?: string; symbolStatus?: string; deliveryTime?: string }[] })?.data ?? []).filter(
+    (i) => (i.symbolStatus ?? "normal") === "normal",
+  );
+  const quote = product === "USDT-FUTURES" ? "USDT" : product === "USDC-FUTURES" ? "USDC" : "USD";
+  return compact(
+    list.map((i) =>
+      i.symbolType === "delivery"
+        ? market(`BITGET:${i.symbol}`, "future", { expiry: isoDay(i.deliveryTime ?? 0) })
+        : market(`BITGET:${i.baseCoin}${quote}.P`, "perp", {}, i.symbol),
+    ),
+  );
+}
+
+export function parseKucoinSpot(json: Json): Market[] {
+  const list = ((json as { data?: { baseCurrency: string; quoteCurrency: string; enableTrading?: boolean }[] })?.data ?? []).filter((i) => i.enableTrading);
+  return compact(list.map((i) => market(`KUCOIN:${i.baseCurrency}${i.quoteCurrency}`, "spot")));
+}
+
+export function parseKucoinFutures(json: Json): Market[] {
+  const list = ((json as { data?: { symbol: string; baseCurrency: string; quoteCurrency: string; expireDate?: number | null; status?: string }[] })?.data ?? []).filter((i) => i.status === "Open");
+  return compact(
+    list.map((i) =>
+      i.expireDate
+        ? market(`KUCOIN:${i.symbol}`, "future", { expiry: isoDay(i.expireDate) })
+        : market(`KUCOIN:${krakenCoin(i.baseCurrency)}${i.quoteCurrency}.P`, "perp", {}, i.symbol),
+    ),
+  );
+}
+
+interface DeribitInstrument {
+  instrument_name: string;
+  kind?: string;
+  is_active?: boolean;
+  settlement_period?: string;
+  expiration_timestamp?: number;
+  strike?: number;
+  option_type?: string;
+}
+
+export function parseDeribit(json: Json): Market[] {
+  const list = ((json as { result?: DeribitInstrument[] })?.result ?? []).filter((i) => i.is_active !== false);
+  return compact(
+    list.map((i) => {
+      const name = i.instrument_name;
+      const perp = /^([A-Z0-9]+)(?:_(USDC|USDT))?-PERPETUAL$/.exec(name);
+      if (perp) return market(`DERIBIT:${perp[1]}${perp[2] ?? "USD"}.P`, "perp", {}, name);
+      if (i.kind === "spot") {
+        const [base, quote] = name.split("_");
+        return market(`DERIBIT:${base}${quote}`, "spot", {}, name) ?? market(`DERIBIT:${name}`, "spot");
+      }
+      const expiry = isoDay(i.expiration_timestamp ?? 0);
+      if (i.kind === "option") return market(`DERIBIT:${name}`, "option", opt(expiry, i.strike, i.option_type ?? ""));
+      return market(`DERIBIT:${name}`, "future", { expiry });
+    }),
+  );
+}
+
+export function parseBitmex(json: Json): Market[] {
+  if (!Array.isArray(json)) return [];
+  const list = (json as { symbol: string; typ?: string; underlying?: string; quoteCurrency?: string; state?: string; expiry?: string | null }[]).filter((i) => i.state === "Open");
+  return compact(
+    list.map((i) => {
+      if (i.typ === "FFWCSX") return market(`BITMEX:${krakenCoin(i.underlying ?? "")}${i.quoteCurrency}.P`, "perp", {}, i.symbol);
+      if (i.typ === "FFCCSX") return market(`BITMEX:${i.symbol}`, "future", { expiry: i.expiry ? i.expiry.slice(0, 10) : undefined });
+      if (i.typ === "IFXXXP") return market(`BITMEX:${i.symbol}`, "spot");
+      return null;
+    }),
+  );
+}
+
 // ---------------- Loading ----------------
 
 type Source = [url: string, parse: (json: Json) => Market[]];
@@ -179,6 +277,7 @@ const SOURCES: Record<VenueId, Source[]> = {
     ["https://api.binance.com/api/v3/ticker/price", parseBinanceSpot],
     ["https://fapi.binance.com/fapi/v1/exchangeInfo", parseBinanceFutures],
     ["https://dapi.binance.com/dapi/v1/exchangeInfo", parseBinanceFutures],
+    ["https://eapi.binance.com/eapi/v1/exchangeInfo", parseBinanceOptions],
   ],
   COINBASE: [["https://api.exchange.coinbase.com/products", parseCoinbase]],
   KRAKEN: [
@@ -194,12 +293,30 @@ const SOURCES: Record<VenueId, Source[]> = {
     ["https://www.okx.com/api/v5/public/instruments?instType=SPOT", (j) => parseOkx(j, "SPOT")],
     ["https://www.okx.com/api/v5/public/instruments?instType=SWAP", (j) => parseOkx(j, "SWAP")],
     ["https://www.okx.com/api/v5/public/instruments?instType=FUTURES", (j) => parseOkx(j, "FUTURES")],
+    ["https://www.okx.com/api/v5/public/instruments?instType=OPTION&instFamily=BTC-USD", parseOkxOptions],
+    ["https://www.okx.com/api/v5/public/instruments?instType=OPTION&instFamily=ETH-USD", parseOkxOptions],
   ],
   BITSTAMP: [["https://www.bitstamp.net/api/v2/trading-pairs-info/", parseBitstamp]],
   BITFINEX: [
     ["https://api-pub.bitfinex.com/v2/conf/pub:list:pair:exchange", (j) => parseBitfinex(j, false)],
     ["https://api-pub.bitfinex.com/v2/conf/pub:list:pair:futures", (j) => parseBitfinex(j, true)],
   ],
+  BITGET: [
+    ["https://api.bitget.com/api/v2/spot/public/symbols", parseBitgetSpot],
+    ["https://api.bitget.com/api/v2/mix/market/contracts?productType=USDT-FUTURES", (j) => parseBitgetContracts(j, "USDT-FUTURES")],
+    ["https://api.bitget.com/api/v2/mix/market/contracts?productType=USDC-FUTURES", (j) => parseBitgetContracts(j, "USDC-FUTURES")],
+    ["https://api.bitget.com/api/v2/mix/market/contracts?productType=COIN-FUTURES", (j) => parseBitgetContracts(j, "COIN-FUTURES")],
+  ],
+  KUCOIN: [
+    ["https://api.kucoin.com/api/v2/symbols", parseKucoinSpot],
+    ["https://api-futures.kucoin.com/api/v1/contracts/active", parseKucoinFutures],
+  ],
+  DERIBIT: [
+    ["https://www.deribit.com/api/v2/public/get_instruments?currency=any&kind=spot", parseDeribit],
+    ["https://www.deribit.com/api/v2/public/get_instruments?currency=any&kind=future", parseDeribit],
+    ["https://www.deribit.com/api/v2/public/get_instruments?currency=any&kind=option", parseDeribit],
+  ],
+  BITMEX: [["https://www.bitmex.com/api/v1/instrument/active", parseBitmex]],
 };
 
 export interface VenueMarkets {
@@ -221,35 +338,53 @@ export async function loadVenueMarkets(venue: VenueId, fetchJson: (url: string) 
   return { markets, failed };
 }
 
-const KIND_ORDER: Record<MarketKind, number> = { spot: 0, perp: 1, future: 2 };
+const KIND_ORDER: Record<MarketKind, number> = { spot: 0, perp: 1, future: 2, option: 3 };
 const QUOTE_ORDER = ["USDT", "USD", "USDC", "FDUSD", "EUR"];
 const quoteRank = (q: string) => (QUOTE_ORDER.includes(q) ? QUOTE_ORDER.indexOf(q) : QUOTE_ORDER.length);
 
 /**
- * Markets matching a search ("btc", "BTCUSDT", "eth perp", "BYBIT:BTCUSDT.P"): the pair or symbol must start with the text,
- * "perp"/"future"/"spot" in the query narrows the kind. Sorted by kind, then quote, then expiry.
+ * Markets matching a search ("btc", "BTCUSDT", "eth perp", "BYBIT:BTCUSDT.P", "btc call 100000"): the pair or symbol must
+ * start with the text, "perp"/"future"/"spot"/"option"/"call"/"put" in the query narrows the kind, a number the strike.
+ * Options (thousands per exchange) only show when asked for or when the text has digits (an expiry or strike).
+ * Sorted by kind, then quote, then expiry and strike.
  */
 export function searchMarkets(markets: Market[], query: string): Market[] {
   const words = query.toUpperCase().split(/\s+/).filter(Boolean);
   const kinds = new Set<MarketKind>();
   const rest: string[] = [];
+  let right: "C" | "P" | null = null;
+  let strike: number | null = null;
   for (const w of words) {
-    if (/^(PERP|PERPS|PERPETUAL|\.P|SWAP)$/.test(w)) kinds.add("perp");
+    if (/^(OPTION|OPTIONS|OPTIONEN|OPT)$/.test(w)) kinds.add("option");
+    else if (/^(CALL|CALLS)$/.test(w)) (kinds.add("option"), (right = "C"));
+    else if (/^(PUT|PUTS)$/.test(w)) (kinds.add("option"), (right = "P"));
+    else if (/^\d+([.,]\d+)?$/.test(w) && rest.length > 0) strike = Number(w.replace(",", "."));
+    else if (/^(PERP|PERPS|PERPETUAL|\.P|SWAP)$/.test(w)) kinds.add("perp");
     else if (/^(FUTURE|FUTURES|FUT|LAUFZEIT)$/.test(w)) kinds.add("future");
     else if (w === "SPOT") kinds.add("spot");
     else rest.push(w.replace(/[^A-Z0-9]/g, ""));
   }
   const text = rest.join("");
+  const withOptions = kinds.has("option") || /\d/.test(text);
   return markets
+    .filter((m) => (m.kind !== "option" || withOptions) && (!right || m.right === right) && (strike === null || m.strike === strike))
     .filter((m) => (kinds.size === 0 || kinds.has(m.kind)) && (!text || (m.base + m.quote).startsWith(text) || m.symbol.replace(/[^A-Z0-9]/g, "").startsWith(text) || m.symbol.replace(/^[A-Z]+:|[^A-Z0-9]/g, "").startsWith(text)))
     .sort((a, b) => {
       const exact = Number(b.base === text) - Number(a.base === text);
-      return exact || KIND_ORDER[a.kind] - KIND_ORDER[b.kind] || quoteRank(a.quote) - quoteRank(b.quote) || (a.expiry ?? "").localeCompare(b.expiry ?? "") || a.symbol.localeCompare(b.symbol);
+      return exact || KIND_ORDER[a.kind] - KIND_ORDER[b.kind] || quoteRank(a.quote) - quoteRank(b.quote) || (a.expiry ?? "").localeCompare(b.expiry ?? "") || (a.strike ?? 0) - (b.strike ?? 0) || a.symbol.localeCompare(b.symbol);
     });
 }
 
-/** "Perpetual, BTC / USDT", "Futures 27.03.2026, BTC / USD (Coin-margined)". */
+/** "BTC / USDT · Perpetual", "BTC / USD · Futures 27.03.2026 (Coin-margined)", "BTC / USD · Call 100.000 27.03.2026". */
 export function marketLabel(m: Market): string {
-  const kind = m.kind === "spot" ? "Spot" : m.kind === "perp" ? "Perpetual" : `Futures${m.expiry ? ` ${m.expiry.split("-").reverse().join(".")}` : ""}`;
+  const day = m.expiry ? ` ${m.expiry.split("-").reverse().join(".")}` : "";
+  const kind =
+    m.kind === "spot"
+      ? "Spot"
+      : m.kind === "perp"
+        ? "Perpetual"
+        : m.kind === "option"
+          ? `${m.right === "C" ? "Call" : "Put"} ${m.strike?.toLocaleString("de-DE") ?? ""}${day}`
+          : `Futures${day}`;
   return `${m.base} / ${m.quote} · ${kind}${m.inverse ? " (Coin-margined)" : ""}`;
 }

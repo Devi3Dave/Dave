@@ -14,6 +14,17 @@ export interface Release {
  */
 export const CHANGELOG: Release[] = [
   {
+    version: "0.54.0",
+    date: "2026-10-28",
+    title: "Bitget, KuCoin, Deribit, BitMEX und Krypto-Optionen",
+    changes: [
+      "Neue Börsen: Bitget (Spot, USDT-/USDC-/Coin-Perpetuals, Coin-Futures), KuCoin (Spot, Perpetuals, Futures), Deribit (Spot, Perpetuals, Futures), BitMEX (Spot, Perpetuals wie XBTUSD, Futures)",
+      "Optionen als Chart: Deribit (DERIBIT:BTC-27MAR26-100000-C), OKX (OKX:BTC-USD-260327-100000-C) und Binance (BINANCE:BTC-260327-100000-C); Bybit bietet keine öffentlichen Options-Kerzen",
+      "Suche nach Optionen mit „btc call 100000“, „eth put“ oder „btc option“; ohne solche Wörter bleiben die tausenden Optionen ausgeblendet",
+      "KuCoin streamt öffentlich nur mit Anmelde-Token, darum laden KuCoin-Charts jede Minute neu statt live",
+    ],
+  },
+  {
     version: "0.53.0",
     date: "2026-10-28",
     title: "Krypto: alle Handelspaare, Perpetuals und Futures",

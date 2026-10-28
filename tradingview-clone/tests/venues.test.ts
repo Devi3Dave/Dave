@@ -232,3 +232,80 @@ describe("loading from an exchange", () => {
     expect(urls[0]).toContain("symbol=BTCUSDT");
   });
 });
+
+describe("Bitget, KuCoin, Deribit, BitMEX and options", () => {
+  const p = (s: string) => {
+    const i = parseVenueSymbol(s);
+    return i && { kind: i.kind, native: i.native, inverse: !!i.inverse, quote: i.pair.quote };
+  };
+
+  it("maps spot, perpetuals and futures to each exchange's names", () => {
+    expect(p("BITGET:BTCUSDT")).toEqual({ kind: "spot", native: "BTCUSDT", inverse: false, quote: "USDT" });
+    expect(p("BITGET:BTCUSDT.P")).toEqual({ kind: "perp", native: "BTCUSDT", inverse: false, quote: "USDT" });
+    expect(p("BITGET:BTCUSDC.P")).toEqual({ kind: "perp", native: "BTCPERP", inverse: false, quote: "USDC" });
+    expect(p("BITGET:BTCUSD.P")).toEqual({ kind: "perp", native: "BTCUSD", inverse: true, quote: "USD" });
+    expect(p("BITGET:BTCUSDZ26")).toEqual({ kind: "future", native: "BTCUSDZ26", inverse: true, quote: "USD" });
+    expect(p("KUCOIN:BTCUSDT")).toEqual({ kind: "spot", native: "BTC-USDT", inverse: false, quote: "USDT" });
+    expect(p("KUCOIN:BTCUSDT.P")).toEqual({ kind: "perp", native: "XBTUSDTM", inverse: false, quote: "USDT" });
+    expect(p("KUCOIN:BTCUSD.P")).toEqual({ kind: "perp", native: "XBTUSDM", inverse: true, quote: "USD" });
+    expect(p("KUCOIN:XBTMZ26")).toEqual({ kind: "future", native: "XBTMZ26", inverse: true, quote: "USD" });
+    expect(p("DERIBIT:BTCUSD.P")).toEqual({ kind: "perp", native: "BTC-PERPETUAL", inverse: true, quote: "USD" });
+    expect(p("DERIBIT:SOLUSDC.P")).toEqual({ kind: "perp", native: "SOL_USDC-PERPETUAL", inverse: false, quote: "USDC" });
+    expect(p("DERIBIT:BTC-27MAR26")).toEqual({ kind: "future", native: "BTC-27MAR26", inverse: true, quote: "USD" });
+    expect(p("DERIBIT:BTCUSDC")).toEqual({ kind: "spot", native: "BTC_USDC", inverse: false, quote: "USDC" });
+    expect(p("BITMEX:BTCUSD.P")).toEqual({ kind: "perp", native: "XBTUSD", inverse: true, quote: "USD" });
+    expect(p("BITMEX:BTCUSDT.P")).toEqual({ kind: "perp", native: "XBTUSDT", inverse: false, quote: "USDT" });
+    expect(p("BITMEX:XBTZ26")).toEqual({ kind: "future", native: "XBTZ26", inverse: true, quote: "USD" });
+    expect(p("BITMEX:ETHUSDTZ26")).toEqual({ kind: "future", native: "ETHUSDTZ26", inverse: false, quote: "USDT" });
+    expect(p("BITMEX:BTCUSDT")).toEqual({ kind: "spot", native: "XBT_USDT", inverse: false, quote: "USDT" });
+    expect(perpSymbol("DERIBIT", "BTCUSDT")).toBe("DERIBIT:BTCUSD.P");
+    expect(venueSymbol("KUCOIN", "BTCUSDT")).toBe("KUCOIN:BTCUSDT");
+  });
+
+  it("reads options under the exchange's names", () => {
+    expect(p("DERIBIT:BTC-27MAR26-100000-C")).toEqual({ kind: "option", native: "BTC-27MAR26-100000-C", inverse: true, quote: "USD" });
+    expect(p("DERIBIT:XRP_USDC-27MAR26-0d625-P")).toMatchObject({ kind: "option", native: "XRP_USDC-27MAR26-0d625-P" });
+    expect(p("OKX:BTC-USD-260327-100000-C")).toEqual({ kind: "option", native: "BTC-USD-260327-100000-C", inverse: true, quote: "USD" });
+    expect(p("BINANCE:BTC-260327-100000-P")).toEqual({ kind: "option", native: "BTC-260327-100000-P", inverse: false, quote: "USDT" });
+    expect(findAsset("DERIBIT:BTC-27MAR26-100000-C")?.name).toBe("Bitcoin");
+  });
+
+  it("parses their candles", () => {
+    expect(feed("BITGET:BTCUSDT.P").parseCandles({ code: "00000", data: [[String((T0 + H) * 1000), "10", "12", "9", "11", "5", "55"], [String(T0 * 1000), "9", "11", "8", "10", "4", "40"]] }).map((b) => b.time)).toEqual([T0, T0 + H]);
+    expect(feed("KUCOIN:BTCUSDT").parseCandles({ code: "200000", data: [[String(T0), "9", "10", "11", "8", "4", "40"]] })[0]).toEqual({ time: T0, open: 9, close: 10, high: 11, low: 8, volume: 4 });
+    expect(feed("KUCOIN:BTCUSDT.P").parseCandles({ code: "200000", data: [[T0 * 1000, 9, 11, 8, 10, 4]] })[0]).toEqual({ time: T0, open: 9, high: 11, low: 8, close: 10, volume: 4 });
+    expect(feed("DERIBIT:BTCUSD.P").parseCandles({ result: { status: "ok", ticks: [T0 * 1000], open: [9], high: [11], low: [8], close: [10], volume: [4] } })[0]).toEqual({ time: T0, open: 9, high: 11, low: 8, close: 10, volume: 4 });
+    // BitMEX stamps buckets with their end, newest first.
+    const bitmex = feed("BITMEX:BTCUSD.P").parseCandles([
+      { timestamp: new Date((T0 + 2 * H) * 1000).toISOString(), open: 10, high: 12, low: 9, close: 11, volume: 5 },
+      { timestamp: new Date((T0 + H) * 1000).toISOString(), open: 9, high: 11, low: 8, close: 10, volume: 4 },
+    ]);
+    expect(bitmex.map((b) => b.time)).toEqual([T0, T0 + H]);
+    expect(feed("BINANCE:BTC-260327-100000-C").parseCandles([{ openTime: T0 * 1000, open: "9", high: "11", low: "8", close: "10", volume: "4" }])[0]).toEqual({ time: T0, open: 9, high: 11, low: 8, close: 10, volume: 4 });
+    expect(() => feed("BITGET:BTCUSDT").parseCandles({ code: "40034", msg: "Parameter does not exist" })).toThrow("Bitget: Parameter does not exist");
+  });
+
+  it("asks the right APIs", () => {
+    const url = (symbol: string, code: string, end?: number) => {
+      const i = parseVenueSymbol(symbol)!;
+      return i.feed.candlesUrl(i.native, code, 100, end);
+    };
+    expect(url("BITGET:BTCUSD.P", "1H")).toContain("/mix/market/candles?symbol=BTCUSD&productType=COIN-FUTURES&granularity=1H");
+    expect(url("BITGET:BTCUSDT", "1h")).toContain("/spot/market/candles?symbol=BTCUSDT&granularity=1h");
+    expect(url("KUCOIN:BTCUSDT", "1hour", T0)).toBe(`https://api.kucoin.com/api/v1/market/candles?type=1hour&symbol=BTC-USDT&startAt=${T0 - 1 - 100 * H}&endAt=${T0 - 1}`);
+    expect(url("KUCOIN:BTCUSDT.P", "60", T0)).toBe(`https://api-futures.kucoin.com/api/v1/kline/query?symbol=XBTUSDTM&granularity=60&from=${T0 * 1000 - 1 - 100 * H * 1000}&to=${T0 * 1000 - 1}`);
+    expect(url("DERIBIT:BTC-27MAR26-100000-C", "60", T0)).toContain("instrument_name=BTC-27MAR26-100000-C&resolution=60");
+    expect(url("BITMEX:BTCUSD.P", "1h")).toContain("binSize=1h&partial=true&symbol=XBTUSD&count=100&reverse=true");
+    expect(url("BINANCE:BTC-260327-100000-C", "1h")).toContain("eapi.binance.com/eapi/v1/klines?symbol=BTC-260327-100000-C");
+    expect(url("OKX:BTC-USD-260327-100000-C", "1H")).toContain("instId=BTC-USD-260327-100000-C");
+  });
+
+  it("reads their live trades; KuCoin has no public stream", () => {
+    expect(feed("BITGET:BTCUSDT").parseTrades({ action: "update", arg: { channel: "trade" }, data: [{ ts: "5", price: "2", size: "3" }] })).toEqual([{ price: 2, size: 3, timeMs: 5 }]);
+    expect(feed("DERIBIT:BTCUSD.P").parseTrades({ method: "subscription", params: { channel: "trades.BTC-PERPETUAL.100ms", data: [{ price: 2, amount: 3, timestamp: 5 }] } })).toEqual([{ price: 2, size: 3, timeMs: 5 }]);
+    expect(feed("BITMEX:BTCUSD.P").parseTrades({ table: "trade", action: "insert", data: [{ price: 2, size: 3, timestamp: "1970-01-01T00:00:00.005Z" }] })).toEqual([{ price: 2, size: 3, timeMs: 5 }]);
+    expect(feed("BITMEX:BTCUSD.P").parseTrades({ table: "trade", action: "partial", data: [] })).toEqual([]);
+    expect(feed("BINANCE:BTC-260327-100000-C").parseTrades({ e: "trade", p: "2", q: "3", T: 5 })).toEqual([{ price: 2, size: 3, timeMs: 5 }]);
+    expect(feed("KUCOIN:BTCUSDT").wsUrl).toBeUndefined();
+  });
+});

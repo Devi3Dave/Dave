@@ -4,7 +4,9 @@
  * - Perpetuals with ".P": BINANCE:BTCUSDT.P (USDⓈ-M), BINANCE:BTCUSD.P (COIN-M), BYBIT:BTCUSDT.P, OKX:BTCUSDT.P,
  *   KRAKEN:BTCUSD.P, BITFINEX:BTCUSDT.P
  * - Futures with an expiry under the exchange's own name: BINANCE:BTCUSDT_260327, OKX:BTC-USD-260327,
- *   BYBIT:BTCUSDT-27MAR26, BYBIT:BTCUSDH26, KRAKEN:FF_XBTUSD_260327
+ *   BYBIT:BTCUSDT-27MAR26, BYBIT:BTCUSDH26, KRAKEN:FF_XBTUSD_260327, DERIBIT:BTC-27MAR26, BITMEX:XBTZ26
+ * - Options under the exchange's own name: DERIBIT:BTC-27MAR26-100000-C, OKX:BTC-USD-260327-100000-C,
+ *   BINANCE:BTC-260327-100000-C (Bybit has no public option candles)
  * Every market here has public data without a key: candles over REST and trades over a WebSocket. A plain
  * symbol (BTCUSDT) and BINANCE:BTCUSDT keep loading Binance spot through shared/marketData.ts.
  *
@@ -17,11 +19,17 @@
  * - OKX: www.okx.com/docs-v5 (GET /api/v5/market/candles for SPOT, SWAP and FUTURES instIds; channel "trades")
  * - Bitstamp: www.bitstamp.net/api (GET /api/v2/ohlc/{pair}/; channel live_trades_{pair})
  * - Bitfinex: docs.bitfinex.com (GET /v2/candles/trade:{tf}:{symbol}/hist; perpetuals tBTCF0:USTF0; channel "trades")
+ * - Bitget: bitget.com/api-doc (v2 GET /spot/market/candles and /mix/market/candles; WebSocket v2 channel "trade")
+ * - KuCoin: kucoin.com/docs (GET /api/v1/market/candles, futures /api/v1/kline/query; its WebSocket needs a
+ *   token from a POST first, so KuCoin charts reload every minute instead of streaming)
+ * - Deribit: docs.deribit.com (public/get_tradingview_chart_data for futures and options; channel trades.{instrument}.100ms)
+ * - BitMEX: bitmex.com/app/apiOverview (GET /api/v1/trade/bucketed, stamped at the bucket's end; realtime table "trade")
+ * - Binance options: developers.binance.com European options (GET /eapi/v1/klines; stream <symbol>@trade)
  */
 import type { Bar } from "./math.js";
 
-export type VenueId = "BINANCE" | "COINBASE" | "KRAKEN" | "BYBIT" | "OKX" | "BITSTAMP" | "BITFINEX";
-export type MarketKind = "spot" | "perp" | "future";
+export type VenueId = "BINANCE" | "COINBASE" | "KRAKEN" | "BYBIT" | "OKX" | "BITSTAMP" | "BITFINEX" | "BITGET" | "KUCOIN" | "DERIBIT" | "BITMEX";
+export type MarketKind = "spot" | "perp" | "future" | "option";
 
 /** One trade from a venue's WebSocket. */
 export interface VenueTrade {
@@ -42,7 +50,8 @@ export interface Feed {
   candlesUrl(native: string, code: string, limit: number, endSec?: number): string;
   /** Candles in ascending time; throws the exchange's error text. */
   parseCandles(json: unknown): Bar[];
-  wsUrl: string;
+  /** None: the chart reloads over REST instead of streaming (KuCoin). */
+  wsUrl?: string;
   subscribe(native: string): string;
   /** Message to keep the connection open, and how often. */
   ping?: { everyMs: number; message: string };
@@ -124,6 +133,22 @@ function binanceFeed(rest: string, ws: string): Feed {
 }
 
 const binanceUsdm = binanceFeed("https://fapi.binance.com/fapi/v1/klines", "wss://fstream.binance.com/ws");
+const binanceOptions: Feed = {
+  ...binanceFeed("https://eapi.binance.com/eapi/v1/klines", "wss://nbstream.binance.com/eoptions/ws"),
+  intervals: Object.fromEntries(["1m", "3m", "5m", "15m", "30m", "1h", "2h", "4h", "6h", "12h", "1d", "3d", "1w"].map((i) => [i, i])),
+  maxLimit: 1500,
+  // Option klines are objects: { openTime, open, high, low, close, volume }.
+  parseCandles(json) {
+    if (!Array.isArray(json)) return fail("Binance Optionen", (json as { msg?: string })?.msg ?? "keine Kerzen");
+    if (Array.isArray(json[0])) return klineRows("Binance Optionen", json);
+    return (json as Record<string, string | number>[]).map((r) => ({ time: Math.floor(num(r.openTime) / 1000), open: num(r.open), high: num(r.high), low: num(r.low), close: num(r.close), volume: num(r.volume) }));
+  },
+  subscribe: (native) => JSON.stringify({ method: "SUBSCRIBE", params: [`${native}@trade`], id: 1 }),
+  parseTrades(msg) {
+    const m = msg as { e?: string; p?: string; q?: string; T?: number };
+    return m.e === "trade" ? [{ price: num(m.p), size: num(m.q), timeMs: num(m.T) }] : [];
+  },
+};
 const binanceCoinm = binanceFeed("https://dapi.binance.com/dapi/v1/klines", "wss://dstream.binance.com/ws");
 
 const binance: Venue = {
@@ -132,6 +157,9 @@ const binance: Venue = {
   defaultQuote: "USDT",
   perpQuote: "USDT",
   resolve(rest) {
+    // Options: BTC-260327-100000-C (settled in USDT).
+    const opt = /^([A-Z0-9]+)-\d{6}-\d+(?:\.\d+)?-[CP]$/.exec(rest);
+    if (opt) return { venue: binance, kind: "option", pair: { base: opt[1], quote: "USDT" }, native: rest, feed: binanceOptions };
     // COIN-M: BTCUSD.P → BTCUSD_PERP, BTCUSD_260327; USDⓈ-M: BTCUSDT.P → BTCUSDT, BTCUSDT_260327.
     const perp = PERP.exec(rest);
     const dated = /^([A-Z0-9]+)_(\d{6})$/.exec(rest);
@@ -339,7 +367,9 @@ const okx: Venue = {
   defaultQuote: "USDT",
   perpQuote: "USDT",
   resolve(rest) {
-    // OKX's own names: BTC-USDT-SWAP, BTC-USD-260327.
+    // OKX's own names: BTC-USDT-SWAP, BTC-USD-260327, options BTC-USD-260327-100000-C.
+    const opt = /^([A-Z0-9]+)-(USD|USDT|USDC)-\d{6}-\d+(?:\.\d+)?-[CP]$/.exec(rest);
+    if (opt) return { venue: okx, kind: "option", pair: { base: opt[1], quote: opt[2] }, native: rest, inverse: opt[2] === "USD", feed: okxFeed };
     const own = /^([A-Z0-9]+)-([A-Z]+)-(SWAP|\d{6})$/.exec(rest);
     if (own) return { venue: okx, kind: own[3] === "SWAP" ? "perp" : "future", pair: { base: own[1], quote: own[2] }, native: rest, inverse: own[2] === "USD", feed: okxFeed };
     const perp = PERP.exec(rest);
@@ -425,9 +455,244 @@ const bitfinex: Venue = {
   },
 };
 
+// ---------------- Bitget ----------------
+
+type BitgetProduct = "SPOT" | "USDT-FUTURES" | "USDC-FUTURES" | "COIN-FUTURES";
+
+function bitgetFeed(product: BitgetProduct): Feed {
+  const spot = product === "SPOT";
+  return {
+    intervals: spot
+      ? { "1m": "1min", "3m": "3min", "5m": "5min", "15m": "15min", "30m": "30min", "1h": "1h", "4h": "4h", "6h": "6h", "12h": "12h", "1d": "1day", "3d": "3day", "1w": "1week", "1M": "1M" }
+      : { "1m": "1m", "3m": "3m", "5m": "5m", "15m": "15m", "30m": "30m", "1h": "1H", "4h": "4H", "6h": "6H", "12h": "12H", "1d": "1D", "3d": "3D", "1w": "1W", "1M": "1M" },
+    maxLimit: spot ? 1000 : 1000,
+    paging: true,
+    candlesUrl: (native, code, limit, endSec) =>
+      spot
+        ? `https://api.bitget.com/api/v2/spot/market/candles?symbol=${native}&granularity=${code}&limit=${limit}${endSec ? `&endTime=${endSec * 1000 - 1}` : ""}`
+        : `https://api.bitget.com/api/v2/mix/market/candles?symbol=${native}&productType=${product}&granularity=${code}&limit=${limit}${endSec ? `&endTime=${endSec * 1000 - 1}` : ""}`,
+    parseCandles(json) {
+      const j = json as { code?: string; msg?: string; data?: unknown[][] };
+      if (j.code !== "00000") fail("Bitget", j.msg ?? "Fehler");
+      // [ts ms, open, high, low, close, base volume, …]
+      return (j.data ?? []).map((r) => ({ time: Math.floor(num(r[0]) / 1000), open: num(r[1]), high: num(r[2]), low: num(r[3]), close: num(r[4]), volume: num(r[5]) })).sort((a, b) => a.time - b.time);
+    },
+    wsUrl: "wss://ws.bitget.com/v2/ws/public",
+    subscribe: (native) => JSON.stringify({ op: "subscribe", args: [{ instType: product, channel: "trade", instId: native }] }),
+    // Bitget closes connections without a "ping" for 2 minutes.
+    ping: { everyMs: 30_000, message: "ping" },
+    parseTrades(msg) {
+      const m = msg as { arg?: { channel?: string }; action?: string; data?: { ts: string; price: string; size: string }[] };
+      if (m.arg?.channel !== "trade" || m.action !== "update" || !Array.isArray(m.data)) return [];
+      return m.data.map((t) => ({ price: num(t.price), size: num(t.size), timeMs: num(t.ts) }));
+    },
+  };
+}
+
+const BITGET = { spot: bitgetFeed("SPOT"), usdt: bitgetFeed("USDT-FUTURES"), usdc: bitgetFeed("USDC-FUTURES"), coin: bitgetFeed("COIN-FUTURES") };
+
+const bitget: Venue = {
+  id: "BITGET",
+  name: "Bitget",
+  defaultQuote: "USDT",
+  perpQuote: "USDT",
+  resolve(rest) {
+    // Coin-margined delivery contracts: BTCUSDZ25 (month code and year).
+    const dated = /^([A-Z0-9]+)USD([FGHJKMNQUVXZ]\d{2})$/.exec(rest);
+    if (dated) return { venue: bitget, kind: "future", pair: { base: dated[1], quote: "USD" }, native: rest, inverse: true, feed: BITGET.coin };
+    const perp = PERP.exec(rest);
+    const pair = splitPair(perp?.[1] ?? rest);
+    if (!pair || (!perp && !/^[A-Z0-9]+$/.test(rest))) return null;
+    if (!perp) return { venue: bitget, kind: "spot", pair, native: pair.base + pair.quote, feed: BITGET.spot };
+    if (pair.quote === "USD") return { venue: bitget, kind: "perp", pair, native: `${pair.base}USD`, inverse: true, feed: BITGET.coin };
+    if (pair.quote === "USDC") return { venue: bitget, kind: "perp", pair, native: `${pair.base}PERP`, feed: BITGET.usdc };
+    return { venue: bitget, kind: "perp", pair, native: pair.base + pair.quote, feed: BITGET.usdt };
+  },
+};
+
+// ---------------- KuCoin ----------------
+
+const KUCOIN_SPOT_TYPE: Record<string, [string, number]> = {
+  "1m": ["1min", 60], "3m": ["3min", 180], "5m": ["5min", 300], "15m": ["15min", 900], "30m": ["30min", 1800], "1h": ["1hour", 3600], "2h": ["2hour", 7200],
+  "4h": ["4hour", 14400], "6h": ["6hour", 21600], "8h": ["8hour", 28800], "12h": ["12hour", 43200], "1d": ["1day", 86400], "1w": ["1week", 604800],
+};
+const KUCOIN_SPOT_STEP = Object.fromEntries(Object.values(KUCOIN_SPOT_TYPE));
+
+const kucoinSpot: Feed = {
+  intervals: Object.fromEntries(Object.entries(KUCOIN_SPOT_TYPE).map(([k, [code]]) => [k, code])),
+  maxLimit: 1500,
+  paging: true,
+  candlesUrl(native, code, limit, endSec) {
+    const end = endSec ? endSec - 1 : Math.floor(Date.now() / 1000);
+    return `https://api.kucoin.com/api/v1/market/candles?type=${code}&symbol=${native}&startAt=${end - limit * KUCOIN_SPOT_STEP[code]}&endAt=${end}`;
+  },
+  parseCandles(json) {
+    const j = json as { code?: string; msg?: string; data?: string[][] };
+    if (j.code !== "200000") fail("KuCoin", j.msg ?? "Fehler");
+    // [time s, open, close, high, low, volume, turnover], newest first.
+    return (j.data ?? []).map((r) => ({ time: num(r[0]), open: num(r[1]), close: num(r[2]), high: num(r[3]), low: num(r[4]), volume: num(r[5]) })).reverse();
+  },
+  subscribe: () => "",
+  parseTrades: () => [],
+};
+
+const KUCOIN_FUTURES_MIN: Record<string, number> = { "1m": 1, "5m": 5, "15m": 15, "30m": 30, "1h": 60, "2h": 120, "4h": 240, "8h": 480, "12h": 720, "1d": 1440, "1w": 10080 };
+
+const kucoinFutures: Feed = {
+  intervals: Object.fromEntries(Object.entries(KUCOIN_FUTURES_MIN).map(([k, m]) => [k, String(m)])),
+  maxLimit: 500,
+  paging: true,
+  candlesUrl(native, code, limit, endSec) {
+    const end = endSec ? endSec * 1000 - 1 : Date.now();
+    return `https://api-futures.kucoin.com/api/v1/kline/query?symbol=${native}&granularity=${code}&from=${end - limit * Number(code) * 60_000}&to=${end}`;
+  },
+  parseCandles(json) {
+    const j = json as { code?: string; msg?: string; data?: number[][] };
+    if (j.code !== "200000") fail("KuCoin Futures", j.msg ?? "Fehler");
+    // [time ms, open, high, low, close, volume], oldest first.
+    return (j.data ?? []).map((r) => ({ time: Math.floor(num(r[0]) / 1000), open: num(r[1]), high: num(r[2]), low: num(r[3]), close: num(r[4]), volume: num(r[5]) }));
+  },
+  subscribe: () => "",
+  parseTrades: () => [],
+};
+
+/** KuCoin futures call Bitcoin XBT: BTCUSDT.P → XBTUSDTM, BTCUSD.P → XBTUSDM (inverse). */
+const kucoinFutAsset = (a: string) => (a === "BTC" ? "XBT" : a);
+
+const kucoin: Venue = {
+  id: "KUCOIN",
+  name: "KuCoin",
+  defaultQuote: "USDT",
+  perpQuote: "USDT",
+  resolve(rest) {
+    // Dated coin-margined futures: XBTMZ25.
+    const dated = /^([A-Z0-9]+)M([FGHJKMNQUVXZ]\d{2})$/.exec(rest);
+    if (dated) return { venue: kucoin, kind: "future", pair: { base: krakenCoin(dated[1]), quote: "USD" }, native: rest, inverse: true, feed: kucoinFutures };
+    const perp = PERP.exec(rest);
+    const pair = splitPair(perp?.[1] ?? rest);
+    if (!pair || (!perp && !/^[A-Z0-9]+$/.test(rest))) return null;
+    if (!perp) return { venue: kucoin, kind: "spot", pair, native: `${pair.base}-${pair.quote}`, feed: kucoinSpot };
+    return { venue: kucoin, kind: "perp", pair, native: `${kucoinFutAsset(pair.base)}${pair.quote}M`, inverse: pair.quote === "USD", feed: kucoinFutures };
+  },
+};
+
+// ---------------- Deribit ----------------
+
+const DERIBIT_RES: Record<string, [string, number]> = {
+  "1m": ["1", 60], "3m": ["3", 180], "5m": ["5", 300], "15m": ["15", 900], "30m": ["30", 1800], "1h": ["60", 3600], "2h": ["120", 7200],
+  "3h": ["180", 10800], "6h": ["360", 21600], "12h": ["720", 43200], "1d": ["1D", 86400],
+};
+const DERIBIT_STEP = Object.fromEntries(Object.values(DERIBIT_RES));
+
+const deribitFeed: Feed = {
+  intervals: Object.fromEntries(Object.entries(DERIBIT_RES).map(([k, [code]]) => [k, code])),
+  maxLimit: 1000,
+  paging: true,
+  candlesUrl(native, code, limit, endSec) {
+    const end = endSec ? endSec * 1000 - 1 : Date.now();
+    return `https://www.deribit.com/api/v2/public/get_tradingview_chart_data?instrument_name=${native}&resolution=${code}&start_timestamp=${end - limit * DERIBIT_STEP[code] * 1000}&end_timestamp=${end}`;
+  },
+  parseCandles(json) {
+    const j = json as { result?: { status?: string; ticks?: number[]; open?: number[]; high?: number[]; low?: number[]; close?: number[]; volume?: number[] }; error?: { message?: string } };
+    const r = j.result;
+    if (!r?.ticks) return fail("Deribit", j.error?.message ?? "keine Kerzen");
+    return r.ticks.map((t, i) => ({ time: Math.floor(t / 1000), open: r.open![i], high: r.high![i], low: r.low![i], close: r.close![i], volume: r.volume![i] }));
+  },
+  wsUrl: "wss://www.deribit.com/ws/api/v2",
+  subscribe: (native) => JSON.stringify({ jsonrpc: "2.0", id: 1, method: "public/subscribe", params: { channels: [`trades.${native}.100ms`] } }),
+  ping: { everyMs: 30_000, message: JSON.stringify({ jsonrpc: "2.0", id: 2, method: "public/test", params: {} }) },
+  parseTrades(msg) {
+    const m = msg as { method?: string; params?: { channel?: string; data?: { price: number; amount: number; timestamp: number }[] } };
+    if (m.method !== "subscription" || !m.params?.channel?.startsWith("trades.") || !Array.isArray(m.params.data)) return [];
+    return m.params.data.map((t) => ({ price: num(t.price), size: num(t.amount), timeMs: num(t.timestamp) }));
+  },
+};
+
+const DERIBIT_DAY = `\\d{1,2}(?:${MONTHS.join("|")})\\d{2}`;
+
+const deribit: Venue = {
+  id: "DERIBIT",
+  name: "Deribit",
+  defaultQuote: "USDC",
+  perpQuote: "USD",
+  resolve(rest) {
+    // Deribit's own names: BTC-PERPETUAL (inverse), BTC_USDC-PERPETUAL, BTC-27MAR26, BTC-27MAR26-100000-C, BTC_USDC (spot).
+    // Decimal strikes are written with a "d" (0d625); symbols arrive upper-cased.
+    const own = new RegExp(`^([A-Z0-9]+)(?:_(USDC|USDT))?-(PERPETUAL|${DERIBIT_DAY})(-\\d+(?:D\\d+)?-[CP])?$`).exec(rest.toUpperCase());
+    if (own) {
+      const quote = own[2] ?? "USD";
+      const kind: MarketKind = own[4] ? "option" : own[3] === "PERPETUAL" ? "perp" : "future";
+      const native = rest.toUpperCase().replace(/(\d)D(\d)/, "$1d$2");
+      return { venue: deribit, kind, pair: { base: own[1], quote }, native, inverse: quote === "USD", feed: deribitFeed };
+    }
+    const spot = /^([A-Z0-9]+)_(USDC|USDT|EURR)$/.exec(rest);
+    if (spot) return { venue: deribit, kind: "spot", pair: { base: spot[1], quote: spot[2] }, native: rest, feed: deribitFeed };
+    const perp = PERP.exec(rest);
+    const pair = splitPair(perp?.[1] ?? rest);
+    if (!pair || (!perp && !/^[A-Z0-9]+$/.test(rest))) return null;
+    if (perp) {
+      if (pair.quote === "USD") return { venue: deribit, kind: "perp", pair, native: `${pair.base}-PERPETUAL`, inverse: true, feed: deribitFeed };
+      return pair.quote === "USDC" || pair.quote === "USDT" ? { venue: deribit, kind: "perp", pair, native: `${pair.base}_${pair.quote}-PERPETUAL`, feed: deribitFeed } : null;
+    }
+    return pair.quote === "USDC" || pair.quote === "USDT" ? { venue: deribit, kind: "spot", pair, native: `${pair.base}_${pair.quote}`, feed: deribitFeed } : null;
+  },
+};
+
+// ---------------- BitMEX ----------------
+
+const BITMEX_BIN: Record<string, number> = { "1m": 60, "5m": 300, "1h": 3600, "1d": 86400 };
+
+const bitmexFeed: Feed = {
+  intervals: Object.fromEntries(Object.keys(BITMEX_BIN).map((k) => [k, k])),
+  maxLimit: 1000,
+  paging: true,
+  candlesUrl: (native, code, limit, endSec) =>
+    `https://www.bitmex.com/api/v1/trade/bucketed?binSize=${code}&partial=true&symbol=${native}&count=${limit}&reverse=true${endSec ? `&endTime=${new Date((endSec + BITMEX_BIN[code] - 1) * 1000).toISOString()}` : ""}`,
+  parseCandles(json) {
+    if (!Array.isArray(json)) return fail("BitMEX", (json as { error?: { message?: string } })?.error?.message ?? "keine Kerzen");
+    const rows = json as { timestamp: string; open: number; high: number; low: number; close: number; volume: number }[];
+    if (rows.length < 2) return rows.map((r) => ({ time: Date.parse(r.timestamp) / 1000, open: r.open, high: r.high, low: r.low, close: r.close, volume: r.volume }));
+    // BitMEX stamps a bucket with its end: one bucket length earlier is its start. Newest first.
+    const step = Math.abs(Date.parse(rows[0].timestamp) - Date.parse(rows[1].timestamp)) / 1000;
+    return rows
+      .filter((r) => r.open !== null && r.close !== null)
+      .map((r) => ({ time: Date.parse(r.timestamp) / 1000 - step, open: r.open, high: r.high, low: r.low, close: r.close, volume: r.volume }))
+      .reverse();
+  },
+  wsUrl: "wss://ws.bitmex.com/realtime",
+  subscribe: (native) => JSON.stringify({ op: "subscribe", args: [`trade:${native}`] }),
+  ping: { everyMs: 30_000, message: "ping" },
+  parseTrades(msg) {
+    const m = msg as { table?: string; action?: string; data?: { price: number; size: number; timestamp: string }[] };
+    if (m.table !== "trade" || m.action !== "insert" || !Array.isArray(m.data)) return [];
+    return m.data.map((t) => ({ price: num(t.price), size: num(t.size), timeMs: Date.parse(t.timestamp) }));
+  },
+};
+
+const bitmex: Venue = {
+  id: "BITMEX",
+  name: "BitMEX",
+  defaultQuote: "USDT",
+  perpQuote: "USD",
+  resolve(rest) {
+    const xbt = (a: string) => (a === "BTC" ? "XBT" : a);
+    // Dated futures: XBTZ26, ETHUSDZ26, XBTUSDTZ26.
+    const dated = /^([A-Z0-9]+?)(USDT|USD)?([FGHJKMNQUVXZ]\d{2})$/.exec(rest);
+    if (dated && !splitPair(rest)) return { venue: bitmex, kind: "future", pair: { base: krakenCoin(dated[1]), quote: dated[2] ?? "USD" }, native: rest, inverse: !dated[2], feed: bitmexFeed };
+    const spot = /^([A-Z0-9]+)_(USDT|USDC|EUR)$/.exec(rest);
+    if (spot) return { venue: bitmex, kind: "spot", pair: { base: krakenCoin(spot[1]), quote: spot[2] }, native: rest, feed: bitmexFeed };
+    const perp = PERP.exec(rest);
+    const pair = splitPair(perp?.[1] ?? rest);
+    if (!pair || (!perp && !/^[A-Z0-9]+$/.test(rest))) return null;
+    // BTCUSD.P → XBTUSD (inverse), BTCUSDT.P → XBTUSDT; spot BTCUSDT → XBT_USDT.
+    if (perp) return { venue: bitmex, kind: "perp", pair, native: xbt(pair.base) + pair.quote, inverse: pair.quote === "USD", feed: bitmexFeed };
+    return pair.quote === "USD" ? null : { venue: bitmex, kind: "spot", pair, native: `${xbt(pair.base)}_${pair.quote}`, feed: bitmexFeed };
+  },
+};
+
 // ---------------- Lookup ----------------
 
-const ALL: Venue[] = [binance, coinbase, kraken, bybit, okx, bitstamp, bitfinex];
+const ALL: Venue[] = [binance, coinbase, kraken, bybit, okx, bitstamp, bitfinex, bitget, kucoin, deribit, bitmex];
 
 export const VENUES: { id: VenueId; name: string; perps: boolean }[] = ALL.map((v) => ({ id: v.id, name: v.name, perps: !!v.perpQuote }));
 
@@ -484,4 +749,4 @@ export function perpSymbol(venueId: string, binanceSymbol: string): string | nul
   return `${venue.id}:${pair.base}${venue.perpQuote}.P`;
 }
 
-export const KIND_LABEL: Record<MarketKind, string> = { spot: "Spot", perp: "Perpetual", future: "Futures" };
+export const KIND_LABEL: Record<MarketKind, string> = { spot: "Spot", perp: "Perpetual", future: "Futures", option: "Option" };

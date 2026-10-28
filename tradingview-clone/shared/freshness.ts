@@ -6,7 +6,7 @@
 
 import { findAsset } from "./assets";
 import { getExchange, holidayName, marketStatus, tradingDays, wallTime, zoneOffset, zonedToUtc, type Exchange } from "./exchanges";
-import { venueName } from "./venues";
+import { parseVenueSymbol, venueName } from "./venues";
 import { intervalSeconds, bucketTime, isCalendarInterval, isCryptoSymbol, type MarketData } from "./marketData";
 import { parseSpread, spreadSymbols } from "./spread";
 import { isTradeInterval } from "./tickBars";
@@ -255,7 +255,7 @@ export function assessFreshness(input: FreshnessInput, formatTime: (sec: number)
   const mNow = marketNow(market, now);
   const checks: Check[] = [];
   const exchangeFeed = source === "twelvedata";
-  const live = source === "binance" || source === "binance_futures" || source === "venue" || exchangeFeed;
+  const live = source === "binance" || source === "binance_futures" || (source === "venue" && !!parseVenueSymbol(input.symbol)?.feed.wsUrl) || exchangeFeed;
 
   // Device clock against the server clock.
   if (clock) {
