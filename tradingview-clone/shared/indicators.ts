@@ -1,4 +1,5 @@
 import { FVG_MITIGATION, fairValueGaps, fvgEvents, type FvgOptions } from "./fvg.js";
+import { nephewFvgEvents, nephewFvgs, type NephewFvgOptions } from "./fvgNephew.js";
 import { liquidationHeatmap, strongestLevels, type Heatmap } from "./liquidations.js";
 import * as m from "./math.js";
 import { orderBlocks, type OrderBlock, type OrderBlockSignal } from "./orderblocks.js";
@@ -92,6 +93,16 @@ const fvgOptions = (p: Record<string, number>): FvgOptions => ({
   higher: p.tf2 > 0 ? [p.tf2 * MINUTES] : [],
 });
 
+const nephewOptions = (p: Record<string, number>): NephewFvgOptions => ({
+  length: p.length,
+  deleteFilled: p.deleteFilled >= 1,
+  fillBy: p.fillBy >= 1 ? "close" : "wick",
+  chartTf: p.chartTf >= 1,
+  higher: [p.tf1, p.tf2, p.tf3].filter((m) => m > 0).map((m) => m * MINUTES),
+  waitClose: p.waitClose >= 1,
+  labels: p.labels >= 1,
+});
+
 // Rising/falling coloring shared by momentum histograms.
 const prevOf = (values: Series, i: number) => (i > 0 ? values[i - 1] : null);
 const risingFalling =
@@ -168,6 +179,29 @@ export const INDICATORS: IndicatorDef[] = [
       formations: [],
       zones: fairValueGaps(b, fvgOptions(p)),
     }),
+  },
+  {
+    id: "fvgnephew",
+    name: "FVG (Nephew_Sam_)",
+    short: "FVG NS",
+    category: "Muster",
+    overlay: true,
+    description:
+      "Nachbau des TradingView-Indikators „FVG (Nephew_Sam_)“ nach seiner öffentlichen Beschreibung (das Original ist nicht quelloffen). Einfache Drei-Kerzen-Lücke ohne Zusatzfilter auf bis zu drei höheren Zeitrahmen (Minuten, 0 = aus). Gefüllt, wenn der Kurs die ferne Kante erreicht, per Docht oder Schlusskurs (0 = Docht, 1 = Schluss); gefüllte Lücken werden gelöscht oder grau gezeigt. Länge in Kerzen (0 = bis zum rechten Rand). „Auf Kerzenschluss warten“ nimmt bei höheren Zeitrahmen nur abgeschlossene Kerzen, sonst zählt die laufende mit (kann sich noch ändern).",
+    params: [
+      { key: "chartTf", label: "Chart-Zeitrahmen (0/1)", default: 1, min: 0, max: 1 },
+      { key: "tf1", label: "Zeitrahmen 1 (Min., 0 = aus)", default: 0, min: 0, max: 43200 },
+      { key: "tf2", label: "Zeitrahmen 2 (Min., 0 = aus)", default: 0, min: 0, max: 43200 },
+      { key: "tf3", label: "Zeitrahmen 3 (Min., 0 = aus)", default: 0, min: 0, max: 43200 },
+      { key: "length", label: "Länge (Kerzen, 0 = bis Rand)", default: 0, min: 0, max: 500 },
+      { key: "deleteFilled", label: "Gefüllte löschen (0/1)", default: 1, min: 0, max: 1 },
+      { key: "fillBy", label: "Füllung per (0 = Docht, 1 = Schluss)", default: 0, min: 0, max: 1, step: 1 },
+      { key: "waitClose", label: "Auf Kerzenschluss warten (0/1)", default: 1, min: 0, max: 1 },
+      { key: "labels", label: "Labels zeigen (0/1)", default: 1, min: 0, max: 1 },
+    ],
+    outputs: [{ key: "fvgEvent", label: "FVG", color: "#787b86", helper: true, noAutoscale: true, event: { up: "neue bullische FVG", down: "neue bärische FVG" } }],
+    compute: (b, p) => ({ fvgEvent: nephewFvgEvents(b, nephewOptions(p)) }),
+    patterns: (b, p) => ({ candles: [], formations: [], zones: nephewFvgs(b, nephewOptions(p)) }),
   },
   {
     id: "sessions",

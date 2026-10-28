@@ -37,6 +37,7 @@ export const INDICATOR_REFERENCES: Record<string, IndicatorReference> = {
   candlepatterns: ref("formula", "Steve Nison, „Japanese Candlestick Charting Techniques“ (2001); ohne Kurslücken-Bedingung (Krypto 24/7)"),
   orderblocks: ref("formula", "smart-money-concepts smc.ob (joshyattridge); Buy/Sell beim ersten Retest ist eine eigene Regel"),
   fvg: ref("formula", "smart-money-concepts smc.fvg (joshyattridge) / Fair Value Gap [LuxAlgo]"),
+  fvgnephew: ref("approx", "Nachbau nach der öffentlichen Beschreibung von „FVG (Nephew_Sam_)“ auf TradingView (Code nicht öffentlich); Lücke = Drei-Kerzen-Definition wie smart-money-concepts smc.fvg"),
   sessions: ref("approx", "Annäherung an Percocos „IT Foundation“ (Code nicht öffentlich); Handelszeiten von Tokio, London, NYSE"),
   structure: ref("formula", "smart-money-concepts smc.swing_highs_lows / smc.bos_choch (joshyattridge)"),
   chartpatterns: ref("formula", "Thomas Bulkowski, „Encyclopedia of Chart Patterns“ (2005)"),
