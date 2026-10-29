@@ -14,6 +14,15 @@ export interface Release {
  */
 export const CHANGELOG: Release[] = [
   {
+    version: "0.64.0",
+    date: "2026-10-29",
+    title: "Heatmap auch für andere Börsen",
+    changes: [
+      "Die Liquidations-Heatmap lädt jetzt auch Paare anderer Börsen wie KRAKEN:BTCUSD.P; bisher blieb sie bei „Lade Heatmap …“ hängen",
+      "Kraken-Perps kommen dabei wie im Chart über deinen eigenen Proxy. Open Interest gibt es nur von Binance, deshalb rechnet die Heatmap dort mit dem Volumen („nur Volumen“)",
+    ],
+  },
+  {
     version: "0.63.0",
     date: "2026-10-29",
     title: "Sync einfacher: über GitHub oder als Datei",
