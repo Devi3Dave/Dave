@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { openInterestModel, simulateLiquidations, type Heatmap } from "../../shared/liquidations";
 import { isCryptoSymbol } from "../../shared/marketData";
+import { parseVenueSymbol } from "../../shared/venues";
 import type { Bar } from "../../shared/math";
 import { formatPrice } from "../chart/DrawingsPrimitive";
 import { resolveTimeZone } from "../chartSettings";
@@ -86,15 +87,21 @@ export function LiqHeatmapView({ onClose }: { onClose: () => void }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const range = RANGES.find((r) => r.id === rangeId)!;
-  const crypto = isCryptoSymbol(symbol);
+  // Other exchanges (KRAKEN:BTCUSD.P …) load their candles like the chart does (through the own relay
+  // where the exchange blocks the browser); open interest exists only for Binance futures (fapi).
+  const venue = parseVenueSymbol(symbol) !== null;
+  const crypto = isCryptoSymbol(symbol) || venue;
 
   const load = useCallback(async () => {
-    if (!crypto) return;
+    if (!crypto) {
+      setStatus({ loading: false, error: null });
+      return;
+    }
     setStatus((s) => ({ ...s, loading: true }));
     try {
       const [md, oi] = await Promise.all([
         fetchMarketData(symbol, range.interval, range.show + range.warm),
-        fetchOpenInterest(symbol, range.interval, 500).catch(() => null),
+        venue ? Promise.resolve(null) : fetchOpenInterest(symbol, range.interval, 500).catch(() => null),
       ]);
       const bars = md.bars;
       if (bars.length < 10) throw new Error("Zu wenige Kursdaten");
@@ -122,7 +129,7 @@ export function LiqHeatmapView({ onClose }: { onClose: () => void }) {
     } catch (err) {
       setStatus({ loading: false, error: (err as Error).message });
     }
-  }, [symbol, range, crypto]);
+  }, [symbol, range, crypto, venue]);
 
   useEffect(() => {
     void load();
@@ -330,7 +337,7 @@ export function LiqHeatmapView({ onClose }: { onClose: () => void }) {
       </div>
       <div className="heatmap-canvas" ref={wrapRef}>
         {!crypto ? (
-          <div className="panel-empty">Die Liquidations-Heatmap gibt es für Binance-Futures-Paare (z. B. BTCUSDT, ETHUSDT).</div>
+          <div className="panel-empty">Die Liquidations-Heatmap gibt es für Krypto-Paare (z. B. BTCUSDT, KRAKEN:BTCUSD.P).</div>
         ) : (
           <canvas
             ref={canvasRef}
