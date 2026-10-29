@@ -14,6 +14,16 @@ export interface Release {
  */
 export const CHANGELOG: Release[] = [
   {
+    version: "0.63.0",
+    date: "2026-10-29",
+    title: "Sync einfacher: über GitHub oder als Datei",
+    changes: [
+      "☁ Sync geht jetzt auch ohne Cloudflare: einen GitHub-Schlüssel erstellen (der Link füllt alles vor), einfügen, Verbinden. Der Stand liegt in einem geheimen Gist in deinem GitHub-Konto",
+      "Das iPad verbindest du wie bisher mit dem Kopplungslink; der Weg über den eigenen Cloudflare Worker bleibt wählbar",
+      "Neu im ☁-Fenster: Exportieren und Importieren als Datei, ohne Einrichtung über iCloud Drive oder AirDrop, auch als Sicherung",
+    ],
+  },
+  {
     version: "0.62.0",
     date: "2026-10-28",
     title: "Sync zwischen Mac und iPad",

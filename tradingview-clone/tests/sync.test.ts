@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import worker from "../proxy/worker.js";
-import { hashText, isSyncKey, makeSyncKey, pairingLink, pendingItems, readPairing, reconcile, scanLocal, syncErrorText, type SyncDoc, type SyncMeta } from "../shared/sync";
+import { gistErrorText, hashText, isSyncKey, makeBackup, makeSyncKey, mergeItems, pairingLink, parseDoc, pendingItems, readBackup, readPairing, reconcile, scanLocal, syncErrorText, type SyncDoc, type SyncMeta } from "../shared/sync";
 
 const RELAY = "https://chartai-proxy.devi.workers.dev";
 const PAGE = "https://devi3dave.github.io";
@@ -91,9 +91,11 @@ describe("sync logic", () => {
     const key = makeSyncKey((b) => b.fill(7));
     expect(key).toHaveLength(32);
     expect(key).toMatch(/^[A-Za-z0-9_-]+$/);
-    const link = pairingLink(`${PAGE}/Dave/chartai/`, RELAY, key);
+    const link = pairingLink(`${PAGE}/Dave/chartai/`, { url: RELAY, key });
     expect(link.startsWith(`${PAGE}/Dave/chartai/#`)).toBe(true);
     expect(readPairing(new URL(link).hash)).toEqual({ url: RELAY, key });
+    const gist = { kind: "gist" as const, gist: "abc123", token: "ghp_x" };
+    expect(readPairing(new URL(pairingLink(`${PAGE}/Dave/chartai/`, gist)).hash)).toEqual(gist);
     expect(readPairing("")).toBeNull();
     expect(hashText("a")).not.toBe(hashText("b"));
   });
@@ -102,6 +104,33 @@ describe("sync logic", () => {
     expect(syncErrorText(401, null)).toContain("SYNC_KEY");
     expect(syncErrorText(501, { missing: ["CHARTAI_SYNC"] })).toContain("KV");
     expect(syncErrorText(403, { error: "host not allowed" })).toContain("alte Version");
+  });
+});
+
+describe("Gist and file", () => {
+  it("merges like the Worker: newer wins, foreign keys dropped", () => {
+    const base: SyncDoc = { rev: 5, items: { "chartai.layout.v1": { v: "A", t: 10 } } };
+    const r = mergeItems(base, { "chartai.layout.v1": { v: "old", t: 5 }, "chartai.alerts.v1": { v: "X", t: 7 }, "chartai.claude.v1": { v: "sk", t: 99 } }, 1000);
+    expect(r.changed).toBe(true);
+    expect(r.doc.items).toEqual({ "chartai.layout.v1": { v: "A", t: 10 }, "chartai.alerts.v1": { v: "X", t: 7 } });
+    expect(r.doc.rev).toBe(1000);
+    expect(mergeItems(r.doc, { "chartai.alerts.v1": { v: "X", t: 7 } }, 2000).changed).toBe(false);
+    expect(parseDoc("{}")).toEqual({ rev: 0, items: {} });
+  });
+
+  it("explains GitHub answers in German", () => {
+    expect(gistErrorText(401, null)).toContain("abgelaufen");
+    expect(gistErrorText(403, { message: "API rate limit exceeded" })).toContain("Limit");
+    expect(gistErrorText(404, null)).toContain("gist");
+  });
+
+  it("exports and imports the synced keys only", () => {
+    const b = makeBackup({ "chartai.layout.v1": "A", "chartai.claude.v1": '{"apiKey":"sk"}' }, "0.63.0", new Date("2026-10-29T12:00:00Z"));
+    expect(b.items).toEqual({ "chartai.layout.v1": "A" });
+    const back = readBackup(JSON.stringify(b));
+    expect(typeof back === "string" ? back : back.items).toEqual({ "chartai.layout.v1": "A" });
+    expect(readBackup('{"app":"x"}')).toBe("keine ChartAI-Sicherung");
+    expect(readBackup("nope")).toContain("JSON");
   });
 });
 
