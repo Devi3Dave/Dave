@@ -5164,3 +5164,19 @@ select,
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
   font-size: 13px;
 }
+
+.sync-ways {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin-bottom: 6px;
+}
+
+.sync-dialog .button-link {
+  display: inline-block;
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  color: inherit;
+  text-decoration: none;
+}

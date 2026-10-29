@@ -109,18 +109,87 @@ export function makeSyncKey(random: (bytes: Uint8Array<ArrayBuffer>) => Uint8Arr
   return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
-/** Pairing link: opens ChartAI on the other device with address and key filled in. */
-export function pairingLink(pageUrl: string, worker: string, key: string): string {
+/** Where the shared state lives: the own Cloudflare Worker or a secret GitHub Gist (no `kind`: Worker, as in 0.62.0). */
+export type SyncTarget = { kind?: "worker"; url: string; key: string } | { kind: "gist"; gist: string; token: string };
+
+/** Pairing link: opens ChartAI on the other device with the target filled in. */
+export function pairingLink(pageUrl: string, target: SyncTarget): string {
   const u = new URL(pageUrl);
-  u.hash = new URLSearchParams({ "sync-url": worker, "sync-key": key }).toString();
+  u.hash = new URLSearchParams(target.kind === "gist" ? { "sync-gist": target.gist, "sync-token": target.token } : { "sync-url": target.url, "sync-key": target.key }).toString();
   return u.toString();
 }
 
-export function readPairing(hash: string): { url: string; key: string } | null {
+export function readPairing(hash: string): SyncTarget | null {
   const p = new URLSearchParams(hash.replace(/^#/, ""));
+  const gist = p.get("sync-gist");
+  const token = p.get("sync-token");
+  if (gist && token) return { kind: "gist", gist, token };
   const url = p.get("sync-url");
   const key = p.get("sync-key");
   return url && key ? { url, key } : null;
+}
+
+/** Adds items to a document, key by key, the newer t wins (the same rule as /sync in proxy/worker.js). */
+export function mergeItems(doc: SyncDoc, items: Record<string, SyncItem>, now: number): { doc: SyncDoc; changed: boolean } {
+  const next: SyncDoc = { rev: doc.rev, items: { ...doc.items } };
+  let changed = false;
+  for (const [k, item] of Object.entries(items)) {
+    if (!isSyncKey(k) || !(typeof item.v === "string" || item.v === null) || !Number.isFinite(item.t)) continue;
+    const cur = next.items[k];
+    if (!cur || item.t > cur.t) {
+      next.items[k] = { v: item.v, t: item.t };
+      changed = true;
+    }
+  }
+  if (changed) next.rev = Math.max(now, doc.rev + 1);
+  return { doc: next, changed };
+}
+
+/** The Gist that holds the state: one file, found again on the other device by its name. */
+export const GIST_FILE = "chartai-sync.json";
+export const GIST_DESCRIPTION = "ChartAI-Sync (nicht löschen, gleicht Charts zwischen deinen Geräten ab)";
+/** GitHub page that creates a token which may only use Gists, name and right already filled in. */
+export const GIST_TOKEN_URL = "https://github.com/settings/tokens/new?description=ChartAI-Sync&scopes=gist";
+
+export function parseDoc(text: string): SyncDoc {
+  const d = JSON.parse(text) as Partial<SyncDoc>;
+  return { rev: typeof d.rev === "number" ? d.rev : 0, items: d.items && typeof d.items === "object" ? d.items : {} };
+}
+
+/** German text for an answer of the GitHub API. */
+export function gistErrorText(status: number, body: { message?: string } | null): string {
+  const msg = body?.message ?? "";
+  if (status === 401) return "GitHub-Schlüssel ungültig oder abgelaufen – bei GitHub einen neuen erstellen";
+  if (status === 403 && /rate limit/i.test(msg)) return "GitHub-Limit für diese Stunde erreicht, gleich geht es weiter";
+  if (status === 403 || status === 404) return "Schlüssel darf keine Gists (beim Erstellen den Haken bei „gist“ setzen) oder der Sync-Gist wurde gelöscht";
+  if (status === 422) return "GitHub hat den Stand abgelehnt (zu groß?)";
+  return `GitHub-Fehler ${status}${msg ? `: ${msg}` : ""}`;
+}
+
+/** File backup (export/import): every synced key of this device. */
+export interface Backup {
+  app: "ChartAI";
+  version: string;
+  exported: string;
+  items: Record<string, string>;
+}
+
+export function makeBackup(values: Record<string, string>, version: string, now: Date): Backup {
+  const items: Record<string, string> = {};
+  for (const [k, v] of Object.entries(values)) if (isSyncKey(k)) items[k] = v;
+  return { app: "ChartAI", version, exported: now.toISOString(), items };
+}
+
+export function readBackup(text: string): Backup | string {
+  try {
+    const b = JSON.parse(text) as Partial<Backup>;
+    if (b.app !== "ChartAI" || !b.items || typeof b.items !== "object") return "keine ChartAI-Sicherung";
+    const items: Record<string, string> = {};
+    for (const [k, v] of Object.entries(b.items)) if (isSyncKey(k) && typeof v === "string") items[k] = v;
+    return { app: "ChartAI", version: String(b.version ?? "?"), exported: String(b.exported ?? ""), items };
+  } catch {
+    return "Datei ist kein gültiges JSON";
+  }
 }
 
 /** German text for an answer of the Worker's /sync. */

@@ -33,13 +33,40 @@ Die Adresse wird nur auf dem jeweiligen Gerät gespeichert: auf iPad und iPhone 
 
 ## Geräte synchronisieren (Mac ↔ iPad)
 
-Derselbe Worker kann deine Charts, Indikatoren, Zeichnungen, Layouts, Vorlagen, Alarme, Watchlisten, Journal, Demo-Konto und Einstellungen
+ChartAI kann deine Charts, Indikatoren, Zeichnungen, Layouts, Vorlagen, Alarme, Watchlisten, Journal, Demo-Konto und Einstellungen
 zwischen deinen Geräten abgleichen. Danach geht alles von selbst: was du am Mac einzeichnest, ist auf dem iPad da, sobald du ChartAI dort öffnest,
 und umgekehrt. Die API-Schlüssel für Claude und Twelve Data werden nie übertragen, sie bleiben auf dem jeweiligen Gerät.
 
-Dafür bekommt der Worker einen kleinen Speicher (Cloudflare KV) und einen geheimen Schlüssel. Nur wer diesen Schlüssel kennt, kann die Daten lesen
+Apple selbst gleicht die Daten einer Webseite nicht ab (iCloud synchronisiert nur Lesezeichen, Tabs und Passwörter), darum braucht es einen Speicher
+dazwischen. Es gibt drei Wege, oben auf **☁** tippen:
+
+### Weg A: über GitHub (einfach, empfohlen, ca. 3 Minuten)
+
+Der Stand liegt in einem geheimen Gist in deinem GitHub-Konto. Den Proxy brauchst du dafür nicht.
+
+1. **Am Mac:** in ChartAI auf **☁** tippen, „Über GitHub“ ist schon gewählt. **🔑 Schlüssel bei GitHub erstellen** antippen.
+   GitHub öffnet die Seite „New personal access token“, Name `ChartAI-Sync` und der Haken bei **gist** sind schon gesetzt.
+2. Bei **Expiration** „No expiration“ wählen (sonst hört der Sync nach 30 Tagen auf), ganz unten **Generate token** klicken und den Schlüssel
+   (beginnt mit `ghp_`) kopieren. GitHub zeigt ihn nur einmal.
+3. Zurück in ChartAI den Schlüssel einfügen → **3. Verbinden** → „Verbunden, noch leer“ → **Sync einschalten**. Oben steht jetzt **☁✓**.
+4. **iPad verbinden:** am Mac im ☁-Fenster **🔗 Kopplungslink kopieren** und dir den Link aufs iPad schicken (AirDrop, Notizen oder Nachricht an dich
+   selbst). Auf dem iPad antippen: ChartAI öffnet sich und lädt deinen Stand vom Mac („☁ Stand vom anderen Gerät übernommen“).
+   Nutzt du ChartAI auf dem iPad als App vom Home-Bildschirm, hat diese App einen eigenen Speicher: dort selbst auf **☁** tippen, den Schlüssel einfügen
+   (am Mac **Schlüssel kopieren**) → **3. Verbinden** → **Stand vom anderen Gerät laden**.
+
+Der Schlüssel darf nur Gists lesen und schreiben, nicht an deine Repositories. Abschalten: auf GitHub unter Settings → Developer settings →
+Personal access tokens den Schlüssel `ChartAI-Sync` löschen; den Gist „ChartAI-Sync“ findest du unter gist.github.com.
+
+### Weg B: Datei (ohne Einrichtung, nicht automatisch)
+
+Im ☁-Fenster unten am Mac **📤 Exportieren** und die Datei in iCloud Drive sichern oder per AirDrop schicken, am iPad **📥 Importieren** und die Datei
+wählen. Das ersetzt Charts und Einstellungen auf dem iPad. Auch gut als Sicherung.
+
+### Weg C: über den eigenen Cloudflare Worker
+
+Derselbe Worker wie für den Proxy bekommt einen kleinen Speicher (Cloudflare KV) und einen geheimen Schlüssel. Nur wer diesen Schlüssel kennt, kann die Daten lesen
 oder ändern. Die Daten liegen in deinem eigenen Cloudflare-Konto. Einmalig ca. 10 Minuten, ohne Kommandozeile
-(Cloudflare benennt Menüs ab und zu leicht um; die Begriffe in **fett** stehen so oder ähnlich im Dashboard):
+(Cloudflare benennt Menüs ab und zu leicht um; die Begriffe in **fett** stehen so oder ähnlich im Dashboard). Im ☁-Fenster „Über eigenen Cloudflare Worker“ wählen:
 
 1. **Neuen Worker-Code bereitstellen:** wie oben in Schritt 4: in Cloudflare den Worker öffnen → **Edit code** → den ganzen Inhalt durch den aktuellen
    [`worker.js`](./worker.js) ersetzen → **Deploy**.
@@ -60,7 +87,7 @@ oder ändern. Die Daten liegen in deinem eigenen Cloudflare-Konto. Einmalig ca. 
    Nutzt du ChartAI auf dem iPad als App vom Home-Bildschirm, hat diese App einen eigenen Speicher: dort selbst auf **☁** tippen, Adresse und
    Schlüssel einfügen (am Mac **Schlüssel kopieren**, auf dem iPad einfügen) → **Verbinden** → **Stand vom anderen Gerät laden**.
 
-**So arbeitet der Sync**
+**So arbeitet der Sync (Weg A und C)**
 
 - Beim Öffnen von ChartAI holt es zuerst den neuesten Stand (höchstens ein paar Sekunden, ohne Netz startet es einfach mit dem eigenen Stand)
 - Änderungen gehen wenige Sekunden später an den Worker, danach höchstens alle 45 Sekunden und sofort, wenn du ChartAI verlässt oder das iPad sperrst
@@ -68,9 +95,9 @@ oder ändern. Die Daten liegen in deinem eigenen Cloudflare-Konto. Einmalig ca. 
   (die Seite lädt dafür kurz neu)
 - Abgeglichen wird Eintrag für Eintrag (z. B. Chart 1, Alarme, Journal): wer zuletzt geändert hat, gewinnt. Eine Zeichnung am Mac und ein Alarm am iPad
   bleiben also beide erhalten. Ändern beide Geräte gleichzeitig denselben Chart, gilt die spätere Änderung
-- Der Gratis-Tarif erlaubt 1000 Speichervorgänge und 100.000 Abrufe am Tag, das reicht bei normaler Nutzung locker
-- **Ausschalten:** ☁ → **Sync ausschalten**. Alles bleibt auf dem Gerät. Die Daten im Worker löschst du in Cloudflare unter
-  **Workers KV** → `chartai-sync` → Eintrag `chartai-sync-v1` löschen
+- Cloudflares Gratis-Tarif erlaubt 1000 Speichervorgänge und 100.000 Abrufe am Tag, GitHub 5000 Abrufe pro Stunde: das reicht bei normaler Nutzung locker
+- **Ausschalten:** ☁ → **Sync ausschalten**. Alles bleibt auf dem Gerät. Die Daten löschst du bei GitHub (Gist „ChartAI-Sync“) bzw. in Cloudflare
+  unter **Workers KV** → `chartai-sync` → Eintrag `chartai-sync-v1`
 
 **Wenn ☁⚠ erscheint** (Tippen zeigt den Grund):
 
@@ -78,6 +105,8 @@ oder ändern. Die Daten liegen in deinem eigenen Cloudflare-Konto. Einmalig ca. 
 - „im Worker fehlt noch der KV-Speicher“: Schritt 3, der Name muss genau `CHARTAI_SYNC` sein
 - „im Worker fehlt noch das Secret SYNC_KEY“: Schritt 5
 - „Worker ist noch die alte Version ohne Sync“: Schritt 1
+- „GitHub-Schlüssel ungültig oder abgelaufen“: bei GitHub einen neuen Schlüssel erstellen (Weg A, Schritt 1–2), im ☁-Fenster **Sync ausschalten**
+  und mit dem neuen Schlüssel wieder verbinden, auf beiden Geräten
 
 ## Häufige Fragen
 

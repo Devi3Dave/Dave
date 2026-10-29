@@ -1,9 +1,26 @@
 import { useSyncExternalStore } from "react";
 import { normalizeProxyUrl } from "../shared/proxy";
-import { isSyncKey, pendingItems, readPairing, reconcile, scanLocal, syncErrorText, type SyncDoc, type SyncMeta } from "../shared/sync";
+import {
+  GIST_DESCRIPTION,
+  GIST_FILE,
+  gistErrorText,
+  isSyncKey,
+  mergeItems,
+  parseDoc,
+  pendingItems,
+  readPairing,
+  reconcile,
+  scanLocal,
+  syncErrorText,
+  type SyncDoc,
+  type SyncItem,
+  type SyncMeta,
+  type SyncTarget,
+} from "../shared/sync";
 
 /**
- * Automatic sync of charts, indicators, drawings and settings between devices through the own Worker (shared/sync.ts).
+ * Automatic sync of charts, indicators, drawings and settings between devices (shared/sync.ts), through a secret GitHub Gist
+ * or the own Worker.
  * Runs before the app is loaded (main.tsx), so the stores read the newest state. Later changes from the other device are
  * taken over when ChartAI comes back to the front or after a few seconds without input, by reloading the page; the
  * stores would otherwise write their older state back. Must not import the stores.
@@ -15,7 +32,7 @@ const META_KEY = "chartai.syncMeta.v1";
 const APPLIED_KEY = "chartai.syncApplied";
 const PROXY_KEY = "chartai.proxy.v1";
 
-/** First send after a change, then at most this often (Cloudflare's free plan: 1000 saves a day). */
+/** First send after a change, then at most this often (Cloudflare's free plan: 1000 saves a day, GitHub: 5000 calls an hour). */
 const PUSH_DELAY_MS = 4_000;
 const PUSH_GAP_MS = 45_000;
 const POLL_MS = 30_000;
@@ -26,10 +43,7 @@ const START_TIMEOUT_MS = 4_000;
 const RELOAD_GAP_MS = 120_000;
 const RELOADED_KEY = "chartai.syncReloadedAt";
 
-export interface SyncConfig {
-  url: string;
-  key: string;
-}
+export type SyncConfig = SyncTarget;
 
 export interface SyncStatus {
   config: SyncConfig | null;
@@ -66,6 +80,7 @@ export function useSyncStatus(): SyncStatus {
 function readConfig(): SyncConfig | null {
   try {
     const c = JSON.parse(localStorage.getItem(CONFIG_KEY) ?? "null") as SyncConfig | null;
+    if (c?.kind === "gist") return typeof c.gist === "string" && typeof c.token === "string" && c.token ? c : null;
     return c && typeof c.url === "string" && typeof c.key === "string" && c.key ? c : null;
   } catch {
     return null;
@@ -110,7 +125,13 @@ export function defaultWorkerUrl(): string {
   }
 }
 
-async function call(cfg: SyncConfig, init: { method: "GET"; rev?: number } | { method: "POST"; body: string; keepalive?: boolean }, signal?: AbortSignal): Promise<SyncDoc & { same?: boolean }> {
+function netError(e: unknown, who: string): Error {
+  if ((e as Error).name === "TimeoutError" || (e as Error).name === "AbortError") return new Error(`${who} antwortet gerade nicht, nächster Versuch gleich`);
+  if (navigator.onLine === false) return new Error("offline – synchronisiert, sobald wieder Netz da ist");
+  return new Error(who === "GitHub" ? "GitHub nicht erreichbar" : "Worker nicht erreichbar (Adresse prüfen, Worker bereitgestellt?)");
+}
+
+async function workerCall(cfg: { url: string; key: string }, init: { method: "GET"; rev?: number } | { method: "POST"; body: string; keepalive?: boolean }, signal?: AbortSignal): Promise<SyncDoc & { same?: boolean }> {
   const url = `${cfg.url}/sync${init.method === "GET" && init.rev !== undefined ? `?rev=${init.rev}` : ""}`;
   let res: Response;
   try {
@@ -123,12 +144,92 @@ async function call(cfg: SyncConfig, init: { method: "GET"; rev?: number } | { m
       cache: "no-store",
     });
   } catch (e) {
-    if ((e as Error).name === "TimeoutError") throw new Error("Worker antwortet gerade nicht, nächster Versuch gleich");
-    throw new Error(navigator.onLine === false ? "offline – synchronisiert, sobald wieder Netz da ist" : "Worker nicht erreichbar (Adresse prüfen, Worker bereitgestellt?)");
+    throw netError(e, "Worker");
   }
   const body = (await res.json().catch(() => null)) as (SyncDoc & { same?: boolean; error?: string; missing?: string[] }) | null;
   if (!res.ok || !body) throw new Error(syncErrorText(res.status, body));
   return body;
+}
+
+const GITHUB = "https://api.github.com";
+
+/** GitHub REST API (CORS allowed for any page); "no-store", because GitHub lets browsers keep answers for 60 s. */
+async function github<T>(token: string, path: string, init: { method?: string; body?: unknown } = {}, signal?: AbortSignal): Promise<T> {
+  let res: Response;
+  try {
+    res = await fetch(`${GITHUB}${path}`, {
+      method: init.method ?? "GET",
+      headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json", ...(init.body ? { "Content-Type": "application/json" } : {}) },
+      body: init.body ? JSON.stringify(init.body) : undefined,
+      signal: signal ?? AbortSignal.timeout(20_000),
+      cache: "no-store",
+    });
+  } catch (e) {
+    throw netError(e, "GitHub");
+  }
+  const body = (await res.json().catch(() => null)) as (T & { message?: string }) | null;
+  if (!res.ok || !body) throw new Error(gistErrorText(res.status, body));
+  return body;
+}
+
+interface GistFile {
+  content?: string;
+  truncated?: boolean;
+  raw_url?: string;
+}
+
+/** The state in the Gist; a file over 1 MB comes without content and is loaded from raw_url. */
+async function gistDoc(cfg: { gist: string; token: string }, signal?: AbortSignal): Promise<SyncDoc> {
+  const g = await github<{ files: Record<string, GistFile> }>(cfg.token, `/gists/${encodeURIComponent(cfg.gist)}`, {}, signal);
+  const file = g.files[GIST_FILE];
+  if (!file) return { rev: 0, items: {} };
+  let text = file.content ?? "";
+  if (file.truncated && file.raw_url) {
+    try {
+      text = await (await fetch(file.raw_url, { cache: "no-store", signal: signal ?? AbortSignal.timeout(20_000) })).text();
+    } catch (e) {
+      throw netError(e, "GitHub");
+    }
+  }
+  try {
+    return parseDoc(text);
+  } catch {
+    return { rev: 0, items: {} };
+  }
+}
+
+/** Reads the shared state; `same` when it is still `rev`. */
+async function fetchDoc(cfg: SyncConfig, rev: number | undefined, signal?: AbortSignal): Promise<SyncDoc & { same?: boolean }> {
+  if (cfg.kind !== "gist") return workerCall(cfg, { method: "GET", rev }, signal);
+  const doc = await gistDoc(cfg, signal);
+  return doc.rev === rev ? { ...doc, same: true } : doc;
+}
+
+/** Adds this device's newer items; the Worker merges itself, for the Gist it is read, merged and written back. */
+async function pushItems(cfg: SyncConfig, items: Record<string, SyncItem>, keepalive: boolean, signal?: AbortSignal): Promise<SyncDoc> {
+  if (cfg.kind !== "gist") {
+    const body = JSON.stringify({ items });
+    return workerCall(cfg, { method: "POST", body, keepalive: keepalive && body.length < 60_000 }, signal);
+  }
+  const { doc, changed } = mergeItems(await gistDoc(cfg, signal), items, Date.now());
+  if (changed) await github(cfg.token, `/gists/${encodeURIComponent(cfg.gist)}`, { method: "PATCH", body: { files: { [GIST_FILE]: { content: JSON.stringify(doc) } } } }, signal);
+  return doc;
+}
+
+/** Finds the sync Gist of this GitHub account or creates it (secret: only reachable with its address). */
+export async function findOrCreateGist(token: string): Promise<SyncConfig> {
+  const t = token.trim();
+  for (let page = 1; page <= 5; page++) {
+    const list = await github<{ id: string; files: Record<string, unknown> }[]>(t, `/gists?per_page=100&page=${page}`);
+    const hit = list.find((g) => g.files && GIST_FILE in g.files);
+    if (hit) return { kind: "gist", gist: hit.id, token: t };
+    if (list.length < 100) break;
+  }
+  const created = await github<{ id: string }>(t, "/gists", {
+    method: "POST",
+    body: { description: GIST_DESCRIPTION, public: false, files: { [GIST_FILE]: { content: JSON.stringify({ rev: 0, items: {} }) } } },
+  });
+  return { kind: "gist", gist: created.id, token: t };
 }
 
 /** Writes the other device's values. */
@@ -175,11 +276,10 @@ async function cycle(opts: { mayReload: boolean; signal?: AbortSignal; keepalive
     const pending = pendingItems(meta, localValues());
     let doc: SyncDoc & { same?: boolean };
     if (Object.keys(pending).length) {
-      const body = JSON.stringify({ items: pending });
-      doc = await call(cfg, { method: "POST", body, keepalive: opts.keepalive && body.length < 60_000 }, opts.signal);
+      doc = await pushItems(cfg, pending, Boolean(opts.keepalive), opts.signal);
       lastPush = Date.now();
     } else {
-      doc = await call(cfg, { method: "GET", rev: meta.rev }, opts.signal);
+      doc = await fetchDoc(cfg, meta.rev, opts.signal);
     }
     if (!doc.same) {
       const result = reconcile(meta, localValues(), doc);
@@ -277,8 +377,11 @@ function startBackground() {
 export async function startSync(): Promise<void> {
   const pairing = readPairing(location.hash);
   if (pairing) {
-    const url = normalizeProxyUrl(pairing.url);
-    if (url) saveConfig({ url, key: pairing.key }, "join");
+    if (pairing.kind === "gist") saveConfig(pairing, "join");
+    else {
+      const url = normalizeProxyUrl(pairing.url);
+      if (url) saveConfig({ url, key: pairing.key }, "join");
+    }
     history.replaceState(null, "", location.pathname + location.search);
   }
   try {
@@ -333,12 +436,32 @@ export function syncNow(): Promise<void> {
   return run({ mayReload: true });
 }
 
-/** Looks at the Worker without changing anything: whether the key fits and how many keys it holds. */
+/** Looks at the Worker or Gist without changing anything: whether the key fits and how many keys it holds. */
 export async function probeSync(cfg: SyncConfig): Promise<{ ok: true; keys: number } | { ok: false; detail: string }> {
   try {
-    const doc = await call(cfg, { method: "GET" });
+    const doc = await fetchDoc(cfg, undefined);
     return { ok: true, keys: Object.values(doc.items ?? {}).filter((i) => i.v !== null).length };
   } catch (e) {
     return { ok: false, detail: (e as Error).message };
   }
+}
+
+/** All synced keys of this device, for the file backup. */
+export function syncedValues(): Record<string, string> {
+  return localValues();
+}
+
+/**
+ * Replaces this device's state with a backup and restarts the app. Written through the normal methods,
+ * so a switched-on sync passes the imported state on to the other devices.
+ */
+export function restoreBackup(items: Record<string, string>) {
+  for (const k of Object.keys(localValues())) if (!(k in items)) localStorage.removeItem(k);
+  for (const [k, v] of Object.entries(items)) localStorage.setItem(k, v);
+  if (status.config) {
+    // Send before the reload, so the other device does not overwrite the import with its older state.
+    window.clearTimeout(pushTimer);
+    pushTimer = undefined;
+    void (running ?? Promise.resolve()).then(() => run({ mayReload: false })).finally(() => location.reload());
+  } else location.reload();
 }
