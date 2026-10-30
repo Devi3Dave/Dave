@@ -32,7 +32,6 @@ import {
   removeDrawing,
   removeIndicator,
   store,
-  updateIndicator,
   type ChartMarker,
   type Drawing,
   type Interval,
@@ -146,15 +145,14 @@ async function run(name: ToolName, input: unknown, engine: ChartEngine | null): 
     }
 
     case "move_indicator": {
-      const { id, with: target, to, shared_scale } = input as ToolInput<"move_indicator">;
+      const { id, with: target, to } = input as ToolInput<"move_indicator">;
       const inst = s.indicators.find((i) => i.id === id);
       if (!inst) return fail(`Kein Indikator mit id=${id}`);
       if (!canMovePane(inst.type)) return fail(`${getIndicator(inst.type)?.name ?? inst.type} lässt sich nicht verschieben`);
       if (target && !s.indicators.some((i) => i.id === target)) return fail(`Kein Indikator mit id=${target}`);
-      if (!target && !to && shared_scale === undefined) return fail("Gib with, to oder shared_scale an");
+      if (!target && !to) return fail("Gib with oder to an");
       if (target) moveIndicatorPane(id, { with: target });
       else if (to) moveIndicatorPane(id, to);
-      if (shared_scale !== undefined) updateIndicator(id, { sharedScale: shared_scale });
       const panes = resolvePanes(indicatorPaneItems(store.get().indicators));
       const pane = panes.get(id) ?? 0;
       const together = store.get().indicators.filter((i) => i.id !== id && panes.get(i.id) === pane).map((i) => i.id);

@@ -14,6 +14,16 @@ export interface Release {
  */
 export const CHANGELOG: Release[] = [
   {
+    version: "0.69.0",
+    date: "2026-10-30",
+    title: "Feste Skalen und eigene Achsen",
+    changes: [
+      "Indikatoren mit festem Wertebereich zeigen immer ihre ganze Skala: RSI, MFI, Stochastik, Stoch RSI, ADX, Aroon, Ultimate Oscillator, Connors RSI, STC und Choppiness 0 bis 100, Williams %R −100 bis 0, CMF −1 bis 1. Ihre typischen Grenzlinien (z. B. 30/70 oder 20/80) sind dabei. CVD, Volumen, MACD & Co. skalieren weiter automatisch",
+      "Liegen mehrere Indikatoren in einem Fenster, bekommt jeder automatisch seine eigene Achse: z. B. RSI rechts, CVD links. Indikatoren mit derselben festen Skala (RSI und Stochastik) teilen sich eine Achse. Ab der dritten Skala in einem Fenster skaliert der Indikator ohne sichtbare Achse",
+      "Der Schalter „Skala mit dem Fenster teilen“ entfällt, das passiert jetzt von selbst",
+    ],
+  },
+  {
     version: "0.68.0",
     date: "2026-10-30",
     title: "Journal: Strategie oder Ausführung?",

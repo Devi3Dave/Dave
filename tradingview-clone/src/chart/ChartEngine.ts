@@ -29,7 +29,7 @@ import { brickKey as brickOptionsKey, displayBars, hollowStyle, isPriceDriven } 
 import { alignCompare } from "../../shared/compare";
 import { buildFootprints, footprintRowSize } from "../../shared/footprint";
 import { SOURCE_INDICATORS, computeIndicator, getIndicator, resolveParams, type IndicatorDef, type OutputDef } from "../../shared/indicators";
-import { indicatorPaneItems, resolvePanes } from "../../shared/panes";
+import { assignScales, indicatorPaneItems, resolvePanes } from "../../shared/panes";
 import { heikinAshi, type Bar, type Series } from "../../shared/math";
 import { barIndexAt } from "../../shared/replay";
 import { getExchange, tradingDays } from "../../shared/exchanges";
@@ -135,6 +135,8 @@ export class ChartEngine {
   private patternKey = "";
   private liquidations: LiveLiquidation[] = [];
   private side: "left" | "right" = "right";
+  /** Axis on the other side, shown while an indicator pane holds a second scale (e.g. RSI and CVD). */
+  private otherAxis = false;
   private settingsKey = "";
   private intervalSeconds = 3600;
   private interval = "1h";
@@ -202,7 +204,7 @@ export class ChartEngine {
     const toEvent = (ev: { clientX: number; clientY: number }): PointerEvent | null => {
       const rect = container.getBoundingClientRect();
       // Pane x starts after a left-side price scale.
-      const x = ev.clientX - rect.left - (this.side === "left" ? this.priceScaleWidth() : 0);
+      const x = ev.clientX - rect.left - this.axisWidths().left;
       const y = ev.clientY - rect.top;
       if (x < 0 || x > this.chart.timeScale().width()) return null; // price scale
       const logical = this.chart.timeScale().coordinateToLogical(x);
@@ -356,7 +358,7 @@ export class ChartEngine {
       const ts = this.chart.timeScale();
       if (g.type === "gesturestart") {
         const range = ts.getVisibleLogicalRange();
-        const x = g.clientX - container.getBoundingClientRect().left - (this.side === "left" ? this.priceScaleWidth() : 0);
+        const x = g.clientX - container.getBoundingClientRect().left - this.axisWidths().left;
         const anchor = ts.coordinateToLogical(Math.max(0, Math.min(ts.width(), x)));
         pinch = range && anchor !== null ? { from: range.from, to: range.to, anchor } : null;
       } else if (g.type === "gesturechange" && pinch && g.scale > 0) {
@@ -652,8 +654,8 @@ export class ChartEngine {
     const toDate = (t: Time) => new Date((t as number) * 1000);
 
     this.chart.applyOptions({
-      rightPriceScale: this.side === "right" ? scale : hidden,
-      leftPriceScale: this.side === "left" ? scale : hidden,
+      rightPriceScale: this.side === "right" || this.otherAxis ? scale : hidden,
+      leftPriceScale: this.side === "left" || this.otherAxis ? scale : hidden,
       grid: {
         vertLines: { visible: st.grid === "both" || st.grid === "vert", color: THEME.grid },
         horzLines: { visible: st.grid === "both" || st.grid === "horz", color: THEME.grid },
@@ -757,19 +759,19 @@ export class ChartEngine {
     this.chart.timeScale().setVisibleLogicalRange({ from, to: n + (this.interval === "all" ? 2 : 8) });
   }
 
-  priceScaleWidth(): number {
-    if (this.destroyed) return 0;
-    try {
-      return this.chart.priceScale(this.side).width();
-    } catch {
-      // A freshly shown left scale has no axis widget until the next render.
-      return 0;
-    }
+  /** Width of the visible price axes; the left one shifts the panes' x. */
+  axisWidths(): { left: number; right: number } {
+    const width = (side: "left" | "right") => {
+      if (this.destroyed || (side !== this.side && !this.otherAxis)) return 0;
+      try {
+        return this.chart.priceScale(side).width();
+      } catch {
+        return 0;
+      }
+    };
+    return { left: width("left"), right: width("right") };
   }
 
-  get scaleSide() {
-    return this.side;
-  }
 
   private displayBars(): Bar[] {
     return this.chartType === "heikin_ashi" ? heikinAshi(this.bars) : this.bars;
@@ -814,26 +816,28 @@ export class ChartEngine {
   private buildIndicators(instances: IndicatorInstance[]) {
     this.clearIndicators();
     const paneOf = resolvePanes(indicatorPaneItems(instances));
-    // The first indicator of a pane uses the visible price scale; others moved in scale on their own unless shared.
-    const scaleOwner = new Set<number>([0]);
-    const scaleOf = new Map<string, string>();
+    const sourced = (i: IndicatorInstance) => (i.source && SOURCE_INDICATORS.has(i.type) ? i.source.id : undefined);
+    const scaleOf = assignScales(
+      instances.flatMap((i) => {
+        const def = getIndicator(i.type);
+        if (!def) return [];
+        return [{ id: i.id, pane: paneOf.get(i.id) ?? 0, fixed: def.scale, onPrice: def.overlay, volume: def.id === "volume", sourceId: sourced(i) }];
+      }),
+    );
+    const other = this.side === "left" ? "right" : "left";
+    const needOther = [...scaleOf.values()].includes("other");
+    if (needOther !== this.otherAxis) {
+      this.otherAxis = needOther;
+      this.chart.applyOptions({ [`${other}PriceScale`]: { visible: needOther, borderColor: THEME.border } });
+    }
     for (const instance of instances) {
       const def = getIndicator(instance.type);
       if (!def) continue;
       const params = resolveParams(def, instance.params);
       const isVolume = def.id === "volume";
       const paneIndex = paneOf.get(instance.id) ?? 0;
-      // On another indicator's line: drawn in that indicator's pane and on its scale.
-      const source = instance.source && SOURCE_INDICATORS.has(def.id) ? this.built.find((b) => b.computed.instance.id === instance.source!.id) : undefined;
-      let scaleId: string;
-      if (source && source.computed.paneIndex === paneIndex) scaleId = scaleOf.get(source.computed.instance.id) ?? this.side;
-      else if (isVolume && paneIndex === 0) scaleId = "volume";
-      else if (paneIndex === 0 && def.overlay) scaleId = this.side;
-      else if (!scaleOwner.has(paneIndex)) {
-        scaleOwner.add(paneIndex);
-        scaleId = this.side;
-      } else scaleId = instance.sharedScale ? this.side : `ind:${instance.id}`;
-      scaleOf.set(instance.id, scaleId);
+      const slot = scaleOf.get(instance.id) ?? "main";
+      const scaleId = slot === "main" ? this.side : slot === "other" ? other : slot === "volume" ? "volume" : `ind:${slot}`;
       const series = def.outputs.map((o, k) => this.addOutputSeries(def, o, instance.colors?.[k] ?? o.color, paneIndex, isVolume, !!instance.hidden, scaleId));
 
       if (def.levels && series[0]) {
@@ -871,7 +875,11 @@ export class ChartEngine {
   private addOutputSeries(def: IndicatorDef, o: OutputDef, color: string, paneIndex: number, isVolume: boolean, hidden: boolean, scaleId: string) {
     const base = {
       visible: !hidden && !o.helper,
-      ...(o.noAutoscale ? { autoscaleInfoProvider: () => null } : {}),
+      ...(o.noAutoscale
+        ? { autoscaleInfoProvider: () => null }
+        : def.scale
+          ? { autoscaleInfoProvider: () => ({ priceRange: { minValue: def.scale!.min, maxValue: def.scale!.max } }) }
+          : {}),
       priceLineVisible: false,
       lastValueVisible: !def.overlay && !isVolume,
       title: "",
@@ -897,7 +905,7 @@ export class ChartEngine {
       );
     }
     if (scaleId === "volume") s.priceScale().applyOptions({ scaleMargins: { top: 0.82, bottom: 0 } });
-    else if (scaleId.startsWith("ind:")) s.priceScale().applyOptions({ scaleMargins: { top: 0.1, bottom: 0.1 } });
+    else if (scaleId.startsWith("ind:") || paneIndex > 0) s.priceScale().applyOptions({ scaleMargins: { top: 0.08, bottom: 0.08 } });
     return s;
   }
 
