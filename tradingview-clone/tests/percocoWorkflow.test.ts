@@ -110,8 +110,9 @@ describe("5. journal checklist", () => {
 
   it("keeps the checks in CSV and backups", () => {
     const t = trade({ checks: ["choch", "ltfFvg"] });
-    expect(toCsv([t]).split("\n")[1].endsWith(";choch,ltfFvg")).toBe(true);
-    expect(parseBackup({ trades: [{ ...t, checks: ["choch", "unbekannt"] }] })[0].checks).toEqual(["choch"]);
+    expect(toCsv([t]).split("\n")[1]).toContain(";choch,ltfFvg;");
+    // Checks are now rules of the trade's playbook; old checklist trades land in the Percoco playbook.
+    expect(parseBackup({ trades: [{ ...t, checks: ["choch", "choch", 3] }] })[0]).toMatchObject({ checks: ["choch"], playbook: "percoco" });
   });
 });
 

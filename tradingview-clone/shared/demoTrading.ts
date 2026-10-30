@@ -365,12 +365,18 @@ const localDate = (ms: number) => {
   const d = new Date(ms);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
+const localTime = (ms: number) => {
+  const d = new Date(ms);
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+};
 
 /** Journal entry for a closed demo trade (setup "Demo", so the journal can filter it). */
 export function toJournalTrade(t: DemoTrade): JournalTrade {
   return {
     id: journalId(t),
     date: localDate(t.closedAt),
+    ...(t.openedAt > 0 ? { time: localTime(t.openedAt) } : {}),
+    ...(t.closedAt > 0 ? { exitTime: localTime(t.closedAt) } : {}),
     symbol: t.symbol,
     side: t.side,
     entry: t.entry,

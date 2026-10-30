@@ -20,8 +20,18 @@ export interface JournalTrade {
   pnl?: number;
   setup?: string;
   note?: string;
-  /** Ticked points of the entry checklist (keys of CHECKLIST). */
+  /** Ticked rules of the trade's playbook (rule ids; for the Percoco playbook the keys of CHECKLIST). */
   checks?: string[];
+  /** Entry and exit time of day (HH:MM, local); used by the time and duration reports. */
+  time?: string;
+  exitTime?: string;
+  /** Playbook (strategy) the trade was taken with, by id. */
+  playbook?: string;
+  /** Free tags and mistakes ("FOMO", "Stop verschoben"), as in TradeZella's tag categories. */
+  tags?: string[];
+  mistakes?: string[];
+  /** Own grade of the execution, 1–5 stars. */
+  rating?: number;
 }
 
 /**
@@ -166,7 +176,7 @@ export function journalStats(trades: JournalTrade[]): JournalStats {
   };
 }
 
-const CSV_COLUMNS = ["date", "symbol", "side", "entry", "stop", "exit", "qty", "fees", "pnl", "r", "setup", "note", "checks"] as const;
+const CSV_COLUMNS = ["date", "symbol", "side", "entry", "stop", "exit", "qty", "fees", "pnl", "r", "setup", "note", "checks", "time", "exitTime", "tags", "mistakes"] as const;
 
 /** CSV for spreadsheets (semicolon separated, decimal comma, as German Excel expects). */
 export function toCsv(trades: JournalTrade[]): string {
@@ -176,10 +186,15 @@ export function toCsv(trades: JournalTrade[]): string {
     return /[;"\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
   const rows = sortTrades(trades).map((t) =>
-    [t.date, t.symbol, t.side, t.entry, t.stop, t.exit, t.qty, t.fees, tradePnl(t), tradeR(t), t.setup, t.note, t.checks?.join(",")].map(cell).join(";"),
+    [t.date, t.symbol, t.side, t.entry, t.stop, t.exit, t.qty, t.fees, tradePnl(t), tradeR(t), t.setup, t.note, t.checks?.join(","), t.time, t.exitTime, t.tags?.join(","), t.mistakes?.join(",")].map(cell).join(";"),
   );
   return [CSV_COLUMNS.join(";"), ...rows].join("\n");
 }
+
+const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+const strings = (a: unknown[]) => [...new Set(a.filter((c): c is string => typeof c === "string" && c.trim() !== "").map((c) => c.trim()))];
+/** Id of the built-in playbook that holds the Percoco checklist. */
+export const PERCOCO_PLAYBOOK = "percoco";
 
 /** Validates trades from a backup file; drops entries that are not usable. */
 export function parseBackup(json: unknown): JournalTrade[] {
@@ -202,8 +217,16 @@ export function parseBackup(json: unknown): JournalTrade[] {
       pnl: r.pnl === undefined || r.pnl === null || r.pnl === "" ? undefined : n(r.pnl),
       setup: typeof r.setup === "string" ? r.setup : undefined,
       note: typeof r.note === "string" ? r.note : undefined,
-      ...(Array.isArray(r.checks) ? { checks: r.checks.filter((c): c is string => CHECKLIST.some((x) => x.key === c)) } : {}),
+      ...(Array.isArray(r.checks) ? { checks: strings(r.checks) } : {}),
+      ...(typeof r.time === "string" && TIME_RE.test(r.time) ? { time: r.time } : {}),
+      ...(typeof r.exitTime === "string" && TIME_RE.test(r.exitTime) ? { exitTime: r.exitTime } : {}),
+      ...(typeof r.playbook === "string" && r.playbook ? { playbook: r.playbook } : {}),
+      ...(Array.isArray(r.tags) && strings(r.tags).length ? { tags: strings(r.tags) } : {}),
+      ...(Array.isArray(r.mistakes) && strings(r.mistakes).length ? { mistakes: strings(r.mistakes) } : {}),
+      ...(typeof r.rating === "number" && r.rating >= 1 && r.rating <= 5 ? { rating: Math.round(r.rating) } : {}),
     };
+    // Journals before the playbooks: the checklist was the Percoco model's.
+    if (t.checks && !t.playbook) t.playbook = PERCOCO_PLAYBOOK;
     if (t.stop !== undefined && !Number.isFinite(t.stop)) t.stop = undefined;
     const pricesOk = [t.entry, t.exit, t.qty].every(Number.isFinite);
     const pnlOk = t.pnl !== undefined && Number.isFinite(t.pnl);
