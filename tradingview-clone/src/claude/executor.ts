@@ -10,6 +10,7 @@ import { withCompare } from "../../shared/compare";
 import { isCryptoSymbol } from "../../shared/marketData";
 import { groupLevels, groupingSteps, type Level } from "../../shared/orderbook";
 import { orderBlocks } from "../../shared/orderblocks";
+import { canMovePane, indicatorPaneItems, resolvePanes } from "../../shared/panes";
 import { autoFibonacci, detectCandlePatterns, detectFormations } from "../../shared/patterns";
 import { isValidPosition, positionStats } from "../../shared/position";
 import { toolSchemas, type ToolInput, type ToolName } from "../../shared/tools";
@@ -26,10 +27,12 @@ import {
   addIndicator,
   clearDrawings,
   loadChart,
+  moveIndicatorPane,
   newId,
   removeDrawing,
   removeIndicator,
   store,
+  updateIndicator,
   type ChartMarker,
   type Drawing,
   type Interval,
@@ -140,6 +143,22 @@ async function run(name: ToolName, input: unknown, engine: ChartEngine | null): 
       const out = computeInstances(store.get().indicators, bars).find((c) => c.instance.id === inst.id)?.outputs ?? {};
       const latest = Object.fromEntries(def.outputs.map((o) => [o.key, num(out[o.key]?.[bars.length - 1])]));
       return ok(`${indicatorLabel(def, p)} hinzugefügt`, { id: inst.id, label: indicatorLabel(def, p), panel: def.overlay ? "overlay" : "eigenes Panel", latest });
+    }
+
+    case "move_indicator": {
+      const { id, with: target, to, shared_scale } = input as ToolInput<"move_indicator">;
+      const inst = s.indicators.find((i) => i.id === id);
+      if (!inst) return fail(`Kein Indikator mit id=${id}`);
+      if (!canMovePane(inst.type)) return fail(`${getIndicator(inst.type)?.name ?? inst.type} lässt sich nicht verschieben`);
+      if (target && !s.indicators.some((i) => i.id === target)) return fail(`Kein Indikator mit id=${target}`);
+      if (!target && !to && shared_scale === undefined) return fail("Gib with, to oder shared_scale an");
+      if (target) moveIndicatorPane(id, { with: target });
+      else if (to) moveIndicatorPane(id, to);
+      if (shared_scale !== undefined) updateIndicator(id, { sharedScale: shared_scale });
+      const panes = resolvePanes(indicatorPaneItems(store.get().indicators));
+      const pane = panes.get(id) ?? 0;
+      const together = store.get().indicators.filter((i) => i.id !== id && panes.get(i.id) === pane).map((i) => i.id);
+      return ok(pane === 0 ? "Im Hauptchart" : `In Fenster ${pane}`, { pane, together });
     }
 
     case "remove_indicator": {

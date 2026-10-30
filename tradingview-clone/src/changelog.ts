@@ -14,6 +14,16 @@ export interface Release {
  */
 export const CHANGELOG: Release[] = [
   {
+    version: "0.67.0",
+    date: "2026-10-30",
+    title: "Indikatoren in ein Fenster verschieben",
+    changes: [
+      "⇅ in der Legende jedes Indikators verschiebt ihn wie bei TradingView: ins Fenster darüber oder darunter, in ein neues Fenster oder ins Hauptchart. So liegen z. B. RSI und CVD zusammen in einem Fenster",
+      "Im gemeinsamen Fenster skaliert jeder weitere Indikator auf seine eigenen Werte, damit RSI (0–100) und CVD (Millionen) beide lesbar bleiben. Bei ähnlichen Werten (z. B. RSI und Stoch RSI) schaltest du „Skala mit dem Fenster teilen“ ein",
+      "Die Fenster-Aufteilung wird mit dem Layout, in Vorlagen und mit ☁ Sync gespeichert. Claude kann Indikatoren ebenfalls zusammenlegen („leg CVD zum RSI“)",
+    ],
+  },
+  {
     version: "0.66.0",
     date: "2026-10-30",
     title: "Screenshots im Journal",

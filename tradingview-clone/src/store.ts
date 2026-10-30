@@ -11,6 +11,7 @@ import { loadSpreadData, parseSpread } from "../shared/spread";
 import { wsVia } from "../shared/proxy";
 import { parseVenueSymbol, type Instrument } from "../shared/venues";
 import type { IndicatorSourceRef } from "../shared/indicators";
+import { canMovePane, indicatorPaneItems, joinPane, movePane, type PaneMove } from "../shared/panes";
 import { addTrades, isTradeInterval, MAX_TRADE_BARS, parseTradeInterval } from "../shared/tickBars";
 import type { CHART_TYPES, CustomInterval, INTERVALS, TradeIntervalCode } from "../shared/tools";
 import type { ShapeKind } from "../shared/drawingShapes";
@@ -76,6 +77,10 @@ export interface IndicatorInstance {
   author: Author;
   /** Computed on another indicator's line instead of the close (TradingView's "Source"). */
   source?: IndicatorSourceRef;
+  /** Chart pane chosen with "Verschieben" (0 = price chart); without it each oscillator gets a pane of its own. */
+  pane?: number;
+  /** Shares the price scale of the pane's first indicator instead of scaling on its own. */
+  sharedScale?: boolean;
 }
 
 export const BASIC_TOOLS = ["cursor", "trendline", "ray", "hline", "vline", "zone", "fib", "fibext", "channel", "measure", "brush", "text", "long", "short", "erase"] as const;
@@ -501,6 +506,15 @@ export function addIndicator(type: string, params: Record<string, number>, autho
 
 export function updateIndicator(id: string, patch: Partial<IndicatorInstance>) {
   store.set((s) => ({ indicators: s.indicators.map((i) => (i.id === id ? { ...i, ...patch } : i)) }));
+}
+
+/** TradingView's "Move to": pane above, pane below, a new pane or the price chart. */
+export function moveIndicatorPane(id: string, move: PaneMove | { with: string }) {
+  store.set((s) => {
+    const items = indicatorPaneItems(s.indicators);
+    const panes = typeof move === "string" ? movePane(items, id, move) : joinPane(items, id, move.with);
+    return { indicators: s.indicators.map((i) => (panes.has(i.id) && canMovePane(i.type) ? { ...i, pane: panes.get(i.id) } : i)) };
+  });
 }
 
 /** Removes an indicator together with the indicators computed on its lines. */

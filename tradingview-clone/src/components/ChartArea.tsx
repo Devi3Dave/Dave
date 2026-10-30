@@ -13,7 +13,9 @@ import { liquidationFeed } from "../market/liquidationFeed";
 import { DEFAULT_FIBEXT_LEVELS, DEFAULT_FIB_LEVELS, formatPrice } from "../chart/DrawingsPrimitive";
 import { placeOnSide } from "../../shared/position";
 import { SHAPES, isShapeKind, shapeDef } from "../../shared/drawingShapes";
-import { activeChart, addDrawing, newId, pickReplayStart, removeIndicator, removeCompare, stepBackReplay, stepReplay, updateIndicator, updateSettings, useChart, workspace, type ChartStore, type Drawing, type Point } from "../store";
+import { availableMoves, canMovePane, indicatorPaneItems, type PaneMove } from "../../shared/panes";
+import { Menu } from "./Menu";
+import { activeChart, addDrawing, moveIndicatorPane, newId, pickReplayStart, removeIndicator, removeCompare, stepBackReplay, stepReplay, updateIndicator, updateSettings, useChart, workspace, type ChartStore, type Drawing, type Point } from "../store";
 import { cloneInPlace, copyDrawing, deleteDrawing, pasteDrawing, redoDrawings, replaceDrawing, selectDrawing, selectedDrawing, trackHistory, undoDrawings, useSelectedDrawing } from "../drawingEdit";
 import { shortcutLabel, useShortcuts } from "../shortcuts";
 import { OPEN_GOTO_EVENT } from "./GoToDateDialog";
@@ -587,6 +589,55 @@ export function ChartArea({ chart, onEngine, magnet, onEditIndicator, onEditPosi
 
   useEffect(() => publishCrosshair(chart.slot, { index: idx, bars, computed }), [chart, idx, bars, computed]);
 
+  const indicators = useChart(chart, (s) => s.indicators);
+  const paneItems = useMemo(() => indicatorPaneItems(indicators), [indicators]);
+  const paneMenu = (c: ComputedIndicator) => {
+    if (!canMovePane(c.instance.type)) return null;
+    const moves = availableMoves(paneItems, c.instance.id);
+    // A pane shared with an earlier indicator: this one can use that indicator's price scale.
+    const guest = c.paneIndex > 0 && computed.some((x) => x.paneIndex === c.paneIndex && x !== c && computed.indexOf(x) < computed.indexOf(c) && !x.instance.source) && !c.instance.source;
+    if (!moves.length && !guest) return null;
+    const label: Record<PaneMove, string> = {
+      up: "↑ In das Fenster darüber",
+      down: "↓ In das Fenster darunter",
+      new: "＋ In ein neues Fenster",
+      main: "⤒ Ins Hauptchart (Kurs)",
+    };
+    return (
+      <Menu label="⇅" className="legend-pane" ariaLabel="Verschieben" tip={"Verschieben\nIn ein anderes Fenster oder mit anderen Indikatoren zusammen"}>
+        {(close) => (
+          <>
+            <div className="menu-title">{indicatorLabel(c.def, c.params)} verschieben</div>
+            {moves.map((m) => (
+              <button
+                key={m}
+                className="menu-item"
+                onClick={() => {
+                  moveIndicatorPane(c.instance.id, m);
+                  close();
+                }}
+              >
+                {label[m]}
+              </button>
+            ))}
+            {guest && (
+              <button
+                className={`menu-item ${c.instance.sharedScale ? "active" : ""}`}
+                data-tip={"Aus: eigene Skala, passt bei ganz anderen Werten (z. B. RSI und CVD)\nAn: gleiche Skala wie der erste Indikator im Fenster (z. B. RSI und Stoch RSI)"}
+                onClick={() => {
+                  updateIndicator(c.instance.id, { sharedScale: !c.instance.sharedScale });
+                  close();
+                }}
+              >
+                {c.instance.sharedScale ? "☑" : "☐"} Skala mit dem Fenster teilen
+              </button>
+            )}
+          </>
+        )}
+      </Menu>
+    );
+  };
+
   const legendFor = (paneIndex: number) =>
     computed
       .filter((c) => c.paneIndex === paneIndex)
@@ -613,6 +664,7 @@ export function ChartArea({ chart, onEngine, magnet, onEditIndicator, onEditPosi
             <button data-tip={c.instance.hidden ? "Einblenden" : "Ausblenden"} aria-label={c.instance.hidden ? "Einblenden" : "Ausblenden"} onClick={() => updateIndicator(c.instance.id, { hidden: !c.instance.hidden })}>
               {c.instance.hidden ? "◌" : "◉"}
             </button>
+            {paneMenu(c)}
             <button data-tip="Einstellungen: Parameter und Farben" aria-label="Einstellungen" onClick={() => onEditIndicator(c.instance.id)}>
               ⚙
             </button>
