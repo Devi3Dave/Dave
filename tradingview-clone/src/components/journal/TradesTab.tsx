@@ -119,7 +119,10 @@ export function TradesTab({ api, shown }: { api: JournalApi; shown: JournalTrade
                         </span>
                       ))}
                     </td>
-                    <td className="jz-star-cell">{t.rating ? "★".repeat(t.rating) : ""}</td>
+                    <td className="jz-star-cell">
+                      {t.rating ? "★".repeat(t.rating) : ""}
+                      {t.images?.length ? <span className="jz-cam"> 📷{t.images.length > 1 ? t.images.length : ""}</span> : null}
+                    </td>
                   </tr>
                 );
               })}

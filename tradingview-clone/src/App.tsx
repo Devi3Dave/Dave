@@ -231,7 +231,7 @@ export default function App() {
       {heatmapOpen && <LiqHeatmapView onClose={() => setHeatmapOpen(false)} />}
       {calcOpen && <CalculatorView onClose={() => setCalcOpen(false)} />}
       {screenerOpen && <ScreenerView onClose={() => setScreenerOpen(false)} />}
-      {journalOpen && <JournalView onClose={() => setJournalOpen(false)} />}
+      {journalOpen && <JournalView onClose={() => setJournalOpen(false)} getEngine={getEngine} />}
       {exchangesOpen && <ExchangesView onClose={() => setExchangesOpen(false)} />}
       {rankingsOpen && <RankingsView onClose={() => setRankingsOpen(false)} />}
       {/* Kept mounted while hidden so the conversation survives toggling. */}

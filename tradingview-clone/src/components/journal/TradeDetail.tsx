@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { tradePnl, tradeR, tradeRisk, type JournalTrade } from "../../../shared/journal";
 import { durationMin } from "../../../shared/journalAnalytics";
+import { Screenshots } from "./Screenshots";
 import { fmtDate, longDate, num, signed, tone, type JournalApi } from "./format";
 
 /** 1–5 stars; tapping the set star again clears it. */
@@ -186,6 +187,9 @@ export function TradeDetail({
         <div className="jz-detail-sec jz-two">
           <TagInput label="Tags" values={trade.tags ?? []} known={knownTags} onChange={(v) => patch({ tags: v })} placeholder="Tag hinzufügen" />
           <TagInput label="Fehler" values={trade.mistakes ?? []} known={knownMistakes} onChange={(v) => patch({ mistakes: v })} placeholder="Fehler hinzufügen" bad />
+        </div>
+        <div className="jz-detail-sec">
+          <Screenshots ids={trade.images ?? []} onChange={(v) => patch({ images: v })} chartShot={api.chartShot} />
         </div>
         <div className="jz-detail-sec">
           <div className="calc-field">

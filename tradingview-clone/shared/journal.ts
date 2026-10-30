@@ -32,6 +32,8 @@ export interface JournalTrade {
   mistakes?: string[];
   /** Own grade of the execution, 1–5 stars. */
   rating?: number;
+  /** Ids of attached screenshots; the pictures are in the browser's image store (src/journalImages.ts). */
+  images?: string[];
 }
 
 /**
@@ -223,6 +225,7 @@ export function parseBackup(json: unknown): JournalTrade[] {
       ...(typeof r.playbook === "string" && r.playbook ? { playbook: r.playbook } : {}),
       ...(Array.isArray(r.tags) && strings(r.tags).length ? { tags: strings(r.tags) } : {}),
       ...(Array.isArray(r.mistakes) && strings(r.mistakes).length ? { mistakes: strings(r.mistakes) } : {}),
+      ...(Array.isArray(r.images) && strings(r.images).length ? { images: strings(r.images) } : {}),
       ...(typeof r.rating === "number" && r.rating >= 1 && r.rating <= 5 ? { rating: Math.round(r.rating) } : {}),
     };
     // Journals before the playbooks: the checklist was the Percoco model's.

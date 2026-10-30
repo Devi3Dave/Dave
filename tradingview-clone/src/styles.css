@@ -6066,3 +6066,86 @@ select,
 .jz-note-body {
   min-height: 50vh;
 }
+
+/* journal: screenshots per trade */
+
+.jz-shots {
+  margin-top: 10px;
+}
+
+.jz-shot-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.jz-shot {
+  width: 132px;
+  height: 84px;
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+}
+
+.jz-shot img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.jz-shot em {
+  font-style: normal;
+  font-size: 11px;
+  color: var(--muted);
+  padding: 4px;
+  text-align: center;
+}
+
+.jz-shot-add {
+  border-style: dashed;
+  color: #9db7ff;
+  font-size: 12px;
+}
+
+.jz-cam {
+  color: var(--muted);
+}
+
+.jz-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.88);
+}
+
+.jz-lightbox img {
+  max-width: 100%;
+  max-height: calc(100% - 60px);
+  object-fit: contain;
+  border-radius: 6px;
+}
+
+.jz-lightbox-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: min(900px, 100%);
+  color: var(--text);
+}
+
+.jz-lightbox-bar button {
+  border: 1px solid var(--border);
+  background: var(--panel);
+  min-width: 34px;
+}
