@@ -14,6 +14,22 @@ export interface Release {
  */
 export const CHANGELOG: Release[] = [
   {
+    version: "0.65.0",
+    date: "2026-10-30",
+    title: "Journal neu: Dashboard, Kalender, Tagebuch, Playbooks",
+    changes: [
+      "📒 Das Journal ist umgebaut nach dem Vorbild von TradeZella: oben Tabs für Dashboard, Tagebuch, Trades, Berichte, Playbooks und Notizbuch, dazu ein Zeitraum-, Symbol- und Playbook-Filter für alle Seiten",
+      "Dashboard: Netto-Ergebnis, Erwartungswert, Profit-Faktor, Trefferquote, Tage im Plus und Ø Gewinn/Verlust als Kacheln, ein Journal-Score von 0–100 (aufgebaut wie der Zella Score), kumulierte Kurve und Ergebnis je Tag",
+      "Kalender: jeder Handelstag grün oder rot mit Ergebnis und Anzahl Trades, rechts die Summe jeder Woche; ein Tipp öffnet den Tag",
+      "Tagebuch: jeder Tag mit Kurve, Kennzahlen, seinen Trades und einer Tagesnotiz",
+      "Trade-Ansicht: Tippen auf einen Trade zeigt alle Werte, Playbook-Regeln zum Abhaken, Tags, Fehler, Sterne-Bewertung und Notiz; „Im Chart öffnen“ springt zum Symbol",
+      "Berichte nach Wochentag, Uhrzeit, Monat, Symbol, Long/Short, Playbook, Setup, Tags, Fehlern, Haltedauer, R und Bewertung",
+      "Playbooks: eigene Strategien mit Regeln, je Playbook Ergebnis, Trefferquote und Regeltreue. Die bisherige Percoco-Checkliste ist jetzt das erste Playbook, deine alten Häkchen bleiben erhalten",
+      "Notizbuch mit Ordnern und Vorlagen (Plan vor Handelsbeginn, Tages- und Wochenrückblick, Trading-Plan)",
+      "Import einer CSV-Datei deiner Börse oder deines Brokers; das Backup sichert jetzt auch Playbooks und Notizen. Alle bisherigen Trades bleiben unverändert",
+    ],
+  },
+  {
     version: "0.64.0",
     date: "2026-10-29",
     title: "Heatmap auch für andere Börsen",
