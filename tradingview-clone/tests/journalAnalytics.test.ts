@@ -118,3 +118,36 @@ describe("journal screenshots", () => {
     expect(parseBackup([{ ...t, images: [] }])[0]).not.toHaveProperty("images");
   });
 });
+
+describe("strategy evaluation", () => {
+  const t = (p: Partial<JournalTrade>): JournalTrade => ({ id: Math.random().toString(36), date: "2026-10-01", symbol: "X", side: "long", entry: 100, stop: 95, exit: 110, qty: 10, fees: 0, ...p });
+
+  it("computes the planned reward/risk and keeps the take-profit", async () => {
+    const { plannedRR, journalStats } = await import("../shared/journal");
+    expect(plannedRR(t({ target: 115 }))).toBeCloseTo(3);
+    expect(plannedRR(t({}))).toBeNull();
+    expect(parseBackup([t({ target: 115 })])[0].target).toBe(115);
+    expect(parseTradesCsv(toCsv([t({ target: 115 })])).trades).toHaveLength(1);
+    // +2R, −1R, −1R, +2R: R curve 2 → 1 → 0 → 2, drawdown 2R; win streaks 1.
+    const s = journalStats([t({}), t({ exit: 95 }), t({ exit: 95 }), t({}), t({})]);
+    expect(s.maxDrawdownR).toBeCloseTo(2);
+    expect(s.longestWinningStreak).toBe(2);
+    expect(s.longestLosingStreak).toBe(2);
+  });
+
+  it("separates rule-conform trades from broken rules and mistakes", async () => {
+    const { compliance, complianceStats } = await import("../shared/journalAnalytics");
+    const pbs = DEFAULT_PLAYBOOKS;
+    const all = ["htfFvg", "choch", "ltfFvg"];
+    const clean = t({ playbook: "percoco", checks: all });
+    const broke = t({ playbook: "percoco", checks: ["choch"], exit: 95 });
+    const mistake = t({ playbook: "percoco", checks: all, mistakes: ["FOMO"], exit: 95 });
+    const free = t({});
+    expect([clean, broke, mistake, free].map((x) => compliance(x, pbs))).toEqual(["clean", "broken", "broken", null]);
+    expect(compliance(t({ mistakes: ["FOMO"] }), pbs)).toBe("broken");
+    const c = complianceStats([clean, broke, mistake, free], pbs);
+    expect(c.clean).toMatchObject({ count: 1, net: 100, avgR: 2 });
+    expect(c.broken).toMatchObject({ count: 2, net: -100, avgR: -1 });
+    expect(c.unjudged).toBe(1);
+  });
+});

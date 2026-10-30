@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { type JournalTrade } from "../../../shared/journal";
-import { DURATION_BUCKETS, durationBucket, groupStats, hourOf, R_BUCKETS, rBucket, WEEKDAYS, weekdayOf, type GroupRow } from "../../../shared/journalAnalytics";
+import { compliance, MIN_SAMPLE, DURATION_BUCKETS, durationBucket, groupStats, hourOf, R_BUCKETS, rBucket, WEEKDAYS, weekdayOf, type GroupRow } from "../../../shared/journalAnalytics";
 import { SignedBars } from "./charts";
 import { MONTHS, num, pct, signed, tone, type JournalApi } from "./format";
 
@@ -26,6 +26,16 @@ export function Reports({ api, shown, unit }: { api: JournalApi; shown: JournalT
       { id: "playbook", label: "Playbook", keys: (t) => api.playbooks.find((p) => p.id === t.playbook)?.name ?? "ohne Playbook" },
       { id: "setup", label: "Setup", keys: (t) => t.setup || null, needs: "Setup" },
       { id: "tags", label: "Tags", keys: (t) => t.tags ?? null, needs: "Tags" },
+      {
+        id: "rules",
+        label: "Regeltreue",
+        keys: (t) => {
+          const c = compliance(t, api.playbooks);
+          return c === "clean" ? "regelkonform" : c === "broken" ? "Regel gebrochen / Fehler" : null;
+        },
+        order: ["regelkonform", "Regel gebrochen / Fehler"],
+        needs: "Playbook mit abgehakten Regeln oder Fehler",
+      },
       { id: "mistakes", label: "Fehler", keys: (t) => (t.mistakes?.length ? t.mistakes : "ohne Fehler") },
       { id: "duration", label: "Haltedauer", keys: durationBucket, order: DURATION_BUCKETS, needs: "beide Uhrzeiten" },
       { id: "r", label: "R-Verteilung", keys: rBucket, order: R_BUCKETS, needs: "Stop-Loss" },
@@ -70,6 +80,7 @@ export function Reports({ api, shown, unit }: { api: JournalApi; shown: JournalT
             <h3>Ergebnis nach {dim.label}</h3>
             <div className="calc-chart-title">{unit === "usd" ? "Netto-Ergebnis in $" : "Summe R (nur Trades mit Stop)"}</div>
             <SignedBars bars={rows.map((r) => ({ label: label(r.key), sub: `${r.count} Trades`, value: value(r) }))} fmt={(v) => signed(v, unit === "usd" ? 0 : 1)} height={240} />
+            {rows.some((r) => r.count < MIN_SAMPLE) && <div className="calc-note">⚠ = weniger als {MIN_SAMPLE} Trades: Zufall spielt dort noch eine große Rolle, nicht zu viel hineinlesen.</div>}
             <div className="jr-table-wrap">
               <table className="calc-table jz-table">
                 <thead>
@@ -85,9 +96,12 @@ export function Reports({ api, shown, unit }: { api: JournalApi; shown: JournalT
                 </thead>
                 <tbody>
                   {rows.map((r) => (
-                    <tr key={r.key}>
+                    <tr key={r.key} className={r.count < MIN_SAMPLE ? "jz-few" : undefined}>
                       <td>{label(r.key)}</td>
-                      <td>{r.count}</td>
+                      <td>
+                        {r.count}
+                        {r.count < MIN_SAMPLE && <span title={`unter ${MIN_SAMPLE} Trades: noch nicht belastbar`}> ⚠</span>}
+                      </td>
                       <td>{pct(r.winRate, 0)}</td>
                       <td className={tone(r.net)}>{signed(r.net)} $</td>
                       <td>{num(r.profitFactor)}</td>

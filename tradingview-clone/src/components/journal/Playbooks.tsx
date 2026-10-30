@@ -1,9 +1,9 @@
 import { useState } from "react";
 import type { JournalTrade } from "../../../shared/journal";
-import { playbookStats, type Playbook } from "../../../shared/journalAnalytics";
+import { MIN_SAMPLE, playbookStats, type Playbook } from "../../../shared/journalAnalytics";
 import { newId, num, pct, signed, tone, type JournalApi } from "./format";
 
-function PlaybookEditor({ initial, onSave, onCancel, onDelete }: { initial: Playbook; onSave: (p: Playbook) => void; onCancel: () => void; onDelete?: () => void }) {
+function PlaybookEditor({ initial, used, onSave, onCancel, onDelete }: { initial: Playbook; used?: number; onSave: (p: Playbook) => void; onCancel: () => void; onDelete?: () => void }) {
   const [name, setName] = useState(initial.name);
   const [description, setDescription] = useState(initial.description ?? "");
   const [rules, setRules] = useState(initial.rules);
@@ -22,6 +22,7 @@ function PlaybookEditor({ initial, onSave, onCancel, onDelete }: { initial: Play
       </label>
       <div className="calc-field">
         <span>Regeln (werden pro Trade abgehakt)</span>
+        {!!used && <div className="calc-warn">Schon {used} Trades mit diesem Playbook. Ändere die Regeln nur, wenn du bewusst eine neue Version testen willst – sonst misst du ab jetzt eine andere Strategie. Besser: ein neues Playbook anlegen.</div>}
         {rules.map((r, i) => (
           <div key={r.id} className="jz-rule-row">
             <div className="calc-input">
@@ -87,6 +88,7 @@ export function Playbooks({ api, shown }: { api: JournalApi; shown: JournalTrade
               <PlaybookEditor
                 key={pb.id}
                 initial={pb}
+                used={api.trades.filter((t) => t.playbook === pb.id).length}
                 onSave={save}
                 onCancel={() => setEditing(null)}
                 onDelete={() => {
@@ -106,6 +108,11 @@ export function Playbooks({ api, shown }: { api: JournalApi; shown: JournalTrade
                 </button>
               </h3>
               {pb.description && <p className="jr-muted">{pb.description}</p>}
+              {s.count < MIN_SAMPLE && (
+                <div className="jz-sample" data-tip={"Faustregel: erst ab etwa 30 Trades pro Setup sind die Zahlen halbwegs belastbar, besser 50–100.\nRegeln in dieser Zeit nicht ändern."}>
+                  ⚠ Erst {s.count} von {MIN_SAMPLE} Trades – noch keine belastbare Aussage
+                </div>
+              )}
               <div className="jz-mini jz-mini-row">
                 <span>Trades</span>
                 <strong>{s.count}</strong>

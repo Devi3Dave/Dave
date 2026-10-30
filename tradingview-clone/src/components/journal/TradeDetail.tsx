@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { tradePnl, tradeR, tradeRisk, type JournalTrade } from "../../../shared/journal";
+import { plannedRR, tradePnl, tradeR, tradeRisk, type JournalTrade } from "../../../shared/journal";
 import { durationMin } from "../../../shared/journalAnalytics";
 import { Screenshots } from "./Screenshots";
 import { fmtDate, longDate, num, signed, tone, type JournalApi } from "./format";
@@ -112,6 +112,8 @@ export function TradeDetail({
     ["Haltedauer", durationText(durationMin(trade))],
     ["Einstieg", manual && !trade.entry ? "–" : num(trade.entry)],
     ["Stop-Loss", trade.stop === undefined ? "–" : num(trade.stop)],
+    ["Take-Profit", trade.target === undefined ? "–" : num(trade.target)],
+    ["Geplant Chance : Risiko", plannedRR(trade) === null ? "–" : `1 : ${num(plannedRR(trade)!, 1)}`],
     ["Ausstieg", manual && !trade.exit ? "–" : num(trade.exit)],
     ["Menge", manual && !trade.qty ? "–" : num(trade.qty, 4).replace(/,?0+$/, "")],
     ["Gebühren", `${num(trade.fees || 0)} $`],
