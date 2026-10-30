@@ -887,6 +887,21 @@ textarea {
   background: var(--panel);
 }
 
+/* Pane menu (⇅) between the eye and the gear. */
+.legend-actions .menu {
+  display: inline-block;
+}
+
+.legend-actions .menu-panel {
+  width: 260px;
+}
+
+.legend-actions .menu-panel .menu-item {
+  padding: 7px 8px;
+  font-size: 13px;
+  background: none;
+}
+
 .by-claude {
   color: var(--claude);
   margin-left: 4px;

@@ -29,6 +29,7 @@ import { brickKey as brickOptionsKey, displayBars, hollowStyle, isPriceDriven } 
 import { alignCompare } from "../../shared/compare";
 import { buildFootprints, footprintRowSize } from "../../shared/footprint";
 import { SOURCE_INDICATORS, computeIndicator, getIndicator, resolveParams, type IndicatorDef, type OutputDef } from "../../shared/indicators";
+import { indicatorPaneItems, resolvePanes } from "../../shared/panes";
 import { heikinAshi, type Bar, type Series } from "../../shared/math";
 import { barIndexAt } from "../../shared/replay";
 import { getExchange, tradingDays } from "../../shared/exchanges";
@@ -812,16 +813,28 @@ export class ChartEngine {
 
   private buildIndicators(instances: IndicatorInstance[]) {
     this.clearIndicators();
-    let nextPane = 1;
+    const paneOf = resolvePanes(indicatorPaneItems(instances));
+    // The first indicator of a pane uses the visible price scale; others moved in scale on their own unless shared.
+    const scaleOwner = new Set<number>([0]);
+    const scaleOf = new Map<string, string>();
     for (const instance of instances) {
       const def = getIndicator(instance.type);
       if (!def) continue;
       const params = resolveParams(def, instance.params);
       const isVolume = def.id === "volume";
-      // On another indicator's line: drawn in that indicator's pane.
+      const paneIndex = paneOf.get(instance.id) ?? 0;
+      // On another indicator's line: drawn in that indicator's pane and on its scale.
       const source = instance.source && SOURCE_INDICATORS.has(def.id) ? this.built.find((b) => b.computed.instance.id === instance.source!.id) : undefined;
-      const paneIndex = source ? source.computed.paneIndex : def.overlay || isVolume ? 0 : nextPane++;
-      const series = def.outputs.map((o, k) => this.addOutputSeries(def, o, instance.colors?.[k] ?? o.color, paneIndex, isVolume, !!instance.hidden));
+      let scaleId: string;
+      if (source && source.computed.paneIndex === paneIndex) scaleId = scaleOf.get(source.computed.instance.id) ?? this.side;
+      else if (isVolume && paneIndex === 0) scaleId = "volume";
+      else if (paneIndex === 0 && def.overlay) scaleId = this.side;
+      else if (!scaleOwner.has(paneIndex)) {
+        scaleOwner.add(paneIndex);
+        scaleId = this.side;
+      } else scaleId = instance.sharedScale ? this.side : `ind:${instance.id}`;
+      scaleOf.set(instance.id, scaleId);
+      const series = def.outputs.map((o, k) => this.addOutputSeries(def, o, instance.colors?.[k] ?? o.color, paneIndex, isVolume, !!instance.hidden, scaleId));
 
       if (def.levels && series[0]) {
         for (const price of def.levels) {
@@ -855,14 +868,14 @@ export class ChartEngine {
     this.onLayout();
   }
 
-  private addOutputSeries(def: IndicatorDef, o: OutputDef, color: string, paneIndex: number, isVolume: boolean, hidden: boolean) {
+  private addOutputSeries(def: IndicatorDef, o: OutputDef, color: string, paneIndex: number, isVolume: boolean, hidden: boolean, scaleId: string) {
     const base = {
       visible: !hidden && !o.helper,
       ...(o.noAutoscale ? { autoscaleInfoProvider: () => null } : {}),
       priceLineVisible: false,
       lastValueVisible: !def.overlay && !isVolume,
       title: "",
-      priceScaleId: isVolume ? "volume" : this.side,
+      priceScaleId: scaleId,
     };
     let s: ISeriesApi<SeriesType>;
     if (o.style === "histogram") {
@@ -883,7 +896,8 @@ export class ChartEngine {
         paneIndex,
       );
     }
-    if (isVolume) s.priceScale().applyOptions({ scaleMargins: { top: 0.82, bottom: 0 } });
+    if (scaleId === "volume") s.priceScale().applyOptions({ scaleMargins: { top: 0.82, bottom: 0 } });
+    else if (scaleId.startsWith("ind:")) s.priceScale().applyOptions({ scaleMargins: { top: 0.1, bottom: 0.1 } });
     return s;
   }
 

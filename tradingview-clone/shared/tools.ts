@@ -93,6 +93,16 @@ export const toolSchemas = {
         ),
     }),
   },
+  move_indicator: {
+    description:
+      "Verschiebt einen Indikator in ein anderes Fenster (wie TradingViews „Verschieben nach“), z. B. CVD zum RSI in ein gemeinsames Fenster. Im gemeinsamen Fenster bekommt er eine eigene Skala, außer shared_scale=true.",
+    schema: z.object({
+      id: z.string().describe("Instanz-ID des Indikators."),
+      with: z.string().optional().describe("Instanz-ID eines anderen Indikators: in dessen Fenster legen."),
+      to: z.enum(["up", "down", "new", "main"]).optional().describe("Fenster darüber, darunter, ein neues Fenster oder das Hauptchart."),
+      shared_scale: z.boolean().optional().describe("Skala des ersten Indikators im Fenster mitbenutzen (nur bei ähnlichen Werten, z. B. RSI und Stoch RSI)."),
+    }),
+  },
   remove_indicator: {
     description: "Entfernt einen Indikator per Instanz-ID oder alle mit id='all'.",
     schema: z.object({ id: z.string() }),

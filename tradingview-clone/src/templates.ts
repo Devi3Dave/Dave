@@ -180,7 +180,7 @@ export function snapshotOf(chart: ChartStore, opts: { symbol: boolean; interval:
     ...(opts.symbol || opts.drawings ? { symbol: s.symbol } : {}),
     ...(opts.interval ? { interval: s.interval } : {}),
     chartType: s.chartType,
-    indicators: s.indicators.map(({ type, params, colors, hidden }) => ({ type, params, ...(colors ? { colors } : {}), ...(hidden ? { hidden } : {}) })),
+    indicators: s.indicators.map(({ type, params, colors, hidden, pane, sharedScale }) => ({ type, params, ...(colors ? { colors } : {}), ...(hidden ? { hidden } : {}), ...(pane !== undefined ? { pane } : {}), ...(sharedScale ? { sharedScale } : {}) })),
     // Strategy tester arrows are only shown while its panel is open.
     ...(opts.drawings ? { drawings: s.drawings, markers: s.markers.filter((m) => !m.id.startsWith("strategy-")) } : {}),
   };

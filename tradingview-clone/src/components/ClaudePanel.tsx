@@ -10,6 +10,7 @@ const TOOL_LABELS: Record<string, string> = {
   get_chart_data: "Kursdaten lesen",
   get_indicator_values: "Indikator berechnen",
   add_indicator: "Indikator hinzufügen",
+  move_indicator: "Indikator verschieben",
   remove_indicator: "Indikator entfernen",
   set_chart: "Chart wechseln",
   draw_trendline: "Trendlinie zeichnen",
