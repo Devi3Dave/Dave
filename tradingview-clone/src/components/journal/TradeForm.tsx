@@ -4,6 +4,7 @@ import type { Playbook } from "../../../shared/journalAnalytics";
 import { HelpBox } from "../CalculatorView";
 import type { Help } from "../calcHelp";
 import { newId, num, signed, today, tone } from "./format";
+import { Screenshots } from "./Screenshots";
 import { Stars, TagInput } from "./TradeDetail";
 
 const CALC_KEY = "chartai.calculators.v1";
@@ -44,6 +45,7 @@ interface Draft {
   tags: string[];
   mistakes: string[];
   rating: number;
+  images: string[];
 }
 
 const parseNum = (s: string) => (s.trim() === "" ? undefined : Number(s.trim().replace(/\s/g, "").replace(",", ".")));
@@ -68,6 +70,7 @@ const emptyDraft = (symbol: string, last?: JournalTrade): Draft => ({
   tags: [],
   mistakes: [],
   rating: 0,
+  images: [],
 });
 
 const toDraft = (t: JournalTrade): Draft => ({
@@ -89,6 +92,7 @@ const toDraft = (t: JournalTrade): Draft => ({
   tags: t.tags ?? [],
   mistakes: t.mistakes ?? [],
   rating: t.rating ?? 0,
+  images: t.images ?? [],
 });
 
 /** Turns the form into a trade, or explains what is missing. */
@@ -118,6 +122,7 @@ function fromDraft(d: Draft, id: string, keep?: JournalTrade): JournalTrade | st
     ...(d.tags.length ? { tags: d.tags } : {}),
     ...(d.mistakes.length ? { mistakes: d.mistakes } : {}),
     ...(d.rating ? { rating: d.rating } : {}),
+    ...(d.images.length ? { images: d.images } : {}),
   };
 }
 
@@ -156,6 +161,7 @@ export function TradeForm({
   trades,
   playbooks,
   firstTime,
+  chartShot,
   onSave,
   onClose,
 }: {
@@ -166,6 +172,7 @@ export function TradeForm({
   trades: JournalTrade[];
   playbooks: Playbook[];
   firstTime: boolean;
+  chartShot: () => string | null;
   onSave: (t: JournalTrade, isNew: boolean) => void;
   onClose: () => void;
 }) {
@@ -287,6 +294,7 @@ export function TradeForm({
           </div>
         </div>
 
+        <Screenshots ids={draft.images} onChange={set("images")} chartShot={chartShot} />
         <datalist id="jr-symbols">
           {symbols.map((s) => (
             <option key={s} value={s} />

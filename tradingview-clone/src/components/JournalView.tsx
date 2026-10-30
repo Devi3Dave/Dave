@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { parseBackup, sortTrades, toCsv, tradePnl, type JournalTrade } from "../../shared/journal";
+import type { ChartEngine } from "../chart/ChartEngine";
+import { deleteImage, imagesFor, restoreImages } from "../journalImages";
 import { DEFAULT_PLAYBOOKS, parseNotes, parsePlaybooks, parseTradesCsv, type JournalNotes, type Playbook } from "../../shared/journalAnalytics";
 import { JOURNAL_EVENT, refreshJournaled } from "../demoAccount";
 import { saveFile } from "../saveFile";
@@ -69,7 +71,7 @@ const loadTrades = () => {
   }
 };
 
-export function JournalView({ onClose }: { onClose: () => void }) {
+export function JournalView({ onClose, getEngine }: { onClose: () => void; getEngine: () => ChartEngine | null }) {
   const chartSymbol = useChartState((s) => s.symbol);
   const chartInterval = useChartState((s) => s.interval);
   const [trades, setTrades] = useState<JournalTrade[]>(loadTrades);
@@ -129,7 +131,8 @@ export function JournalView({ onClose }: { onClose: () => void }) {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
+      // An open picture closes first (Screenshots handles that).
+      if (e.key !== "Escape" || document.querySelector(".jz-lightbox")) return;
       if (form) setForm(null);
       else if (detailId) setDetailId(null);
       else return;
@@ -163,6 +166,13 @@ export function JournalView({ onClose }: { onClose: () => void }) {
     updateTrade: (t) => setTrades((list) => list.map((x) => (x.id === t.id ? t : x))),
     setNotes: setNotesState,
     setPlaybooks: setPlaybooksState,
+    chartShot: () => {
+      try {
+        return getEngine()?.screenshot() ?? null;
+      } catch {
+        return null;
+      }
+    },
   };
 
   const symbols = useMemo(() => [...new Set(trades.map((t) => t.symbol).filter(Boolean))].sort(), [trades]);
@@ -197,6 +207,8 @@ export function JournalView({ onClose }: { onClose: () => void }) {
     try {
       const json = JSON.parse(await file.text()) as { playbooks?: unknown; notes?: unknown };
       addImported(parseBackup(json), 0, "dem Backup");
+      const pics = await restoreImages((json as { images?: unknown }).images);
+      if (pics) setNotice((n) => `${n ?? ""} · ${pics} Screenshots`);
       if (Array.isArray(json.playbooks)) {
         const restored = parsePlaybooks(json.playbooks);
         setPlaybooksState((list) => [...list, ...restored.filter((p) => !list.some((x) => x.id === p.id))]);
@@ -261,8 +273,11 @@ export function JournalView({ onClose }: { onClose: () => void }) {
           ⇩ CSV
         </button>
         <button
-          onClick={() => void saveFile(`journal-backup-${today()}.json`, JSON.stringify({ version: 2, trades, playbooks, notes }, null, 2), "application/json")}
-          data-tip={"Sicherung von Trades, Playbooks und Notizen als Datei\nauf dem iPad: „In Dateien sichern“"}
+          onClick={async () => {
+            const images = await imagesFor(trades.flatMap((t) => t.images ?? []));
+            void saveFile(`journal-backup-${today()}.json`, JSON.stringify({ version: 2, trades, playbooks, notes, images }, null, 2), "application/json");
+          }}
+          data-tip={"Sicherung von Trades, Playbooks, Notizen und Screenshots als Datei\nauf dem iPad: „In Dateien sichern“"}
         >
           ⤓ Backup
         </button>
@@ -352,6 +367,7 @@ export function JournalView({ onClose }: { onClose: () => void }) {
             onClose();
           }}
           onDelete={(id) => {
+            for (const img of trades.find((t) => t.id === id)?.images ?? []) void deleteImage(img).catch(() => undefined);
             setTrades((list) => list.filter((t) => t.id !== id));
             setDetailId(null);
             setNotice("Trade gelöscht");
@@ -367,6 +383,7 @@ export function JournalView({ onClose }: { onClose: () => void }) {
           trades={trades}
           playbooks={playbooks}
           firstTime={firstTime}
+          chartShot={api.chartShot}
           onSave={saveTrade}
           onClose={() => setForm(null)}
         />

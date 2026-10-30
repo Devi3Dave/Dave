@@ -36,4 +36,6 @@ export interface JournalApi {
   updateTrade: (t: JournalTrade) => void;
   setNotes: (fn: (n: JournalNotes) => JournalNotes) => void;
   setPlaybooks: (fn: (p: Playbook[]) => Playbook[]) => void;
+  /** JPEG data URL of the chart behind the journal, or null without one. */
+  chartShot: () => string | null;
 }

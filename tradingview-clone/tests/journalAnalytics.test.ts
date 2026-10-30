@@ -109,3 +109,12 @@ describe("journal analytics", () => {
     });
   });
 });
+
+describe("journal screenshots", () => {
+  it("keeps the image ids of a trade through a backup", () => {
+    const t = { id: "s1", date: "2026-10-01", symbol: "BTCUSDT", side: "long" as const, entry: 100, exit: 110, qty: 1, fees: 0, images: ["img-1", "img-2"] };
+    expect(parseBackup([t])[0].images).toEqual(["img-1", "img-2"]);
+    expect(parseBackup([{ ...t, images: [3, "", "img-1", "img-1"] }])[0].images).toEqual(["img-1"]);
+    expect(parseBackup([{ ...t, images: [] }])[0]).not.toHaveProperty("images");
+  });
+});

@@ -14,6 +14,16 @@ export interface Release {
  */
 export const CHANGELOG: Release[] = [
   {
+    version: "0.66.0",
+    date: "2026-10-30",
+    title: "Screenshots im Journal",
+    changes: [
+      "📷 An jeden Trade kannst du jetzt Screenshots anhängen: beim Eintragen oder in der Trade-Ansicht über „＋ Bild“ (Dateien oder Fotos), „📈 Chart aufnehmen“ für den aktuellen Chart, am Mac auch per Hineinziehen oder ⌘V",
+      "Tippen auf ein Bild zeigt es groß, mit ‹ › blätterst du, 🗑 löscht es. In der Trade-Liste zeigt 📷, welche Trades Bilder haben",
+      "Die Bilder werden verkleinert und im Browser gespeichert. Sie reisen nicht mit ☁ Sync (dafür wären sie zu groß), aber mit „⤓ Backup“: das Backup enthält jetzt auch die Screenshots",
+    ],
+  },
+  {
     version: "0.65.0",
     date: "2026-10-30",
     title: "Journal neu: Dashboard, Kalender, Tagebuch, Playbooks",
