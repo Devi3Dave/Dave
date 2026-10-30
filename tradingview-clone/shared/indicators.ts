@@ -56,6 +56,8 @@ export interface IndicatorDef {
   params: ParamDef[];
   outputs: OutputDef[];
   levels?: number[];
+  // Fixed value range given by the formula (RSI, MFI, Stochastic 0–100 …); without it the scale follows the values (CVD, volume …).
+  scale?: { min: number; max: number };
   // Shade the area between two outputs.
   fills?: { upper: string; lower: string; color: string; colorBelow?: string }[];
   compute: (bars: Bar[], p: Record<string, number>) => Record<string, Series>;
@@ -506,6 +508,7 @@ export const INDICATORS: IndicatorDef[] = [
     params: [len(14)],
     outputs: [{ key: "value", label: "MFI", color: "#7e57c2" }],
     levels: [20, 80],
+    scale: { min: 0, max: 100 },
     compute: (b, p) => ({ value: m.mfi(b, p.length) }),
   },
   {
@@ -517,6 +520,7 @@ export const INDICATORS: IndicatorDef[] = [
     params: [len(20)],
     outputs: [{ key: "value", label: "CMF", color: "#43a047" }],
     levels: [0],
+    scale: { min: -1, max: 1 },
     compute: (b, p) => ({ value: m.cmf(b, p.length) }),
   },
 
@@ -533,6 +537,7 @@ export const INDICATORS: IndicatorDef[] = [
       { key: "ma", label: "MA", color: "#ffeb3b", lineWidth: 1 },
     ],
     levels: [30, 50, 70],
+    scale: { min: 0, max: 100 },
     compute: (b, p) => {
       const value = m.rsi(m.closes(b), p.length);
       return { value, ma: m.sma(value, p.maLength) };
@@ -565,6 +570,7 @@ export const INDICATORS: IndicatorDef[] = [
       { key: "hbear", label: "Versteckt bärisch", color: "#f23645", lineWidth: 1, dashed: true, sparse: true },
     ],
     levels: [30, 50, 70],
+    scale: { min: 0, max: 100 },
     fills: [{ upper: "value", lower: "clamp", color: "rgba(242,54,69,0.35)", colorBelow: "rgba(8,153,129,0.35)" }],
     compute: (b, p) => {
       const value = m.rsi(m.closes(b), p.length);
@@ -617,6 +623,7 @@ export const INDICATORS: IndicatorDef[] = [
       { key: "d", label: "%D", color: "#ff6d00" },
     ],
     levels: [20, 80],
+    scale: { min: 0, max: 100 },
     compute: (b, p) => m.stochastic(b, p.k, p.smooth, p.d),
   },
   {
@@ -636,6 +643,7 @@ export const INDICATORS: IndicatorDef[] = [
       { key: "d", label: "%D", color: "#ff6d00" },
     ],
     levels: [20, 80],
+    scale: { min: 0, max: 100 },
     compute: (b, p) => m.stochRsi(m.closes(b), p.rsiLength, p.stochLength, p.k, p.d),
   },
   {
@@ -658,6 +666,7 @@ export const INDICATORS: IndicatorDef[] = [
     params: [len(14)],
     outputs: [{ key: "value", label: "%R", color: "#8e24aa" }],
     levels: [-80, -20],
+    scale: { min: -100, max: 0 },
     compute: (b, p) => ({ value: m.williamsR(b, p.length) }),
   },
   {
@@ -731,6 +740,7 @@ export const INDICATORS: IndicatorDef[] = [
       { key: "minusDI", label: "−DI", color: "#ef5350" },
     ],
     levels: [20, 25],
+    scale: { min: 0, max: 100 },
     compute: (b, p) => m.adx(b, p.length),
   },
 
@@ -1231,6 +1241,7 @@ export const INDICATORS: IndicatorDef[] = [
     ],
     outputs: [{ key: "value", label: "UO", color: "#f44336" }],
     levels: [30, 50, 70],
+    scale: { min: 0, max: 100 },
     compute: (b, p) => ({ value: m.ultimateOscillator(b, p.fast, p.mid, p.slow) }),
   },
   {
@@ -1260,6 +1271,7 @@ export const INDICATORS: IndicatorDef[] = [
       { key: "down", label: "Aroon Down", color: "#2962ff" },
     ],
     levels: [30, 70],
+    scale: { min: 0, max: 100 },
     compute: (b, p) => m.aroon(b, p.length),
   },
   {
@@ -1303,6 +1315,7 @@ export const INDICATORS: IndicatorDef[] = [
     ],
     outputs: [{ key: "value", label: "CRSI", color: "#7e57c2" }],
     levels: [10, 90],
+    scale: { min: 0, max: 100 },
     compute: (b, p) => ({ value: m.connorsRsi(m.closes(b), p.rsi, p.streak, p.rank) }),
   },
   {
@@ -1318,6 +1331,7 @@ export const INDICATORS: IndicatorDef[] = [
     ],
     outputs: [{ key: "value", label: "STC", color: "#26c6da", lineWidth: 2 }],
     levels: [25, 75],
+    scale: { min: 0, max: 100 },
     compute: (b, p) => ({ value: m.schaffTrendCycle(m.closes(b), p.cycle, p.fast, p.slow) }),
   },
   {
@@ -1388,6 +1402,7 @@ export const INDICATORS: IndicatorDef[] = [
     params: [len(14)],
     outputs: [{ key: "value", label: "CHOP", color: "#2962ff" }],
     levels: [38.2, 61.8],
+    scale: { min: 0, max: 100 },
     compute: (b, p) => ({ value: m.choppiness(b, p.length) }),
   },
   {

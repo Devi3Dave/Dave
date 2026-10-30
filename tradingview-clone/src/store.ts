@@ -79,8 +79,6 @@ export interface IndicatorInstance {
   source?: IndicatorSourceRef;
   /** Chart pane chosen with "Verschieben" (0 = price chart); without it each oscillator gets a pane of its own. */
   pane?: number;
-  /** Shares the price scale of the pane's first indicator instead of scaling on its own. */
-  sharedScale?: boolean;
 }
 
 export const BASIC_TOOLS = ["cursor", "trendline", "ray", "hline", "vline", "zone", "fib", "fibext", "channel", "measure", "brush", "text", "long", "short", "erase"] as const;

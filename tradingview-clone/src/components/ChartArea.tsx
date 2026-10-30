@@ -143,7 +143,8 @@ export function ChartArea({ chart, onEngine, magnet, onEditIndicator, onEditPosi
   magnetRef.current = magnet;
   const [hover, setHover] = useState<number | null>(null);
   const [layout, setLayout] = useState<{ top: number; height: number }[]>([]);
-  const [scale, setScale] = useState<{ side: "left" | "right"; width: number }>({ side: "right", width: 0 });
+  /** Widths of the visible price axes, to keep legends and buttons off them. */
+  const [axes, setAxes] = useState<{ left: number; right: number }>({ left: 0, right: 0 });
   const scaleMode = useChart(chart, (s) => s.settings.scaleMode);
   const [computed, setComputed] = useState<ComputedIndicator[]>([]);
 
@@ -201,7 +202,7 @@ export function ChartArea({ chart, onEngine, magnet, onEditIndicator, onEditPosi
       if (engineRef.current !== engine) return;
       setLayout(engine.paneLayout());
       setComputed(engine.computed);
-      setScale({ side: engine.scaleSide, width: engine.priceScaleWidth() });
+      setAxes(engine.axisWidths());
     };
     engine.onLayout = () => requestAnimationFrame(refreshLayout);
 
@@ -578,7 +579,7 @@ export function ChartArea({ chart, onEngine, magnet, onEditIndicator, onEditPosi
     if (!engine) return;
     setLayout(engine.paneLayout());
     setComputed(engine.computed);
-    setScale({ side: engine.scaleSide, width: engine.priceScaleWidth() });
+    setAxes(engine.axisWidths());
   }, [hover, bars]);
 
   const idx = hover !== null && hover >= 0 && hover < bars.length ? hover : bars.length - 1;
@@ -594,9 +595,7 @@ export function ChartArea({ chart, onEngine, magnet, onEditIndicator, onEditPosi
   const paneMenu = (c: ComputedIndicator) => {
     if (!canMovePane(c.instance.type)) return null;
     const moves = availableMoves(paneItems, c.instance.id);
-    // A pane shared with an earlier indicator: this one can use that indicator's price scale.
-    const guest = c.paneIndex > 0 && computed.some((x) => x.paneIndex === c.paneIndex && x !== c && computed.indexOf(x) < computed.indexOf(c) && !x.instance.source) && !c.instance.source;
-    if (!moves.length && !guest) return null;
+    if (!moves.length) return null;
     const label: Record<PaneMove, string> = {
       up: "↑ In das Fenster darüber",
       down: "↓ In das Fenster darunter",
@@ -620,18 +619,6 @@ export function ChartArea({ chart, onEngine, magnet, onEditIndicator, onEditPosi
                 {label[m]}
               </button>
             ))}
-            {guest && (
-              <button
-                className={`menu-item ${c.instance.sharedScale ? "active" : ""}`}
-                data-tip={"Aus: eigene Skala, passt bei ganz anderen Werten (z. B. RSI und CVD)\nAn: gleiche Skala wie der erste Indikator im Fenster (z. B. RSI und Stoch RSI)"}
-                onClick={() => {
-                  updateIndicator(c.instance.id, { sharedScale: !c.instance.sharedScale });
-                  close();
-                }}
-              >
-                {c.instance.sharedScale ? "☑" : "☐"} Skala mit dem Fenster teilen
-              </button>
-            )}
           </>
         )}
       </Menu>
@@ -679,7 +666,7 @@ export function ChartArea({ chart, onEngine, magnet, onEditIndicator, onEditPosi
     <div className={`chart-area tool-${tool}`}>
       <div ref={containerRef} className="chart-container" />
       {layout.map((pane, i) => (
-        <div key={i} className="legend" style={{ top: pane.top + 6, left: scale.side === "left" ? scale.width + 8 : 8 }}>
+        <div key={i} className="legend" style={{ top: pane.top + 6, left: axes.left + 8 }}>
           {i === 0 && (
             <div className="legend-row main">
               <span className="legend-symbol">
@@ -740,7 +727,7 @@ export function ChartArea({ chart, onEngine, magnet, onEditIndicator, onEditPosi
       {layout[0] && (
         <div
           className="scale-bar"
-          style={{ top: layout[0].top + layout[0].height - 28, ...(scale.side === "right" ? { right: scale.width + 6 } : { right: 6 }) }}
+          style={{ top: layout[0].top + layout[0].height - 28, right: axes.right + 6 }}
         >
           <button
             className={scaleMode === "log" ? "active" : ""}

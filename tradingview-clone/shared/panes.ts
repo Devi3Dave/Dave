@@ -104,3 +104,40 @@ export function indicatorPaneItems(instances: { id: string; type: string; pane?:
   }
   return out;
 }
+
+export interface ScaleItem {
+  id: string;
+  pane: number;
+  /** Fixed value range from the indicator definition; indicators with the same range share an axis. */
+  fixed?: { min: number; max: number };
+  /** Drawn on the candles' price scale (moving averages, bands … on the price chart). */
+  onPrice?: boolean;
+  /** Volume on the price chart keeps its own scale at the bottom. */
+  volume?: boolean;
+  sourceId?: string;
+}
+
+/**
+ * Price scale per indicator, like TradingView: in each pane the first scale is the visible axis on the
+ * chosen side ("main"), the second gets the axis on the other side ("other"), further ones scale on their
+ * own without an axis ("own:…"). On the price chart the candles come first. Lines computed on another
+ * indicator use its scale.
+ */
+export function assignScales(items: ScaleItem[]): Map<string, string> {
+  const groups = new Map<number, Map<string, string>>();
+  const out = new Map<string, string>();
+  const slotFor = (pane: number, key: string) => {
+    let g = groups.get(pane);
+    if (!g) groups.set(pane, (g = new Map(pane === 0 ? [["price", "main"]] : [])));
+    if (!g.has(key)) g.set(key, g.size === 0 ? "main" : g.size === 1 ? "other" : `own:${pane}:${key}`);
+    return g.get(key)!;
+  };
+  for (const it of items) {
+    const source = it.sourceId !== undefined ? items.find((x) => x.id === it.sourceId) : undefined;
+    if (source && source.pane === it.pane && out.has(source.id)) out.set(it.id, out.get(source.id)!);
+    else if (it.pane === 0 && it.volume) out.set(it.id, "volume");
+    else if (it.pane === 0 && it.onPrice) out.set(it.id, slotFor(0, "price"));
+    else out.set(it.id, slotFor(it.pane, it.fixed ? `fixed:${it.fixed.min}:${it.fixed.max}` : `auto:${it.id}`));
+  }
+  return out;
+}
