@@ -13,6 +13,8 @@ export interface JournalTrade {
   /** Planned stop-loss; without it the trade has no R value. */
   stop?: number;
   exit: number;
+  /** Planned take-profit; with the stop it gives the planned reward/risk. */
+  target?: number;
   /** Units bought or sold. */
   qty: number;
   fees: number;
@@ -91,6 +93,13 @@ export function tradeR(t: JournalTrade): number | null {
   return risk > 0 ? tradePnl(t) / risk : null;
 }
 
+/** Planned reward ÷ risk from entry, stop and take-profit, or null without both. */
+export function plannedRR(t: JournalTrade): number | null {
+  if (t.stop === undefined || t.target === undefined || !Number.isFinite(t.stop) || !Number.isFinite(t.target)) return null;
+  const risk = Math.abs(t.entry - t.stop);
+  return risk > 0 ? Math.abs(t.target - t.entry) / risk : null;
+}
+
 /** Trades in the order they happened (date, then insertion order). */
 export function sortTrades(trades: JournalTrade[]): JournalTrade[] {
   return trades
@@ -119,7 +128,10 @@ export interface JournalStats {
   rCount: number;
   /** Largest peak-to-trough drop of the cumulative P&L in $. */
   maxDrawdown: number;
+  /** The same drop measured on the cumulative R curve. */
+  maxDrawdownR: number;
   longestLosingStreak: number;
+  longestWinningStreak: number;
   best: number;
   worst: number;
   /** Cumulative P&L after each trade, starting at 0 (length = count + 1). */
@@ -140,16 +152,24 @@ export function journalStats(trades: JournalTrade[]): JournalStats {
   const equityR = [0];
   let peak = 0;
   let maxDrawdown = 0;
+  let peakR = 0;
+  let maxDrawdownR = 0;
   let streak = 0;
   let longestLosingStreak = 0;
+  let winStreak = 0;
+  let longestWinningStreak = 0;
   pnls.forEach((p, i) => {
     const e = equity[equity.length - 1] + p;
     equity.push(e);
     equityR.push(equityR[equityR.length - 1] + (rs[i] ?? 0));
     peak = Math.max(peak, e);
     maxDrawdown = Math.max(maxDrawdown, peak - e);
+    peakR = Math.max(peakR, equityR[equityR.length - 1]);
+    maxDrawdownR = Math.max(maxDrawdownR, peakR - equityR[equityR.length - 1]);
     streak = p < 0 ? streak + 1 : 0;
     longestLosingStreak = Math.max(longestLosingStreak, streak);
+    winStreak = p > 0 ? winStreak + 1 : 0;
+    longestWinningStreak = Math.max(longestWinningStreak, winStreak);
   });
   const withR = rs.filter((r): r is number => r !== null);
   const totalR = withR.reduce((a, b) => a + b, 0);
@@ -170,7 +190,9 @@ export function journalStats(trades: JournalTrade[]): JournalStats {
     avgR: withR.length ? totalR / withR.length : null,
     rCount: withR.length,
     maxDrawdown,
+    maxDrawdownR,
     longestLosingStreak,
+    longestWinningStreak,
     best: pnls.length ? Math.max(...pnls) : 0,
     worst: pnls.length ? Math.min(...pnls) : 0,
     equity,
@@ -178,7 +200,7 @@ export function journalStats(trades: JournalTrade[]): JournalStats {
   };
 }
 
-const CSV_COLUMNS = ["date", "symbol", "side", "entry", "stop", "exit", "qty", "fees", "pnl", "r", "setup", "note", "checks", "time", "exitTime", "tags", "mistakes"] as const;
+const CSV_COLUMNS = ["date", "symbol", "side", "entry", "stop", "exit", "qty", "fees", "pnl", "r", "setup", "note", "checks", "time", "exitTime", "tags", "mistakes", "target"] as const;
 
 /** CSV for spreadsheets (semicolon separated, decimal comma, as German Excel expects). */
 export function toCsv(trades: JournalTrade[]): string {
@@ -188,7 +210,7 @@ export function toCsv(trades: JournalTrade[]): string {
     return /[;"\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
   const rows = sortTrades(trades).map((t) =>
-    [t.date, t.symbol, t.side, t.entry, t.stop, t.exit, t.qty, t.fees, tradePnl(t), tradeR(t), t.setup, t.note, t.checks?.join(","), t.time, t.exitTime, t.tags?.join(","), t.mistakes?.join(",")].map(cell).join(";"),
+    [t.date, t.symbol, t.side, t.entry, t.stop, t.exit, t.qty, t.fees, tradePnl(t), tradeR(t), t.setup, t.note, t.checks?.join(","), t.time, t.exitTime, t.tags?.join(","), t.mistakes?.join(","), t.target].map(cell).join(";"),
   );
   return [CSV_COLUMNS.join(";"), ...rows].join("\n");
 }
@@ -214,6 +236,7 @@ export function parseBackup(json: unknown): JournalTrade[] {
       entry: n(r.entry),
       stop: r.stop === undefined || r.stop === null || r.stop === "" ? undefined : n(r.stop),
       exit: n(r.exit),
+      ...(r.target === undefined || r.target === null || r.target === "" || !Number.isFinite(n(r.target)) ? {} : { target: n(r.target) }),
       qty: n(r.qty),
       fees: Number.isFinite(n(r.fees)) ? n(r.fees) : 0,
       pnl: r.pnl === undefined || r.pnl === null || r.pnl === "" ? undefined : n(r.pnl),

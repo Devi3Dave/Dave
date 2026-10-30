@@ -5,6 +5,12 @@
 
 import { CHECKLIST, PERCOCO_PLAYBOOK, sortTrades, tradePnl, tradeR, type JournalTrade } from "./journal";
 
+/**
+ * Trades per setup before its numbers mean much. 30 is the usual rule of thumb for a sample mean to be roughly
+ * normal (central limit theorem); with trading results that are far from normal, more (50–100) is better.
+ */
+export const MIN_SAMPLE = 30;
+
 // ---------- days ----------
 
 export interface DayResult {
@@ -198,6 +204,36 @@ export function playbookStats(pb: Playbook, trades: JournalTrade[]): PlaybookSta
       const wo = checked.filter((t) => !t.checks!.includes(r.id));
       return { id: r.id, label: r.label, followed: w.length, winWith: w.length ? winRate(w) : null, winWithout: wo.length ? winRate(wo) : null };
     }),
+  };
+}
+
+// ---------- strategy vs. execution ----------
+
+/**
+ * "clean": taken by the playbook with every rule ticked and no mistake; "broken": a rule not ticked or a mistake
+ * tagged; null: nothing to judge (no playbook checklist and no mistakes).
+ */
+export function compliance(t: JournalTrade, playbooks: Playbook[]): "clean" | "broken" | null {
+  if (t.mistakes?.length) return "broken";
+  const pb = playbooks.find((p) => p.id === t.playbook);
+  if (!pb || !pb.rules.length || t.checks === undefined) return null;
+  return pb.rules.every((r) => t.checks!.includes(r.id)) ? "clean" : "broken";
+}
+
+export interface ComplianceStats {
+  clean: GroupRow | null;
+  broken: GroupRow | null;
+  /** Trades that could not be judged. */
+  unjudged: number;
+}
+
+/** Results of the rule-conform trades against those with a broken rule or a mistake: strategy or execution? */
+export function complianceStats(trades: JournalTrade[], playbooks: Playbook[]): ComplianceStats {
+  const rows = groupStats(trades, (t) => compliance(t, playbooks));
+  return {
+    clean: rows.find((r) => r.key === "clean") ?? null,
+    broken: rows.find((r) => r.key === "broken") ?? null,
+    unjudged: trades.filter((t) => compliance(t, playbooks) === null).length,
   };
 }
 

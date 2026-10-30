@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from "react";
-import { tradePnl, tradeR, type JournalTrade, type Side } from "../../../shared/journal";
+import { plannedRR, tradePnl, tradeR, type JournalTrade, type Side } from "../../../shared/journal";
 import type { Playbook } from "../../../shared/journalAnalytics";
 import { HelpBox } from "../CalculatorView";
 import type { Help } from "../calcHelp";
@@ -34,6 +34,7 @@ interface Draft {
   side: Side;
   entry: string;
   stop: string;
+  target: string;
   exit: string;
   qty: string;
   fees: string;
@@ -59,6 +60,7 @@ const emptyDraft = (symbol: string, last?: JournalTrade): Draft => ({
   side: last?.side ?? "long",
   entry: "",
   stop: "",
+  target: "",
   exit: "",
   qty: last ? showNum(last.qty || undefined) : "",
   fees: "",
@@ -81,6 +83,7 @@ const toDraft = (t: JournalTrade): Draft => ({
   side: t.side,
   entry: showNum(t.entry),
   stop: showNum(t.stop),
+  target: showNum(t.target),
   exit: showNum(t.exit),
   qty: showNum(t.qty),
   fees: t.fees ? showNum(t.fees) : "",
@@ -97,7 +100,7 @@ const toDraft = (t: JournalTrade): Draft => ({
 
 /** Turns the form into a trade, or explains what is missing. */
 function fromDraft(d: Draft, id: string, keep?: JournalTrade): JournalTrade | string {
-  const values = { entry: parseNum(d.entry), stop: parseNum(d.stop), exit: parseNum(d.exit), qty: parseNum(d.qty), fees: parseNum(d.fees), pnl: parseNum(d.pnl) };
+  const values = { entry: parseNum(d.entry), stop: parseNum(d.stop), target: parseNum(d.target), exit: parseNum(d.exit), qty: parseNum(d.qty), fees: parseNum(d.fees), pnl: parseNum(d.pnl) };
   const bad = Object.entries(values).find(([, v]) => v !== undefined && !Number.isFinite(v));
   if (bad) return "Bitte nur Zahlen in die Preisfelder eintragen";
   if (!/^\d{4}-\d{2}-\d{2}$/.test(d.date)) return "Bitte ein Datum wählen";
@@ -110,6 +113,7 @@ function fromDraft(d: Draft, id: string, keep?: JournalTrade): JournalTrade | st
     side: d.side,
     entry: values.entry ?? 0,
     stop: values.stop,
+    ...(values.target !== undefined ? { target: values.target } : {}),
     exit: values.exit ?? 0,
     qty: values.qty ?? 0,
     fees: values.fees ?? 0,
@@ -182,7 +186,7 @@ export function TradeForm({
 
   const preview = useMemo(() => {
     const t = fromDraft(draft, "preview");
-    return typeof t === "string" ? null : { pnl: tradePnl(t), r: tradeR(t) };
+    return typeof t === "string" ? null : { pnl: tradePnl(t), r: tradeR(t), rr: plannedRR(t) };
   }, [draft]);
 
   const symbols = useMemo(() => [...new Set([chartSymbol, ...trades.map((t) => t.symbol).filter(Boolean)])].sort(), [trades, chartSymbol]);
@@ -244,6 +248,9 @@ export function TradeForm({
           </Field>
           <Field label="Stop-Loss">
             <TextInput decimal value={draft.stop} onChange={set("stop")} unit="$" placeholder="für R" />
+          </Field>
+          <Field label="Take-Profit">
+            <TextInput decimal value={draft.target} onChange={set("target")} unit="$" placeholder="geplant" />
           </Field>
           <Field label="Ausstieg">
             <TextInput decimal value={draft.exit} onChange={set("exit")} unit="$" />
@@ -319,6 +326,7 @@ export function TradeForm({
               <>
                 Ergebnis <strong className={tone(preview.pnl)}>{signed(preview.pnl)} $</strong>
                 {preview.r !== null && <strong className={tone(preview.r)}> · {signed(preview.r)} R</strong>}
+                {preview.rr !== null && <span className="jr-muted"> · geplant 1 : {num(preview.rr, 1)}</span>}
               </>
             ) : (
               <span className="jr-muted">Ergebnis erscheint beim Eintippen</span>

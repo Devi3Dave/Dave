@@ -14,6 +14,18 @@ export interface Release {
  */
 export const CHANGELOG: Release[] = [
   {
+    version: "0.68.0",
+    date: "2026-10-30",
+    title: "Journal: Strategie oder Ausführung?",
+    changes: [
+      "Neue Karte im Journal-Dashboard: regelkonforme Trades (alle Playbook-Regeln abgehakt, kein Fehler) gegen Trades mit gebrochener Regel oder Fehler – Trefferquote, Erwartungswert in R, Profit-Faktor, Netto. So siehst du, ob die Strategie oder die Ausführung das Problem ist",
+      "Take-Profit pro Trade eintragen; das Journal zeigt das geplante Chance-Risiko-Verhältnis",
+      "Erwartungswert wahlweise in R (Schalter $/R), max. Drawdown jetzt auch in R, dazu die längste Gewinnserie",
+      "Hinweis bei zu wenig Daten: Playbooks und Berichte markieren alles unter 30 Trades (Faustregel), beim Ändern der Regeln eines benutzten Playbooks kommt eine Warnung",
+      "Neuer Bericht „Regeltreue“",
+    ],
+  },
+  {
     version: "0.67.0",
     date: "2026-10-30",
     title: "Indikatoren in ein Fenster verschieben",
