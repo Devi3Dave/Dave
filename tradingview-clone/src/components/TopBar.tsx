@@ -369,118 +369,119 @@ export function TopBar({ onOpenIndicators, onOpenSettings, onOpenShortcuts, heat
   useShortcutOverrides();
 
   return (
-    <header className="topbar">
-      <div className="brand">
-        <span className="logo">◢</span> <span className="brand-name">ChartAI</span>
-        <VersionMenu />
-      </div>
-      <div className="symbol-picker">
-        <AssetMenu onOpenSearch={() => setSearchOpen(true)} />
-        <button className="pill" onClick={() => setSearchOpen(true)} aria-label="Assets suchen" data-tip={`Assets suchen${keys("dialog.search")}\nNach Rubriken, mit Favoriten`}>
-          🔍
+    <header className="topbar-shell">
+      <div className="topbar">
+        <div className="brand">
+          <span className="logo">◢</span> <span className="brand-name">ChartAI</span>
+          <VersionMenu />
+        </div>
+        <div className="symbol-picker">
+          <AssetMenu onOpenSearch={() => setSearchOpen(true)} />
+          <button className="pill" onClick={() => setSearchOpen(true)} aria-label="Assets suchen" data-tip={`Assets suchen${keys("dialog.search")}\nNach Rubriken, mit Favoriten`}>
+            🔍
+          </button>
+          <button
+            className={`pill ${compareCount ? "active" : ""}`}
+            onClick={() => setCompareOpen(true)}
+            disabled={compareCount >= MAX_COMPARE}
+            aria-label="Symbol vergleichen"
+            data-tip={`Symbol vergleichen\nWeitere Kurse als Linie über den Chart legen, Preisachse in Prozent (bis ${MAX_COMPARE})`}
+          >
+            ⊕{compareCount > 0 && <span className="al-count">{compareCount}</span>}
+          </button>
+          <RefreshButton />
+        </div>
+        {searchOpen && <AssetSearchDialog onClose={() => setSearchOpen(false)} />}
+        {compareOpen && <AssetSearchDialog title="Symbol vergleichen" onSelect={(symbol) => addCompare(symbol)} onClose={() => setCompareOpen(false)} />}
+        <MicaDialog />
+        <VenueCheckDialog />
+        {showPrice && last && (
+          <div className="header-price" data-tip={"Aktueller Kurs\nVeränderung über 24 Stunden (bei Tages-/Wochenchart zur Vorkerze)"}>
+            <strong className={change !== null && change < 0 ? "down" : "up"}>{formatPrice(last.close)}</strong>
+            {change !== null && (
+              <span className={change < 0 ? "down" : "up"}>
+                {change >= 0 ? "+" : ""}
+                {change.toFixed(2)}%
+              </span>
+            )}
+          </div>
+        )}
+        <div className="group intervals-full">
+          {MAIN_INTERVALS.map((iv) => (
+            <button key={iv} className={iv === interval ? "active" : ""} onClick={() => loadChart(symbol, iv)} data-tip={`Zeiteinheit: ${intervalLabel(iv)}`}>
+              {shortLabel(iv)}
+            </button>
+          ))}
+          {!(MAIN_INTERVALS as readonly string[]).includes(interval) && (
+            <button className="active" data-tip={`Zeiteinheit: ${intervalLabel(interval)}`}>
+              {shortLabel(interval)}
+            </button>
+          )}
+          <IntervalMenu className="intervals-more" label="▾" />
+        </div>
+        <IntervalMenu className="intervals-compact" />
+        <select value={chartType} onChange={(e) => store.set({ chartType: e.target.value as ChartType })} aria-label="Charttyp" data-tip="Charttyp">
+          {CHART_TYPE_GROUPS.map(([group, types]) => (
+            <optgroup key={group} label={group}>
+              {types.map(([t, label]) => (
+                <option key={t} value={t}>
+                  {label}
+                </option>
+              ))}
+            </optgroup>
+          ))}
+        </select>
+        <button className="pill" onClick={onOpenIndicators} aria-label="Indikatoren" data-tip={`Indikatoren hinzufügen${keys("dialog.indicators")}\n${INDICATORS.length} verfügbar`}>
+          <span className="pill-icon">ƒx</span>
+          <span className="pill-label"> Indikatoren</span>
         </button>
         <button
-          className={`pill ${compareCount ? "active" : ""}`}
-          onClick={() => setCompareOpen(true)}
-          disabled={compareCount >= MAX_COMPARE}
-          aria-label="Symbol vergleichen"
-          data-tip={`Symbol vergleichen\nWeitere Kurse als Linie über den Chart legen, Preisachse in Prozent (bis ${MAX_COMPARE})`}
+          className={`pill ${replaying ? "active" : ""}`}
+          onClick={() => (replaying ? exitReplay() : startReplay())}
+          aria-label="Replay"
+          data-tip={replaying ? "Replay beenden, zurück zum Live-Chart" : "Bar-Replay\nStartkerze wählen und den Chart Kerze für Kerze abspielen\nMit eigenem Replay-Konto zum Üben"}
         >
-          ⊕{compareCount > 0 && <span className="al-count">{compareCount}</span>}
+          <span className="pill-icon">⏪</span>
+          <span className="pill-label"> Replay</span>
         </button>
-        <RefreshButton />
+        <FavoritesMenu />
+        <SavedLayoutMenu />
+        <TemplatesMenu />
+        <LayoutMenu />
+        <button className="pill" onClick={onOpenShortcuts} aria-label="Tastenkürzel" data-tip={`Tastenkürzel${keys("dialog.shortcuts")}\nAlle Kürzel nachschlagen, ändern und neu belegen`}>
+          ⌨
+        </button>
+        <button className="pill" onClick={onOpenSettings} aria-label="Chart-Einstellungen" data-tip={"Chart-Einstellungen\nAchsen, Kurslabel, Countdown, Zeitzone, Gitter"}>
+          ⚙
+        </button>
+        <SyncButton />
+        <DemoButton active={demoOpen} onClick={onToggleDemo} />
+        <button className={`pill ${alertsOpen ? "active" : ""}`} onClick={onToggleAlerts} aria-label="Alarme" data-tip={`Alarme${keys("panel.alerts")}\nPreis, Indikator, Linie oder Zone – mit Ton und Hinweis`}>
+          <span className="pill-icon">🔔</span>
+          <span className="pill-label"> Alarme</span>
+          {activeAlerts > 0 && <span className="al-count">{activeAlerts}</span>}
+        </button>
+        <button className={`pill ${heatmapOpen ? "active" : ""}`} onClick={onToggleHeatmap} aria-label="Heatmap" data-tip={"Liquidations-Heatmap im CoinGlass-Stil\nVollbild mit Zeiträumen von 12 h bis 1 Jahr"}>
+          <span className="pill-icon">🔥</span>
+          <span className="pill-label"> Heatmap</span>
+        </button>
+        <button className={`pill ${calcOpen ? "active" : ""}`} onClick={onToggleCalc} aria-label="Rechner" data-tip={"Trading-Rechner\nPositionsgröße, Erwartungswert, R-Multiple, Fibonacci, Hebel"}>
+          <span className="pill-icon">🧮</span>
+          <span className="pill-label"> Rechner</span>
+        </button>
+        <button className={`pill ${journalOpen ? "active" : ""}`} onClick={onToggleJournal} aria-label="Journal" data-tip={"Trading-Journal\nTrades eintragen, Equity-Kurve: bin ich profitabel?"}>
+          <span className="pill-icon">📒</span>
+          <span className="pill-label"> Journal</span>
+        </button>
+        <button className={`pill ${exchangesOpen ? "active" : ""}`} onClick={onToggleExchanges} aria-label="Börsen" data-tip={"Börsenzeiten\nÖffnungszeiten der großen Börsen in deiner Zeitzone\nAusgewählte Börsen erscheinen im Chart"}>
+          <span className="pill-icon">🕐</span>
+          <span className="pill-label"> Börsen</span>
+        </button>
+        <button className={`pill ${rankingsOpen ? "active" : ""}`} onClick={onToggleRankings} aria-label="Rankings" data-tip={`Krypto-Rankings wie CoinMarketCap${keys("page.rankings")}\nMarktkapitalisierung, Rang, Volumen, Dominanz`}>
+          <span className="pill-icon">🏆</span>
+          <span className="pill-label"> Rankings</span>
+        </button>
       </div>
-      {searchOpen && <AssetSearchDialog onClose={() => setSearchOpen(false)} />}
-      {compareOpen && <AssetSearchDialog title="Symbol vergleichen" onSelect={(symbol) => addCompare(symbol)} onClose={() => setCompareOpen(false)} />}
-      <MicaDialog />
-      <VenueCheckDialog />
-      {showPrice && last && (
-        <div className="header-price" data-tip={"Aktueller Kurs\nVeränderung über 24 Stunden (bei Tages-/Wochenchart zur Vorkerze)"}>
-          <strong className={change !== null && change < 0 ? "down" : "up"}>{formatPrice(last.close)}</strong>
-          {change !== null && (
-            <span className={change < 0 ? "down" : "up"}>
-              {change >= 0 ? "+" : ""}
-              {change.toFixed(2)}%
-            </span>
-          )}
-        </div>
-      )}
-      <div className="group intervals-full">
-        {MAIN_INTERVALS.map((iv) => (
-          <button key={iv} className={iv === interval ? "active" : ""} onClick={() => loadChart(symbol, iv)} data-tip={`Zeiteinheit: ${intervalLabel(iv)}`}>
-            {shortLabel(iv)}
-          </button>
-        ))}
-        {!(MAIN_INTERVALS as readonly string[]).includes(interval) && (
-          <button className="active" data-tip={`Zeiteinheit: ${intervalLabel(interval)}`}>
-            {shortLabel(interval)}
-          </button>
-        )}
-        <IntervalMenu className="intervals-more" label="▾" />
-      </div>
-      <IntervalMenu className="intervals-compact" />
-      <select value={chartType} onChange={(e) => store.set({ chartType: e.target.value as ChartType })} aria-label="Charttyp" data-tip="Charttyp">
-        {CHART_TYPE_GROUPS.map(([group, types]) => (
-          <optgroup key={group} label={group}>
-            {types.map(([t, label]) => (
-              <option key={t} value={t}>
-                {label}
-              </option>
-            ))}
-          </optgroup>
-        ))}
-      </select>
-      <button className="pill" onClick={onOpenIndicators} aria-label="Indikatoren" data-tip={`Indikatoren hinzufügen${keys("dialog.indicators")}\n${INDICATORS.length} verfügbar`}>
-        <span className="pill-icon">ƒx</span>
-        <span className="pill-label"> Indikatoren</span>
-      </button>
-      <button
-        className={`pill ${replaying ? "active" : ""}`}
-        onClick={() => (replaying ? exitReplay() : startReplay())}
-        aria-label="Replay"
-        data-tip={replaying ? "Replay beenden, zurück zum Live-Chart" : "Bar-Replay\nStartkerze wählen und den Chart Kerze für Kerze abspielen\nMit eigenem Replay-Konto zum Üben"}
-      >
-        <span className="pill-icon">⏪</span>
-        <span className="pill-label"> Replay</span>
-      </button>
-      <FavoritesMenu />
-      <SavedLayoutMenu />
-      <TemplatesMenu />
-      <LayoutMenu />
-      <button className="pill" onClick={onOpenShortcuts} aria-label="Tastenkürzel" data-tip={`Tastenkürzel${keys("dialog.shortcuts")}\nAlle Kürzel nachschlagen, ändern und neu belegen`}>
-        ⌨
-      </button>
-      <button className="pill" onClick={onOpenSettings} aria-label="Chart-Einstellungen" data-tip={"Chart-Einstellungen\nAchsen, Kurslabel, Countdown, Zeitzone, Gitter"}>
-        ⚙
-      </button>
-      <SyncButton />
-      <DemoButton active={demoOpen} onClick={onToggleDemo} />
-      <button className={`pill ${alertsOpen ? "active" : ""}`} onClick={onToggleAlerts} aria-label="Alarme" data-tip={`Alarme${keys("panel.alerts")}\nPreis, Indikator, Linie oder Zone – mit Ton und Hinweis`}>
-        <span className="pill-icon">🔔</span>
-        <span className="pill-label"> Alarme</span>
-        {activeAlerts > 0 && <span className="al-count">{activeAlerts}</span>}
-      </button>
-      <button className={`pill ${heatmapOpen ? "active" : ""}`} onClick={onToggleHeatmap} aria-label="Heatmap" data-tip={"Liquidations-Heatmap im CoinGlass-Stil\nVollbild mit Zeiträumen von 12 h bis 1 Jahr"}>
-        <span className="pill-icon">🔥</span>
-        <span className="pill-label"> Heatmap</span>
-      </button>
-      <button className={`pill ${calcOpen ? "active" : ""}`} onClick={onToggleCalc} aria-label="Rechner" data-tip={"Trading-Rechner\nPositionsgröße, Erwartungswert, R-Multiple, Fibonacci, Hebel"}>
-        <span className="pill-icon">🧮</span>
-        <span className="pill-label"> Rechner</span>
-      </button>
-      <button className={`pill ${journalOpen ? "active" : ""}`} onClick={onToggleJournal} aria-label="Journal" data-tip={"Trading-Journal\nTrades eintragen, Equity-Kurve: bin ich profitabel?"}>
-        <span className="pill-icon">📒</span>
-        <span className="pill-label"> Journal</span>
-      </button>
-      <button className={`pill ${exchangesOpen ? "active" : ""}`} onClick={onToggleExchanges} aria-label="Börsen" data-tip={"Börsenzeiten\nÖffnungszeiten der großen Börsen in deiner Zeitzone\nAusgewählte Börsen erscheinen im Chart"}>
-        <span className="pill-icon">🕐</span>
-        <span className="pill-label"> Börsen</span>
-      </button>
-      <button className={`pill ${rankingsOpen ? "active" : ""}`} onClick={onToggleRankings} aria-label="Rankings" data-tip={`Krypto-Rankings wie CoinMarketCap${keys("page.rankings")}\nMarktkapitalisierung, Rang, Volumen, Dominanz`}>
-        <span className="pill-icon">🏆</span>
-        <span className="pill-label"> Rankings</span>
-      </button>
-      <div className="spacer" />
       <button className={`pill claude-toggle ${claudeOpen ? "active" : ""}`} onClick={onToggleClaude} aria-label="Claude" data-tip={"Seitenleiste ein-/ausblenden\nClaude, Orderbuch, Liquidationen"}>
         <span className="pill-icon">✦</span>
         <span className="pill-label"> Claude</span>

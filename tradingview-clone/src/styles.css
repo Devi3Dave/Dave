@@ -83,17 +83,32 @@ textarea {
     "tools chart claude";
 }
 
-.topbar {
+/* The top bar: the scrollable/wrapping button row plus the sidebar toggle, which stays pinned at the right edge. */
+.topbar-shell {
   grid-area: top;
+  display: flex;
+  align-items: stretch;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+  min-width: 0;
+}
+
+.topbar {
+  flex: 1;
   min-height: 42px;
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 0 10px;
-  border-bottom: 1px solid var(--border);
-  background: var(--bg);
   min-width: 0;
   overflow-x: auto;
+}
+
+.topbar-shell > .claude-toggle {
+  flex: none;
+  align-self: center;
+  margin: 0 10px 0 2px;
+  white-space: nowrap;
 }
 
 .brand {
@@ -1421,7 +1436,7 @@ select,
   touch-action: manipulation;
 }
 
-.topbar,
+.topbar-shell,
 .toolbar,
 .legend,
 .claude-head {
@@ -1449,8 +1464,8 @@ select,
     font-size: 18px;
   }
 
-  .topbar button,
-  .topbar select {
+  .topbar-shell button,
+  .topbar-shell select {
     min-height: 36px;
     padding: 6px 10px;
   }

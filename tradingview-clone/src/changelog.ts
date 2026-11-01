@@ -14,6 +14,14 @@ export interface Release {
  */
 export const CHANGELOG: Release[] = [
   {
+    version: "0.70.0",
+    date: "2026-11-01",
+    title: "Seitenleisten-Knopf fest am rechten Rand",
+    changes: [
+      "Der Knopf ✦ zum Ein- und Ausblenden der rechten Seitenleiste sitzt jetzt fest am rechten Bildschirmrand und scrollt nicht mehr mit der oberen Leiste mit. Kein Scrollen bis ganz nach rechts mehr nötig, auf Mac und iPad",
+    ],
+  },
+  {
     version: "0.69.0",
     date: "2026-10-30",
     title: "Feste Skalen und eigene Achsen",
