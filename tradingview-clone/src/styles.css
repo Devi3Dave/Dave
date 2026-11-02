@@ -6218,3 +6218,127 @@ select,
 .jz-few td {
   color: var(--muted);
 }
+
+/* ---------------- Axis settings (visible time span, price range) ---------------- */
+
+.axis-modal {
+  width: min(460px, calc(100vw - 32px));
+}
+
+.axis-body {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 4px 16px 12px;
+  max-height: calc(100vh - 160px);
+  overflow-y: auto;
+}
+
+.axis-body section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.axis-body h3 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.axis-tabs {
+  display: flex;
+  gap: 4px;
+}
+
+.axis-tabs button,
+.axis-presets button {
+  padding: 6px 10px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text);
+  font-size: 12px;
+}
+
+.axis-tabs button.active,
+.axis-presets button.active {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.axis-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.axis-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.axis-label {
+  font-size: 12px;
+  color: var(--muted);
+  align-self: center;
+}
+
+.axis-row input,
+.axis-row select,
+.axis-window input {
+  padding: 7px 9px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text);
+  color-scheme: dark;
+  font-size: 13px;
+}
+
+.axis-row > button {
+  padding: 7px 12px;
+}
+
+.axis-num {
+  width: 70px;
+}
+
+.axis-price {
+  width: 110px;
+}
+
+.axis-inline {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.axis-window {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.axis-window label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.axis-dt {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.axis-window .axis-row {
+  justify-content: space-between;
+  align-items: center;
+}

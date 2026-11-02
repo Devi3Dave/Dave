@@ -19,6 +19,7 @@ import { activeChart, addDrawing, moveIndicatorPane, newId, pickReplayStart, rem
 import { cloneInPlace, copyDrawing, deleteDrawing, pasteDrawing, redoDrawings, replaceDrawing, selectDrawing, selectedDrawing, trackHistory, undoDrawings, useSelectedDrawing } from "../drawingEdit";
 import { shortcutLabel, useShortcuts } from "../shortcuts";
 import { OPEN_GOTO_EVENT } from "./GoToDateDialog";
+import { OPEN_AXIS_EVENT } from "./AxisRangeDialog";
 import { cloneDrawing, hasMovableAnchors, moveAnchor, shiftDrawing } from "../drawingOps";
 import { DrawingMenu, type MenuTarget } from "./DrawingMenu";
 import { FreshnessBadge } from "./FreshnessBadge";
@@ -745,6 +746,9 @@ export function ChartArea({ chart, onEngine, magnet, onEditIndicator, onEditPosi
           </button>
           <button onClick={() => window.dispatchEvent(new Event(OPEN_GOTO_EVENT))} aria-label="Gehe zu Datum" data-tip={`Gehe zu Datum${shortcutLabel("chart.goto") ? ` (${shortcutLabel("chart.goto")})` : ""}`}>
             📅
+          </button>
+          <button onClick={() => window.dispatchEvent(new Event(OPEN_AXIS_EVENT))} aria-label="Achsen einstellen" data-tip={"Achsen einstellen\nSichtbaren Zeitraum (z. B. 2 Tage, 2 Std, 15 Min) und Preisbereich festlegen"}>
+            ⇔
           </button>
           <button onClick={() => engineRef.current?.autoScale()} data-tip={"Auto-Skalierung\nPreisachse wieder an die sichtbaren Kerzen anpassen"}>
             A
