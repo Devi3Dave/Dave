@@ -36,6 +36,8 @@ export interface ChartSettings {
   rangeSize: number;
   /** Footprint cells (bought/sold volume per price row) over the candles. */
   footprint: boolean;
+  /** Time the x axis shows when the chart loads or is reset, in seconds; 0 = the latest ~160 candles. */
+  viewSpan: number;
 }
 
 export const DEFAULT_SETTINGS: ChartSettings = {
@@ -61,6 +63,7 @@ export const DEFAULT_SETTINGS: ChartSettings = {
   pnfSource: "hl",
   rangeSize: 0,
   footprint: false,
+  viewSpan: 0,
 };
 
 export const TIME_ZONES: { id: string; label: string }[] = [

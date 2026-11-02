@@ -14,6 +14,18 @@ export interface Release {
  */
 export const CHANGELOG: Release[] = [
   {
+    version: "0.71.0",
+    date: "2026-11-02",
+    title: "Achsen einstellen: Zeitraum und Preisbereich",
+    changes: [
+      "Neuer Knopf ⇔ unten an der Preisachse öffnet „Achsen einstellen“",
+      "Zeitachse (X): sichtbaren Zeitraum wählen, z. B. 15 Min, 2 Std, 2 Tage, 1 Monat oder 1 Jahr, oder frei mit Zahl und Einheit (Minuten bis Jahre). Der Zeitraum bleibt beim Wechsel von Symbol oder Zeiteinheit und bei ⟲ erhalten; „Standard“ zeigt wieder die letzten rund 160 Kerzen",
+      "Zeitachse „Von – Bis“: einen festen Ausschnitt mit Datum und Uhrzeit anzeigen",
+      "Preisachse (Y): Auto oder manuell mit Min und Max; ⤓ übernimmt den gerade sichtbaren Bereich. „A“ schaltet wieder auf Auto",
+      "Hinweise, wenn der Zeitraum kürzer als wenige Kerzen ist oder mehr Verlauf verlangt, als geladen ist",
+    ],
+  },
+  {
     version: "0.70.0",
     date: "2026-11-01",
     title: "Seitenleisten-Knopf fest am rechten Rand",

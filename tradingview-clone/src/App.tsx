@@ -17,6 +17,7 @@ import { SidePanel, type SideTab } from "./components/SidePanel";
 import { TooltipLayer } from "./components/Tooltip";
 import { ShortcutsDialog } from "./components/ShortcutsDialog";
 import { GoToDateDialog, OPEN_GOTO_EVENT } from "./components/GoToDateDialog";
+import { AxisRangeDialog, OPEN_AXIS_EVENT } from "./components/AxisRangeDialog";
 import { OPEN_SAVE_LAYOUT_EVENT } from "./components/LayoutMenu";
 import { saveLayout, startLayoutWatch } from "./layouts";
 import { TopBar } from "./components/TopBar";
@@ -40,7 +41,13 @@ export default function App() {
   const [magnet, setMagnet] = useState(true);
   const [sideTab, setSideTab] = useState<SideTab>("claude");
   const [gotoOpen, setGotoOpen] = useState(false);
+  const [axisOpen, setAxisOpen] = useState(false);
   useEffect(() => startLayoutWatch(), []);
+  useEffect(() => {
+    const open = () => setAxisOpen(true);
+    window.addEventListener(OPEN_AXIS_EVENT, open);
+    return () => window.removeEventListener(OPEN_AXIS_EVENT, open);
+  }, []);
   useEffect(() => {
     const open = () => setGotoOpen(true);
     window.addEventListener(OPEN_GOTO_EVENT, open);
@@ -257,6 +264,7 @@ export default function App() {
       {showSettings && <ChartSettingsDialog onClose={() => setShowSettings(false)} />}
       {shortcutsOpen && <ShortcutsDialog onClose={() => setShortcutsOpen(false)} />}
       {gotoOpen && <GoToDateDialog getEngine={getEngine} onClose={() => setGotoOpen(false)} />}
+      {axisOpen && <AxisRangeDialog getEngine={getEngine} onClose={() => setAxisOpen(false)} />}
       <AlertToasts onOpen={() => {
         closePages();
         openAlerts();

@@ -1,4 +1,5 @@
 import { findBarForDate, type GoToResult } from "../../shared/goToDate";
+import { windowForSpan, windowForTimes, type TimeWindow } from "../../shared/viewRange";
 import {
   AreaSeries,
   BarSeries,
@@ -148,6 +149,8 @@ export class ChartEngine {
   private compareSeries = new Map<string, { series: ISeriesApi<"Line">; side: string }>();
   private compareKey = "";
   private scaleSettings: ChartSettings | null = null;
+  /** Seconds the x axis shows after loading or reset (0 = latest ~160 candles). */
+  private viewSpan = 0;
 
   onCrosshair: (logical: number | null, point: PointerEvent | null) => void = () => {};
   onClick: (e: PointerEvent) => void = () => {};
@@ -428,8 +431,16 @@ export class ChartEngine {
       else this.setMainData();
       if ((symbolKey !== this.symbolKey || typeChanged) && this.bars.length > 0) {
         this.symbolKey = symbolKey;
+        this.viewSpan = s.settings.viewSpan;
         this.showDefaultRange();
+        // A manual price range belongs to one symbol and timeframe.
+        this.autoScale();
       }
+    }
+    // A new span from the axis settings shows at once.
+    if (s.settings.viewSpan !== this.viewSpan && this.bars.length > 0) {
+      this.viewSpan = s.settings.viewSpan;
+      this.showDefaultRange();
     }
 
     const indicatorKey = JSON.stringify(s.indicators);
@@ -752,11 +763,57 @@ export class ChartEngine {
     this.autoScale();
   }
 
-  /** The latest ~160 candles; "all" shows the whole history, short histories keep a readable candle width. */
+  /** The chosen span, otherwise the latest ~160 candles; "all" shows the whole history, short histories keep a readable candle width. */
   private showDefaultRange() {
     const n = this.bars.length;
+    if (this.viewSpan > 0 && this.interval !== "all") {
+      const w = windowForSpan(this.bars, this.viewSpan);
+      if (w) return this.chart.timeScale().setVisibleLogicalRange({ from: w.from, to: w.to });
+    }
     const from = this.interval === "all" ? -1 : n - Math.max(40, Math.min(160, n + 2));
     this.chart.timeScale().setVisibleLogicalRange({ from, to: n + (this.interval === "all" ? 2 : 8) });
+  }
+
+  /** What a span would show on the loaded candles (for the axis dialog's hints). */
+  spanWindow(seconds: number): TimeWindow | null {
+    return windowForSpan(this.bars, seconds);
+  }
+
+  /** Shows the candles from `from` to `to` (unix seconds); null when no candle lies in between. */
+  showTimes(from: number, to: number): TimeWindow | null {
+    if (this.destroyed || !this.bars.length) return null;
+    const n = this.bars.length;
+    if (to <= this.bars[0].time || from > this.bars[n - 1].time) return null;
+    const w = windowForTimes(this.bars, from, to);
+    if (w) this.chart.timeScale().setVisibleLogicalRange({ from: w.from, to: w.to });
+    return w;
+  }
+
+  /** First and last loaded candle times. */
+  loadedTimes(): { first: number; last: number } | null {
+    const n = this.bars.length;
+    return n ? { first: this.bars[0].time, last: this.bars[n - 1].time } : null;
+  }
+
+  /** Fixes the price axis to min…max (in price units; percent/indexed scales use their own units). */
+  setPriceRange(min: number, max: number) {
+    if (this.destroyed || !this.main) return;
+    const scale = this.chart.priceScale(this.side, 0);
+    scale.setAutoScale(false);
+    scale.setVisibleRange({ from: min, to: max });
+  }
+
+  /** The prices the axis shows now; null before data. */
+  priceRange(): { min: number; max: number } | null {
+    if (this.destroyed || !this.main) return null;
+    const r = this.chart.priceScale(this.side, 0).getVisibleRange();
+    return r ? { min: Math.min(r.from, r.to), max: Math.max(r.from, r.to) } : null;
+  }
+
+  /** True while the price axis fits itself to the visible candles. */
+  isAutoScale(): boolean {
+    if (this.destroyed) return true;
+    return this.chart.priceScale(this.side, 0).options().autoScale !== false;
   }
 
   /** Width of the visible price axes; the left one shifts the panes' x. */
