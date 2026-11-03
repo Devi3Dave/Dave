@@ -27,6 +27,7 @@ import {
   type UTCTimestamp,
 } from "lightweight-charts";
 import { brickKey as brickOptionsKey, displayBars, hollowStyle, isPriceDriven } from "../../shared/chartTypes";
+import { DEFAULT_CANDLE_COLORS, THEMES, resolveCandleColors, withAlpha } from "../../shared/candleColors";
 import { alignCompare } from "../../shared/compare";
 import { buildFootprints, footprintRowSize } from "../../shared/footprint";
 import { SOURCE_INDICATORS, computeIndicator, getIndicator, resolveParams, type IndicatorDef, type OutputDef } from "../../shared/indicators";
@@ -53,14 +54,8 @@ import { SessionsPrimitive, type SessionBand } from "./SessionsPrimitive";
 import { PriceSeriesView, type PriceSeriesKind } from "./PriceSeries";
 import { VolumeProfilePrimitive } from "./VolumeProfilePrimitive";
 
-export const THEME = {
-  bg: "#131722",
-  text: "#d1d4dc",
-  grid: "rgba(42,46,57,0.6)",
-  border: "#2a2e39",
-  up: "#26a69a",
-  down: "#ef5350",
-};
+/** Default (dark) chart colours; the engine switches them with the background and candle colour settings. */
+export const THEME = { ...THEMES.dark, ...DEFAULT_CANDLE_COLORS.dark };
 
 /** Chart types drawn by PriceSeriesView. */
 const CUSTOM_KINDS = new Set<string>(["volume_candles", "hlc_area", "columns", "high_low", "kagi", "point_figure"] satisfies PriceSeriesKind[]);
@@ -113,6 +108,10 @@ export interface TradeLine {
 
 export class ChartEngine {
   readonly chart: IChartApi;
+  /** Current background and candle colours (from the settings). */
+  private colors = { ...THEME };
+  private colorKey = "";
+  private priceView: PriceSeriesView | null = null;
   readonly drawings = new DrawingsPrimitive();
   private main: ISeriesApi<SeriesType> | null = null;
   private markersApi: ISeriesMarkersPluginApi<Time> | null = null;
@@ -179,15 +178,15 @@ export class ChartEngine {
     this.chart = createChart(container, {
       autoSize: true,
       layout: {
-        background: { type: ColorType.Solid, color: THEME.bg },
-        textColor: THEME.text,
+        background: { type: ColorType.Solid, color: this.colors.bg },
+        textColor: this.colors.text,
         fontFamily: "-apple-system, BlinkMacSystemFont, 'Trebuchet MS', Roboto, Ubuntu, sans-serif",
-        panes: { separatorColor: THEME.border, separatorHoverColor: "rgba(41,98,255,0.3)", enableResize: true },
+        panes: { separatorColor: this.colors.border, separatorHoverColor: "rgba(41,98,255,0.3)", enableResize: true },
       },
-      grid: { vertLines: { color: THEME.grid }, horzLines: { color: THEME.grid } },
+      grid: { vertLines: { color: this.colors.grid }, horzLines: { color: this.colors.grid } },
       crosshair: { mode: CrosshairMode.Normal },
-      rightPriceScale: { borderColor: THEME.border },
-      timeScale: { borderColor: THEME.border, timeVisible: true, secondsVisible: false, rightOffset: 8 },
+      rightPriceScale: { borderColor: this.colors.border },
+      timeScale: { borderColor: this.colors.border, timeVisible: true, secondsVisible: false, rightOffset: 8 },
       localization: { locale: "de-DE" },
     });
 
@@ -396,6 +395,8 @@ export class ChartEngine {
   // ---------------- state sync ----------------
 
   update(s: ChartState) {
+    const recolor = this.applyColors(s.settings);
+    if (recolor) this.patternKey = "";
     // A new chart type or price-scale side recreates the price series and all indicators.
     const typeChanged = s.chartType !== this.chartType || s.settings.scalePosition !== this.side;
     if (typeChanged) {
@@ -403,6 +404,8 @@ export class ChartEngine {
       this.clearIndicators();
       this.side = s.settings.scalePosition;
       this.createMainSeries(s.chartType);
+    } else if (recolor) {
+      this.recolorMain();
     }
     this.intervalSeconds = intervalSeconds(s.interval);
     this.interval = s.interval;
@@ -462,8 +465,8 @@ export class ChartEngine {
       highLow: s.settings.highLowLabels,
       lastPriceLabel: s.settings.lastPriceLabel,
       intervalSeconds: this.intervalSeconds,
-      upColor: THEME.up,
-      downColor: THEME.down,
+      upColor: this.colors.up,
+      downColor: this.colors.down,
     });
 
     this.drawings.setData(s.drawings, this.bars);
@@ -527,6 +530,55 @@ export class ChartEngine {
     if (hadLines !== this.compareSeries.size > 0) this.applyScaleMode();
   }
 
+  /** Takes background and candle colours from the settings; true when the existing price series needs them. */
+  private applyColors(st: ChartSettings): boolean {
+    const theme = st.chartTheme === "light" ? "light" : "dark";
+    const candles = resolveCandleColors(theme, st.candleColors);
+    const key = `${theme}|${candles.up}|${candles.down}`;
+    if (key === this.colorKey) return false;
+    this.colorKey = key;
+    this.colors = { ...THEMES[theme], ...candles };
+    const c = this.colors;
+    this.chart.applyOptions({
+      layout: { background: { type: ColorType.Solid, color: c.bg }, textColor: c.text, panes: { separatorColor: c.border } },
+      grid: { vertLines: { color: c.grid }, horzLines: { color: c.grid } },
+      timeScale: { borderColor: c.border },
+    });
+    // Grid visibility and price-scale borders are set again with the other settings.
+    this.settingsKey = "";
+    return !!this.main;
+  }
+
+  private baselineColors() {
+    const { up, down } = this.colors;
+    return {
+      topLineColor: up,
+      topFillColor1: withAlpha(up, 0.28),
+      topFillColor2: withAlpha(up, 0.05),
+      bottomLineColor: down,
+      bottomFillColor1: withAlpha(down, 0.05),
+      bottomFillColor2: withAlpha(down, 0.28),
+    };
+  }
+
+  /** New candle colours on the existing price series, without resetting the view. */
+  private recolorMain() {
+    const main = this.main;
+    if (!main) return;
+    const { up, down } = this.colors;
+    const t = this.chartType;
+    if (t === "bars") main.applyOptions({ upColor: up, downColor: down });
+    else if (t === "baseline") main.applyOptions(this.baselineColors());
+    else if (t && CUSTOM_KINDS.has(t)) {
+      this.priceView?.setColors({ up, down });
+      main.applyOptions({});
+    } else if (t && !LINE_TYPES.has(t) && t !== "tpo") {
+      main.applyOptions({ upColor: up, downColor: down, borderUpColor: up, borderDownColor: down, wickUpColor: up, wickDownColor: down });
+    }
+    // Hollow candles carry their colours per bar.
+    if (t === "hollow_candles") this.setMainData();
+  }
+
   private createMainSeries(type: ChartType) {
     if (this.main) {
       this.main.detachPrimitive(this.drawings);
@@ -541,7 +593,7 @@ export class ChartEngine {
     const common = { priceLineVisible: true, lastValueVisible: true, priceScaleId: this.side };
     switch (type) {
       case "bars":
-        this.main = this.chart.addSeries(BarSeries, { ...common, upColor: THEME.up, downColor: THEME.down, thinBars: false });
+        this.main = this.chart.addSeries(BarSeries, { ...common, upColor: this.colors.up, downColor: this.colors.down, thinBars: false });
         break;
       case "line":
         this.main = this.chart.addSeries(LineSeries, { ...common, color: "#2962ff", lineWidth: 2 });
@@ -560,12 +612,7 @@ export class ChartEngine {
         // Green above, red below the base level (set from the data in setMainData).
         this.main = this.chart.addSeries(BaselineSeries, {
           ...common,
-          topLineColor: THEME.up,
-          topFillColor1: "rgba(38,166,154,0.28)",
-          topFillColor2: "rgba(38,166,154,0.05)",
-          bottomLineColor: THEME.down,
-          bottomFillColor1: "rgba(239,83,80,0.05)",
-          bottomFillColor2: "rgba(239,83,80,0.28)",
+          ...this.baselineColors(),
           lineWidth: 2,
         });
         break;
@@ -584,17 +631,18 @@ export class ChartEngine {
       case "high_low":
       case "kagi":
       case "point_figure":
-        this.main = this.chart.addCustomSeries(new PriceSeriesView(type, { up: THEME.up, down: THEME.down }), common) as unknown as ISeriesApi<SeriesType>;
+        this.priceView = new PriceSeriesView(type, { up: this.colors.up, down: this.colors.down });
+        this.main = this.chart.addCustomSeries(this.priceView, common) as unknown as ISeriesApi<SeriesType>;
         break;
       default:
         this.main = this.chart.addSeries(CandlestickSeries, {
           ...common,
-          upColor: THEME.up,
-          downColor: THEME.down,
-          borderUpColor: THEME.up,
-          borderDownColor: THEME.down,
-          wickUpColor: THEME.up,
-          wickDownColor: THEME.down,
+          upColor: this.colors.up,
+          downColor: this.colors.down,
+          borderUpColor: this.colors.up,
+          borderDownColor: this.colors.down,
+          wickUpColor: this.colors.up,
+          wickDownColor: this.colors.down,
         });
     }
     this.chartType = type;
@@ -642,7 +690,7 @@ export class ChartEngine {
   }
 
   private applySettings(st: ChartSettings) {
-    const scale = { visible: true, borderColor: THEME.border };
+    const scale = { visible: true, borderColor: this.colors.border };
     const hidden = { visible: false };
     const tz = resolveTimeZone(st.timeZone);
     const daily = this.intervalSeconds >= 86400;
@@ -668,8 +716,8 @@ export class ChartEngine {
       rightPriceScale: this.side === "right" || this.otherAxis ? scale : hidden,
       leftPriceScale: this.side === "left" || this.otherAxis ? scale : hidden,
       grid: {
-        vertLines: { visible: st.grid === "both" || st.grid === "vert", color: THEME.grid },
-        horzLines: { visible: st.grid === "both" || st.grid === "horz", color: THEME.grid },
+        vertLines: { visible: st.grid === "both" || st.grid === "vert", color: this.colors.grid },
+        horzLines: { visible: st.grid === "both" || st.grid === "horz", color: this.colors.grid },
       },
       crosshair: { mode: st.crosshair === "magnet" ? CrosshairMode.Magnet : st.crosshair === "hidden" ? CrosshairMode.Hidden : CrosshairMode.Normal },
       timeScale: {
@@ -840,7 +888,7 @@ export class ChartEngine {
     if (t && LINE_TYPES.has(t)) return { time: ts(b.time), value: b.close };
     if (t && CUSTOM_KINDS.has(t)) return { ...b, time: ts(b.time) };
     const ohlc = { time: ts(b.time), open: b.open, high: b.high, low: b.low, close: b.close };
-    return t === "hollow_candles" ? { ...ohlc, ...hollowStyle(bars, i, THEME.up, THEME.down) } : ohlc;
+    return t === "hollow_candles" ? { ...ohlc, ...hollowStyle(bars, i, this.colors.up, this.colors.down) } : ohlc;
   }
 
   private setMainData() {
@@ -885,7 +933,7 @@ export class ChartEngine {
     const needOther = [...scaleOf.values()].includes("other");
     if (needOther !== this.otherAxis) {
       this.otherAxis = needOther;
-      this.chart.applyOptions({ [`${other}PriceScale`]: { visible: needOther, borderColor: THEME.border } });
+      this.chart.applyOptions({ [`${other}PriceScale`]: { visible: needOther, borderColor: this.colors.border } });
     }
     for (const instance of instances) {
       const def = getIndicator(instance.type);
@@ -1079,7 +1127,7 @@ export class ChartEngine {
       time: ts(c.time),
       position: c.direction === "bullish" ? "belowBar" : "aboveBar",
       shape: c.direction === "bullish" ? "arrowUp" : c.direction === "bearish" ? "arrowDown" : "circle",
-      color: c.direction === "bullish" ? THEME.up : c.direction === "bearish" ? THEME.down : "#787b86",
+      color: c.direction === "bullish" ? this.colors.up : c.direction === "bearish" ? this.colors.down : "#787b86",
       text: c.name,
       size: 0.6,
     }));

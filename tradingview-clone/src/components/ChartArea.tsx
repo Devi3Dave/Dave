@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { resolveCandleColors } from "../../shared/candleColors";
 import { brickKey as brickOptionsKey, displayBars, isPriceDriven } from "../../shared/chartTypes";
 import { SOURCE_INDICATORS, indicatorLabel } from "../../shared/indicators";
 import { ChartEngine, type ComputedIndicator, type PointerEvent } from "../chart/ChartEngine";
@@ -152,6 +153,7 @@ export function ChartArea({ chart, onEngine, magnet, onEditIndicator, onEditPosi
   const { symbol, interval, bars: loaded, chartType, settings, source, tool, loading, error } = useChart(chart, (s) => s);
   // The legend reads the candles as drawn (Renko bricks, Line Break lines).
   const brickKey = brickOptionsKey(chartType, settings);
+  const candleColors = resolveCandleColors(settings.chartTheme, settings.candleColors);
   const bars = useMemo(() => (brickKey ? displayBars(loaded, chartType, settings) : loaded), [loaded, brickKey]);
   const selected = useSelectedDrawing(chart.slot);
   const compareLines = useCompareData(chart);
@@ -664,7 +666,10 @@ export function ChartArea({ chart, onEngine, magnet, onEditIndicator, onEditPosi
       ));
 
   return (
-    <div className={`chart-area tool-${tool}`}>
+    <div
+      className={`chart-area tool-${tool}${settings.chartTheme === "light" ? " chart-light" : ""}`}
+      style={{ "--up": candleColors.up, "--down": candleColors.down } as CSSProperties}
+    >
       <div ref={containerRef} className="chart-container" />
       {layout.map((pane, i) => (
         <div key={i} className="legend" style={{ top: pane.top + 6, left: axes.left + 8 }}>

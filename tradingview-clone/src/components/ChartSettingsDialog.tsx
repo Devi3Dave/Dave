@@ -1,4 +1,5 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
+import { PALETTE_HUES, PALETTE_SHADES, TV_PALETTE, presetsFor, readableOn, resolveCandleColors, type CandlePair, type ChartTheme } from "../../shared/candleColors";
 import { renkoBoxSize } from "../../shared/chartTypes";
 import { DEFAULT_SETTINGS, TIME_ZONES, type ChartSettings } from "../chartSettings";
 import { exportChart } from "../chartExport";
@@ -55,6 +56,82 @@ function NumberInput({ value, min, max, step, onChange }: { value: number; min: 
       }}
       onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
     />
+  );
+}
+
+/** TradingView's palette as a grid (hues across, shades down); colours too faint on the background are left out. */
+function PaletteGrid({ theme, value, onPick }: { theme: ChartTheme; value: string; onPick: (c: string) => void }) {
+  return (
+    <div className="candle-palette" role="listbox">
+      {PALETTE_SHADES.filter((shade) => PALETTE_HUES.some((h) => readableOn(TV_PALETTE[`${h.id}-${shade}`], theme))).map((shade) =>
+        PALETTE_HUES.map((h) => {
+          const c = TV_PALETTE[`${h.id}-${shade}`];
+          if (!readableOn(c, theme)) return <span key={h.id + shade} className="candle-swatch empty" />;
+          return (
+            <button
+              key={h.id + shade}
+              role="option"
+              aria-selected={c === value}
+              aria-label={`${h.label} ${shade} ${c}`}
+              data-tip={`${h.label} ${shade}\n${c.toUpperCase()}`}
+              className={`candle-swatch${c === value ? " active" : ""}`}
+              style={{ background: c }}
+              onClick={() => onPick(c)}
+            />
+          );
+        }),
+      )}
+    </div>
+  );
+}
+
+/** Background and candle colours; each background keeps its own pair. */
+function CandleColorsSection() {
+  const st = useChartState((s) => s.settings);
+  const theme: ChartTheme = st.chartTheme === "light" ? "light" : "dark";
+  const colors = resolveCandleColors(theme, st.candleColors);
+  const [open, setOpen] = useState<"up" | "down" | null>(null);
+  const set = (pair: CandlePair) => updateSettings({ candleColors: { ...st.candleColors, [theme]: pair } });
+  const pickerRow = (side: "up" | "down", label: string) => (
+    <>
+      <Row label={label} tip={side === "up" ? "Kerzen, die über dem Eröffnungskurs schließen" : "Kerzen, die unter dem Eröffnungskurs schließen"}>
+        <button className={`candle-color-btn${open === side ? " active" : ""}`} onClick={() => setOpen(open === side ? null : side)} data-tip="Farbe aus der TradingView-Palette wählen">
+          <span className="candle-swatch" style={{ background: colors[side] }} />
+          {colors[side].toUpperCase()}
+        </button>
+      </Row>
+      {open === side && <PaletteGrid theme={theme} value={colors[side]} onPick={(c) => set({ ...colors, [side]: c })} />}
+    </>
+  );
+  return (
+    <section>
+      <h3>Hintergrund & Kerzen</h3>
+      <Row label="Hintergrund" tip={"Dunkler oder heller Chart wie bei TradingView\nKerzenfarben werden je Hintergrund getrennt gespeichert"}>
+        <Segmented
+          value={theme}
+          onChange={(chartTheme) => updateSettings({ chartTheme })}
+          options={[
+            { value: "dark", label: "Dunkel" },
+            { value: "light", label: "Hell" },
+          ]}
+        />
+      </Row>
+      <Row label="Vorlage" tip={"TradingView-Standardpaare\nNur Paare, die auf diesem Hintergrund gut lesbar sind"}>
+        <div className="segmented">
+          {presetsFor(theme).map((p) => (
+            <button key={p.id} className={p.up === colors.up && p.down === colors.down ? "active" : ""} data-tip={p.tip} onClick={() => set({ up: p.up, down: p.down })}>
+              <span className="candle-swatch mini" style={{ background: p.up }} />
+              <span className="candle-swatch mini" style={{ background: p.down }} /> {p.label}
+            </button>
+          ))}
+        </div>
+      </Row>
+      {pickerRow("up", "Steigend")}
+      {pickerRow("down", "Fallend")}
+      <p className="settings-note">
+        Nur Farben aus der TradingView-Palette, die auf {theme === "light" ? "hellem" : "dunklem"} Hintergrund mindestens 3:1 Kontrast haben (WCAG 2.1).
+      </p>
+    </section>
   );
 }
 
@@ -181,6 +258,8 @@ export function ChartSettingsDialog({ onClose }: { onClose: () => void }) {
               <NumberInput value={st.lineBreakLines} min={1} max={10} step={1} onChange={(lineBreakLines) => updateSettings({ lineBreakLines })} />
             </Row>
           </section>
+
+          <CandleColorsSection />
 
           <section>
             <h3>Darstellung</h3>

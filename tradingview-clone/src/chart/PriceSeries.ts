@@ -58,8 +58,13 @@ export class PriceSeriesView implements ICustomSeriesPaneView<Time, PriceItem, C
 
   constructor(
     private readonly kind: PriceSeriesKind,
-    private readonly colors: PriceSeriesColors,
+    private colors: PriceSeriesColors,
   ) {}
+
+  /** New up/down colours (candle colour setting); drawn on the next repaint. */
+  setColors(colors: PriceSeriesColors) {
+    this.colors = colors;
+  }
 
   renderer() {
     return { draw: (target: CanvasRenderingTarget2D, toY: PriceToCoordinateConverter) => this.draw(target, toY) };
