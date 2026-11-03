@@ -1,3 +1,4 @@
+import { DEFAULT_CANDLE_COLORS, type CandleColorSettings, type ChartTheme } from "../shared/candleColors";
 import type { PnfSource } from "../shared/chartTypes";
 // Chart display settings (scales, labels, time axis), persisted with the layout.
 
@@ -38,6 +39,10 @@ export interface ChartSettings {
   footprint: boolean;
   /** Time the x axis shows when the chart loads or is reset, in seconds; 0 = the latest ~160 candles. */
   viewSpan: number;
+  /** Chart background: TradingView's dark or light chart. */
+  chartTheme: ChartTheme;
+  /** Up/down candle colours, saved separately for each background (TradingView colours only, see shared/candleColors.ts). */
+  candleColors: CandleColorSettings;
 }
 
 export const DEFAULT_SETTINGS: ChartSettings = {
@@ -64,6 +69,8 @@ export const DEFAULT_SETTINGS: ChartSettings = {
   rangeSize: 0,
   footprint: false,
   viewSpan: 0,
+  chartTheme: "dark",
+  candleColors: { dark: { ...DEFAULT_CANDLE_COLORS.dark }, light: { ...DEFAULT_CANDLE_COLORS.light } },
 };
 
 export const TIME_ZONES: { id: string; label: string }[] = [

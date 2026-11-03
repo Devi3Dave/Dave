@@ -14,6 +14,18 @@ export interface Release {
  */
 export const CHANGELOG: Release[] = [
   {
+    version: "0.72.0",
+    date: "2026-11-03",
+    title: "Heller Hintergrund und Kerzenfarben nach TradingView",
+    changes: [
+      "Chart-Einstellungen → „Hintergrund & Kerzen“: Chart dunkel oder hell (weiß) wie bei TradingView",
+      "Kerzenfarben für steigend und fallend wählbar, nur aus TradingViews eigener Farbpalette (Rot, Orange, Gelb, Grün, Mint, Cyan, Blau, Violett, Lila, Pink in je 10 Abstufungen)",
+      "Je Hintergrund werden nur Farben angeboten, die darauf gut lesbar sind (mindestens 3:1 Kontrast nach WCAG 2.1); dunkel und hell speichern ihre Farben getrennt",
+      "Vorlagen: „TradingView“ (#089981 / #F23645) und „Klassisch“ (#26A69A / #EF5350, bisherige ChartAI-Farben, nur auf dunkel)",
+      "Gilt für Kerzen, Hohlkerzen, Balken, Heikin Ashi, Baseline, Kagi und die übrigen Kerzen-Charttypen sowie für die OHLC-Werte in der Legende",
+    ],
+  },
+  {
     version: "0.71.0",
     date: "2026-11-02",
     title: "Achsen einstellen: Zeitraum und Preisbereich",

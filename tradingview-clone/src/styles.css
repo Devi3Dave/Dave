@@ -860,6 +860,11 @@ textarea {
   max-width: calc(100% - 90px);
 }
 
+/* Light chart background: dark legend text, as on TradingView's light chart. */
+.chart-light .legend {
+  color: #131722;
+}
+
 .legend-row {
   display: flex;
   flex-wrap: wrap;
@@ -1676,6 +1681,57 @@ select,
 .segmented button.active {
   background: var(--accent);
   color: #fff;
+}
+
+/* Candle colours: TradingView palette grid in the chart settings. */
+.candle-swatch {
+  display: inline-block;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
+  vertical-align: middle;
+}
+
+.candle-swatch.mini {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  margin-right: 2px;
+}
+
+.candle-swatch.empty {
+  border-color: transparent;
+}
+
+button.candle-swatch.active {
+  outline: 2px solid #fff;
+  outline-offset: 1px;
+}
+
+.candle-color-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-variant-numeric: tabular-nums;
+}
+
+.candle-color-btn.active {
+  border-color: var(--accent);
+}
+
+.candle-palette {
+  display: grid;
+  grid-template-columns: repeat(10, 22px);
+  gap: 4px;
+  justify-content: start;
+}
+
+.settings-note {
+  margin: 0;
+  font-size: 11px;
+  color: var(--muted);
 }
 
 /* ---------- quick scale buttons (bottom right of the price pane) ---------- */
