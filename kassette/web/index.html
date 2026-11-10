@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Kassette</title>
+<meta name="description" content="Kassette – 4-Spur-Synth-Studio im Browser">
+<meta name="theme-color" content="#212124">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Kassette">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="stage">
+  <div id="device">
+    <div class="top">
+      <div class="left">
+        <div class="brand">
+          <div><b>KASSETTE</b><small>4-TRACK SYNTH STUDIO</small></div>
+          <div class="vol" id="vol" title="Lautstärke"><div class="volknob"><i></i></div><span>VOL</span></div>
+        </div>
+        <canvas id="grill" width="300" height="300"></canvas>
+        <div id="leds"><i></i><i></i><i></i><i></i></div>
+      </div>
+      <div class="screenwrap">
+        <div class="screen">
+          <canvas id="screen"></canvas>
+          <div id="chips"></div>
+          <div id="legend"></div>
+        </div>
+      </div>
+      <div class="right">
+        <div id="encoders"></div>
+        <div class="slotbox">
+          <div id="slotTitle">SOUNDS</div>
+          <div id="slots"></div>
+        </div>
+      </div>
+    </div>
+    <div id="buttons"></div>
+    <div class="kbrow">
+      <div class="oct"><small>OKTAVE</small><b id="octValue">0</b><small id="octNote">C3</small></div>
+      <div id="keyboard"></div>
+    </div>
+  </div>
+</div>
+
+<div id="start">
+  <div class="startcard">
+    <b>KASSETTE</b>
+    <small>4-TRACK SYNTH STUDIO</small>
+    <button id="startBtn">▶ Starten</button>
+    <p id="startMsg">Tippe auf Starten, um den Ton einzuschalten.</p>
+  </div>
+</div>
+
+<dialog id="album">
+  <h2>Album</h2>
+  <section>
+    <h3>Mixdown</h3>
+    <button id="bounceBtn">Band als WAV abmischen</button>
+    <progress id="bounceProgress" value="0" max="1" hidden></progress>
+    <p class="hint">Mischt alle 4 Spuren mit den aktuellen Mixer- und Master-Einstellungen zu einer Stereo-WAV-Datei.</p>
+    <div id="exports"></div>
+  </section>
+  <section>
+    <h3>Band</h3>
+    <button id="saveTape">Band sichern</button>
+    <button id="loadTape">Gesichertes Band laden</button>
+    <button id="eraseTape" class="danger">Ganzes Band löschen</button>
+    <p class="hint">Das Band ist 2 Minuten lang und liegt im Arbeitsspeicher. Sichere es, bevor du die Seite schließt – es wird dann in diesem Browser gespeichert.</p>
+  </section>
+  <section>
+    <h3>Klänge</h3>
+    <button id="resetSounds">Werksklänge wiederherstellen</button>
+  </section>
+  <p id="albumMsg" class="msg"></p>
+  <button class="close" data-close>Fertig</button>
+</dialog>
+
+<dialog id="help">
+  <h2>Bedienung</h2>
+  <div id="helpBody"></div>
+  <button class="close" data-close>Fertig</button>
+</dialog>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
