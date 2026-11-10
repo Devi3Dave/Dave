@@ -826,6 +826,25 @@ window.addEventListener('keyup', onKey);
 window.addEventListener('pagehide', save);
 window.addEventListener('blur', () => { for (const [code, note] of codeNotes) { codeNotes.delete(code); noteOff(note); } });
 document.addEventListener('contextmenu', (e) => e.preventDefault());
+
+// Zoom sperren (Safari ignoriert user-scalable=no): Pinch-Gesten und Doppeltipp abfangen.
+for (const type of ['gesturestart', 'gesturechange', 'gestureend']) document.addEventListener(type, (e) => e.preventDefault(), { passive: false });
+document.addEventListener('dblclick', (e) => e.preventDefault(), { passive: false });
+document.addEventListener('touchmove', (e) => { if (!e.target.closest('dialog')) e.preventDefault(); }, { passive: false });
+let lastTouchEnd = 0, touchStartX = 0, touchStartY = 0;
+document.addEventListener('touchstart', (e) => { touchStartX = e.touches[0].clientX; touchStartY = e.touches[0].clientY; }, { passive: true });
+document.addEventListener('touchend', (e) => {
+  if (e.target.closest('dialog')) return;
+  const now = performance.now(), quick = now - lastTouchEnd < 400;
+  lastTouchEnd = now;
+  if (!quick || !e.cancelable) return;
+  // Zweiter schneller Tipp: Standardverhalten (Zoom) unterdrücken, den Klick aber selbst auslösen.
+  e.preventDefault();
+  const t = e.changedTouches[0];
+  if (Math.hypot(t.clientX - touchStartX, t.clientY - touchStartY) < 12) {
+    e.target.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, clientX: t.clientX, clientY: t.clientY }));
+  }
+}, { passive: false });
 document.addEventListener('visibilitychange', () => { if (!document.hidden && ctx && ctx.state !== 'running') ctx.resume(); });
 screenCanvas.addEventListener('click', screenTap);
 $('chips').addEventListener('click', (e) => { const b = e.target.closest('.chip'); if (b) chipActions[+b.dataset.i](); });

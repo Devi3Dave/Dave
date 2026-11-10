@@ -8,6 +8,9 @@
 html, body { height: 100%; margin: 0; background: #212124; overflow: hidden; overscroll-behavior: none; }
 body { font-family: var(--round); color: var(--ink); -webkit-user-select: none; user-select: none; touch-action: none; }
 button { font: inherit; color: inherit; }
+/* iPad-Safari: kein Doppeltipp- oder Pinch-Zoom, keine Textauswahl-Lupe */
+html, body, #stage, #stage *, #start, #start * { touch-action: none; -webkit-touch-callout: none; }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 
 #stage { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
   padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
