@@ -1,0 +1,15 @@
+{
+  "name": "Kassette",
+  "short_name": "Kassette",
+  "description": "4-Spur-Synth-Studio im Browser",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#212124",
+  "theme_color": "#212124",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

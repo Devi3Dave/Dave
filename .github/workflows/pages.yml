@@ -1,6 +1,7 @@
 name: Deploy GitHub Pages
 
-# Publishes ChartAI (standalone iPad build) under /chartai/ and keeps the
+# Publishes ChartAI (standalone iPad build) under /chartai/, the Kassette
+# synth (static web app, no build step) under /kassette/, and keeps the
 # Fill & Sign app, which lives on its own branch, at the site root.
 on:
   push:
@@ -55,6 +56,7 @@ jobs:
             echo '<!doctype html><meta http-equiv="refresh" content="0; url=chartai/">' > _site/index.html
           fi
           cp -r tradingview-clone/dist _site/chartai
+          cp -r kassette/web _site/kassette
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

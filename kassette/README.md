@@ -6,18 +6,23 @@ auf ein 4-Spur-Band aufnehmen, mischen, exportieren – alles mit vier farbigen
 Encodern. Design, Name und Klangerzeugung sind eigenständig; es werden keine
 Marken, Logos oder Gehäuseformen eines Herstellers kopiert.
 
-Läuft auf **iPad** (iPadOS 17+) und auf dem **Mac** (Apple Silicon, z. B. MacBook Air M1/M2/M3).
+## Im Browser starten (empfohlen)
 
-## Starten
+Die Web-App liegt in `web/` und wird über GitHub Pages veröffentlicht – wie ChartAI:
 
-**Auf dem Mac (Xcode 15 oder neuer):**
-1. `Kassette.swiftpm` doppelklicken – öffnet sich in Xcode.
-2. Oben als Ziel **„My Mac (Designed for iPad)“** oder ein angeschlossenes iPad wählen.
-3. ▶ Run. Für ein iPad einmal unter *Signing & Capabilities* dein Apple-Team wählen.
-4. Tipp: Für die beste Audio-Performance *Product → Scheme → Edit Scheme → Run → Build Configuration: Release*.
+**https://devi3dave.github.io/Dave/kassette/**
 
-**Mit Swift Playgrounds (iPad oder Mac):**
-`Kassette.swiftpm` in Swift Playgrounds öffnen (per AirDrop, iCloud Drive oder Dateien-App) und auf ▶ tippen.
+- Läuft in Safari und Chrome auf Mac und iPad, ohne Installation.
+- Als App installierbar: iPad → Teilen → „Zum Home-Bildschirm“, Mac (Safari) → Ablage → „Zum Dock hinzufügen“.
+- Funktioniert danach auch offline. Klänge und Einstellungen werden im Browser gespeichert, das Band über **ALBUM → Band sichern**.
+- Kein Build-Schritt: reines HTML/CSS/JavaScript mit Web Audio (AudioWorklet).
+
+Lokal testen: `cd kassette/web && python3 -m http.server 8000`, dann `http://localhost:8000` öffnen.
+
+## Native Variante (optional)
+
+`Kassette.swiftpm` enthält dieselbe App als SwiftUI-Projekt für Xcode / Swift Playgrounds
+(iPadOS 17+, Mac mit Apple-Chip). Diese Variante wurde bisher nicht kompiliert.
 
 ## Aufbau des Geräts
 
@@ -54,7 +59,7 @@ Werte im Display. **Ziehen = drehen, antippen = drücken.**
 | Taste | Funktion |
 |---|---|
 | `A W S E D F T G Y/Z H U J K O L P` | Klaviertasten |
-| `C` / `X` | Oktave runter / hoch |
+| `Y` / `X` | Oktave runter / hoch |
 | Leertaste | Play / Stop |
 | `R` | Record |
 | `1`–`4` | Seite bzw. Spur |
@@ -72,6 +77,8 @@ Werte im Display. **Ziehen = drehen, antippen = drücken.**
 ## Code-Struktur
 
 ```
+web/                       Web-App (GitHub Pages): index.html, app.js, screen.js,
+                           dsp.js (Klangerzeugung), worklet.js (Audio-Thread), sw.js
 Kassette.swiftpm/
 ├── Package.swift          App-Paket (Swift Playgrounds / Xcode)
 ├── DSP/                   Klangerzeugung in purem Swift, echtzeitfähig, ohne Allokationen
@@ -89,8 +96,7 @@ Kassette.swiftpm/
 
 ## Bekannte Grenzen
 
-- Der Code wurde ohne Xcode geschrieben und nur auf Syntax geprüft. Sollte der
-  Compiler beim ersten Build etwas anmerken (z. B. das Platzhalter-Icon in
-  `Package.swift`), lässt sich das meist mit einer Zeile beheben.
+- MIDI-Keyboards funktionieren im Browser nur in Chrome/Edge (Safari kennt kein Web MIDI).
+- Die Swift-Variante wurde ohne Xcode geschrieben und nur auf Syntax geprüft.
 - Das Band liegt im Arbeitsspeicher (ca. 120 MB). Über **ALBUM → Band sichern** wird es dauerhaft gespeichert.
 - Kein eingebautes Radio und keine Bewegungssensor-Steuerung.
