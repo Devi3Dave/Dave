@@ -2,6 +2,7 @@
 import { ENGINE, FX, SEQ, quantize, clamp, clamp01, attackTime, decayTime, releaseTime, lfoRate, bounce, encodeWAV } from './dsp.js';
 import * as M from './meta.js';
 import { drawScreen, ENC, REC, LANE_TOP, LANE_STRIDE, padRect } from './screen.js';
+import { createLearn } from './learn.js';
 
 const $ = (id) => document.getElementById(id);
 const STORE_KEY = 'kassette.state.v1';
@@ -37,7 +38,7 @@ const pressed = new Set();     // klingende Noten (für die Tastenbeleuchtung)
 const pointerNotes = new Map(); // pointerId → { index, note }
 const codeNotes = new Map();    // Tastatur-Code → Note
 const accum = [0, 0, 0, 0];
-let toastTimer = 0, saveTimer = 0, graceUntil = 0;
+let toastTimer = 0, saveTimer = 0, graceUntil = 0, stepsEditedAt = 0;
 const grace = () => { graceUntil = performance.now() + 500; };
 
 const patch = () => (st.drumActive ? st.drumPatch : st.patches[st.slot]);
@@ -69,6 +70,9 @@ function onWorklet(m) {
   if (m.t === 'state') {
     m.sr = S.sr; m.length = S.length;
     S = m;
+    // Steps, die im Audio-Thread per Tasteneingabe geschrieben wurden, ins Modell übernehmen –
+    // sonst würde die nächste Einstellungsänderung sie wieder überschreiben.
+    if (performance.now() - stepsEditedAt > 300 && S.steps.some((v, i) => v !== st.seq.steps[i])) { st.seq.steps = [...S.steps]; touch(); }
     if (performance.now() > graceUntil) {
       if (st.isPlaying && S.transport && !S.running && S.playhead >= S.length - 3) stop();
       if (st.isPlaying && !S.transport) st.isPlaying = false;
@@ -83,6 +87,7 @@ function onWorklet(m) {
       loop: ['LOOP AN', 'LOOP AUS'], sampleFromTape: ['TAPE → SAMPLER ✓', 'BAND LEER'], setTape: ['BAND GELADEN', 'FEHLER'],
     };
     if (texts[m.op]) flash(texts[m.op][m.ok ? 0 : 1]);
+    if (m.ok && (m.op === 'lift' || m.op === 'drop')) learn.onEvent(m.op + 's');
   } else if (m.t === 'tapeData') {
     const resolve = tapeRequests.get(m.id);
     tapeRequests.delete(m.id);
@@ -113,7 +118,7 @@ function flash(text) {
   toastTimer = setTimeout(() => { st.toast = null; }, 1400);
 }
 
-function noteOn(n, v = 0.8) { pressed.add(n); send({ t: 'on', n, v }); }
+function noteOn(n, v = 0.8) { pressed.add(n); send({ t: 'on', n, v }); learn.onNote(n); }
 function noteOff(n) {
   for (const p of pointerNotes.values()) if (p.note === n) return;
   for (const c of codeNotes.values()) if (c === n) return;
@@ -190,6 +195,7 @@ const STEP = { seqKind: 0.06, arpRate: 0.06, arpMode: 0.06, arpOctaves: 0.06, eu
   euclidSteps: 0.035, euclidPulses: 0.035, euclidRotate: 0.035, tempo: 0.012, tapeJog: 0.01, loopStart: 0.01, loopEnd: 0.01 };
 
 function turn(i, delta) {
+  learn.onTurn(i, delta);
   const p = params()[i], step = STEP[p.k];
   if (step) {
     accum[i] += delta;
@@ -360,7 +366,7 @@ function pressEncoder(i) {
     else if (i === 2) { send({ t: 'loopStart', set: true }); flash('LOOP IN'); }
     else { send({ t: 'loopEnd', set: true }); flash('LOOP OUT'); }
   } else if (st.mode === 'mixer') {
-    if (st.page <= 1) { st.mixer.mutes[i] = !st.mixer.mutes[i]; pushMixer(); }
+    if (st.page <= 1) { st.mixer.mutes[i] = !st.mixer.mutes[i]; pushMixer(); learn.onEvent('mutes'); }
     else if (st.page === 2) nextMasterFX();
     else if (i === 3) toggleMetronome();
   } else if (st.page === 0) {
@@ -374,12 +380,14 @@ function pressEncoder(i) {
 
 // ---------- Pattern ----------
 
-function setStep(i, note) { if (i < 0 || i > 15) return; st.seq.steps[i] = note; S.steps[i] = note; pushSeq(); }
-function clearPattern() { st.seq.steps = new Array(16).fill(-1); S.steps = [...st.seq.steps]; pushSeq(); flash('PATTERN LEER'); }
+function setStep(i, note) { if (i < 0 || i > 15) return; st.seq.steps[i] = note; S.steps[i] = note; stepsEditedAt = performance.now(); pushSeq(); }
+function clearPattern() { setPattern(new Array(16).fill(-1)); flash('PATTERN LEER'); }
+function setPattern(steps) { st.seq.steps = [...steps]; S.steps = [...steps]; stepsEditedAt = performance.now(); S.cursor = 0; send({ t: 'cursor', v: 0 }); pushSeq(); }
+function restStep() { setStep(S.cursor, -1); S.cursor = (S.cursor + 1) % st.seq.length; send({ t: 'cursor', v: S.cursor }); }
 function randomPattern() {
   const scale = [0, 3, 5, 7, 10, 12, 15];
   st.seq.steps = Array.from({ length: 16 }, () => (Math.random() < 0.6 ? 48 + scale[Math.floor(Math.random() * scale.length)] : -1));
-  S.steps = [...st.seq.steps]; pushSeq(); flash('ZUFALL');
+  S.steps = [...st.seq.steps]; stepsEditedAt = performance.now(); pushSeq(); flash('ZUFALL');
 }
 
 // ---------- Transport ----------
@@ -436,6 +444,7 @@ const ICONS = {
   click: '<path d="M9 2h6l5 20H4zm1.600 2L7 18h10l-.800-3.200-3.300-2.700 2.600-3.200L13.400 4zm3.100 7.600 2.700-3.400.400 1.600-1.700 2.100 2.100 1.700.300 1.400z" fill-rule="evenodd"/>',
   hold: '<path d="M8 3h3v8h2V2h3v9h1V5h3v11a6 6 0 0 1-6 6h-2a6 6 0 0 1-5-2.700L3 13l2-2 3 2.500z"/>',
   album: '<path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 6.500a3.500 3.500 0 1 1 0 7 3.500 3.500 0 0 1 0-7zm0 2.500a1 1 0 1 0 0 2 1 1 0 0 0 0-2z" fill-rule="evenodd"/>',
+  learn: '<path d="M12 3 1 9l11 6 9-4.900V17h2V9zM5 13.200V17c0 1.700 3.100 3 7 3s7-1.300 7-3v-3.800l-7 3.800z"/>',
   help: '<path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm-1 14h2v2h-2zm1-10a4 4 0 0 1 4 4c0 2.500-3 2.800-3 5h-2c0-3.300 3-3.500 3-5a2 2 0 0 0-4 0H8a4 4 0 0 1 4-4z" fill-rule="evenodd"/>',
 };
 
@@ -445,6 +454,7 @@ function addButton(parent, spec) {
   b.className = 'hw' + (spec.icon ? '' : ' text');
   if (spec.color) b.style.setProperty('--c', spec.color);
   b.innerHTML = (spec.icon ? `<svg viewBox="0 0 24 24">${ICONS[spec.icon]}</svg>` : '') + `<span>${spec.title || ''}</span>`;
+  if (spec.id) b.dataset.id = spec.id;
   b.addEventListener('click', () => { spec.action(); });
   parent.appendChild(b);
   hw.push({ el: b, span: b.querySelector('span'), spec });
@@ -454,23 +464,24 @@ function addGap(parent) { const g = document.createElement('div'); g.className =
 function buildButtons() {
   const row = $('buttons');
   const modes = [['synth', 'SYNTH', 0], ['drum', 'DRUM', 1], ['tape', 'TAPE', 2], ['mixer', 'MIXER', 3], ['seq', 'SEQ', 0]];
-  for (const [m, title, c] of modes) addButton(row, { icon: m, title, color: ENC[c], action: () => selectMode(m), on: () => st.mode === m });
+  for (const [m, title, c] of modes) addButton(row, { id: m, icon: m, title, color: ENC[c], action: () => selectMode(m), on: () => st.mode === m });
   addGap(row);
   for (let i = 0; i < 4; i++) {
-    addButton(row, { color: ENC[i], action: () => selectPage(i), on: () => (st.mode === 'tape' ? st.armedTrack === i : st.page === i),
+    addButton(row, { id: 'page' + i, color: ENC[i], action: () => selectPage(i), on: () => (st.mode === 'tape' ? st.armedTrack === i : st.page === i),
       title: () => pageTitles()[i] || '—', disabled: () => !pageTitles()[i] });
   }
   addGap(row);
-  addButton(row, { icon: 'rec', title: 'REC', color: REC, action: toggleRecord, on: () => st.isRecording });
-  addButton(row, { icon: 'play', title: 'PLAY', color: '#33b373', action: play, on: () => st.isPlaying });
-  addButton(row, { icon: 'stop', title: 'STOP', action: stop });
+  addButton(row, { id: 'rec', icon: 'rec', title: 'REC', color: REC, action: toggleRecord, on: () => st.isRecording });
+  addButton(row, { id: 'play', icon: 'play', title: 'PLAY', color: '#33b373', action: play, on: () => st.isPlaying });
+  addButton(row, { id: 'stop', icon: 'stop', title: 'STOP', action: stop });
   addGap(row);
-  addButton(row, { icon: 'down', title: 'OKT −', action: () => shiftOctave(-1) });
-  addButton(row, { icon: 'up', title: 'OKT +', action: () => shiftOctave(1) });
-  addButton(row, { icon: 'click', title: 'CLICK', color: ENC[1], action: toggleMetronome, on: () => st.metronomeOn });
-  addButton(row, { icon: 'hold', title: 'HOLD', color: ENC[2], action: toggleLatch, on: () => st.latch });
-  addButton(row, { icon: 'album', title: 'ALBUM', action: () => openDialog('album') });
-  addButton(row, { icon: 'help', title: 'HILFE', action: () => openDialog('help') });
+  addButton(row, { id: 'octDown', icon: 'down', title: 'OKT −', action: () => shiftOctave(-1) });
+  addButton(row, { id: 'octUp', icon: 'up', title: 'OKT +', action: () => shiftOctave(1) });
+  addButton(row, { id: 'click', icon: 'click', title: 'CLICK', color: ENC[1], action: toggleMetronome, on: () => st.metronomeOn });
+  addButton(row, { id: 'hold', icon: 'hold', title: 'HOLD', color: ENC[2], action: toggleLatch, on: () => st.latch });
+  addButton(row, { id: 'album', icon: 'album', title: 'ALBUM', action: () => openDialog('album') });
+  addButton(row, { id: 'learn', icon: 'learn', title: 'LERNEN', color: ENC[0], action: () => learn.open(), on: () => learn.active });
+  addButton(row, { id: 'help', icon: 'help', title: 'HILFE', action: () => openDialog('help') });
 }
 
 const encEls = [];
@@ -620,7 +631,7 @@ function chipSpecs() {
     else if (st.page <= 1) c.push(['ENCODER ANTIPPEN = MUTE', () => {}]);
   } else {
     c.push(['MODUS ›', nextSeqKind, ENC[0]]);
-    if (st.seq.kind === SEQ.pattern) c.push(['PAUSE', () => setStep(S.cursor, -1)], ['ZUFALL', randomPattern], ['LEEREN', clearPattern, REC]);
+    if (st.seq.kind === SEQ.pattern) c.push(['PAUSE', restStep], ['ZUFALL', randomPattern], ['LEEREN', clearPattern, REC]);
     if (st.seq.kind === SEQ.arp || st.seq.kind === SEQ.euclid) c.push(['HOLD', toggleLatch, ENC[2], st.latch]);
   }
   return c;
@@ -652,7 +663,7 @@ function screenTap(ev) {
     const p = padRect(w, h);
     if (x < p.x || x > p.x + p.w || y < p.y || y > p.y + p.h) return;
     const kind = clamp(Math.floor((y - p.y) / (p.h / 2)) * 6 + Math.floor((x - p.x) / (p.w / 6)), 0, 11);
-    send({ t: 'on', n: baseNote() + 12 + kind, v: 0.9 });
+    send({ t: 'on', n: baseNote() + 12 + kind, v: 0.9 }); learn.onNote(baseNote() + 12 + kind);
     send({ t: 'off', n: baseNote() + 12 + kind });
   } else if (st.mode === 'mixer' && st.page <= 1) {
     const idx = Math.floor((x - w * 0.05) / (w * 0.18));
@@ -669,8 +680,9 @@ let scale = 1, pixelRatio = 0;
 
 function layout() {
   const sw = window.innerWidth, sh = window.innerHeight;
-  scale = Math.min(sw / 1200, sh / 700);
-  $('device').style.transform = `scale(${scale})`;
+  const height = learn.active ? 822 : 700; // im Lernmodus liegt der Coach über dem Gerät
+  scale = Math.min(sw / 1200, sh / height);
+  $('rig').style.transform = `scale(${scale})`;
   const pr = Math.min(3, Math.max(1, (window.devicePixelRatio || 1) * scale));
   if (pr !== pixelRatio) { pixelRatio = pr; screenCanvas.width = Math.round(600 * pr); screenCanvas.height = Math.round(222 * pr); }
 }
@@ -682,6 +694,7 @@ function frame(now) {
   requestAnimationFrame(frame);
   sctx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
   drawScreen(sctx, 600, 222, st, S, now / 1000, api);
+  learn.tick(now);
 
   for (let i = 0; i < 4; i++) {
     const f = info(i);
@@ -762,6 +775,7 @@ function setupAlbum() {
       a.href = URL.createObjectURL(blob); a.download = name; a.textContent = '⬇ ' + name;
       $('exports').prepend(a);
       msg('Mixdown fertig – antippen zum Speichern.');
+      learn.onEvent('exports');
     }
     bar.hidden = true; $('bounceBtn').disabled = false;
   });
@@ -793,6 +807,7 @@ function setupAlbum() {
     ['Tape', ['4 Spuren à 2 Minuten. Spur wählen mit 1–4 oder durch Antippen.', 'REC nimmt auf der gewählten Spur auf (Overdub). STOP im Stillstand spult zurück.', 'Encoder: SPEED (auch rückwärts), POSITION, LOOP IN, LOOP OUT – antippen setzt den Punkt an der aktuellen Position.', 'LIFT schneidet den Loop aus, DROP fügt ihn am Abspielkopf ein, UNDO nimmt den letzten Schritt zurück.']],
     ['Mixer', ['LEVEL und PAN je Spur, Encoder antippen = Mute.', 'M-FX: Effekt auf der Summe. MASTER: Lautstärke, Monitor, Tempo, Click.']],
     ['Sequencer', ['PATTERN: 16 Steps. Im Stillstand schreiben Tasten in den gewählten Step, beim Abspielen transponieren sie.', 'ARP: gehaltene Tasten werden arpeggiert. EUCLID: gehaltene Tasten spielen einen euklidischen Rhythmus.', 'HOLD hält Akkorde fest.']],
+    ['Lernen', ['Die Taste LERNEN öffnet 7 geführte Lektionen: erste Töne, Klang formen, Beat bauen, aufnehmen, Akkorde, mischen, Band-Tricks.', 'Der Coach erklärt jeden Schritt, markiert das Bedienelement und geht weiter, sobald du es gemacht hast.']],
     ['Tastatur', ['<kbd>A W S E D F T G Z H U J K O L P</kbd> Klaviertasten (deutsche Tastatur)', '<kbd>Y</kbd> / <kbd>X</kbd> Oktave runter / hoch · <kbd>Leertaste</kbd> Play/Stop · <kbd>R</kbd> Record', '<kbd>1</kbd>–<kbd>4</kbd> Seiten · <kbd>5</kbd> Synth · <kbd>6</kbd> Drum · <kbd>7</kbd> Tape · <kbd>8</kbd> Mixer · <kbd>9</kbd> Seq · <kbd>M</kbd> Click · <kbd>B</kbd> Hold', 'MIDI-Keyboards werden in Chrome und Edge automatisch erkannt.']],
     ['Als App installieren', ['iPad: Teilen-Symbol → „Zum Home-Bildschirm“.', 'Mac (Safari): Ablage → „Zum Dock hinzufügen“. Chrome: Installieren-Symbol in der Adressleiste.']],
   ];
@@ -811,13 +826,22 @@ function setupMIDI() {
 }
 function onMIDI(e) {
   const [status, a, b] = e.data, type = status & 0xf0;
-  if (type === 0x90 && b > 0) { pressed.add(a); send({ t: 'on', n: a, v: b / 127 }); }
+  if (type === 0x90 && b > 0) { pressed.add(a); send({ t: 'on', n: a, v: b / 127 }); learn.onNote(a); }
   else if (type === 0x80 || type === 0x90) { pressed.delete(a); send({ t: 'off', n: a }); }
   else if (type === 0xb0 && (a === 120 || a === 123)) send({ t: 'allOff' });
 }
 
 // ---------- Start ----------
 
+const learn = createLearn({
+  st, S: () => S, patch, baseNote, layout: () => layout(),
+  selectSlot: (i) => { st.slot = i; st.drumActive = false; if (st.mode === 'drum') st.mode = 'synth'; pushPatch(); },
+  selectMode, selectPage, setPattern,
+  setSeqKind: (k) => { if (st.seq.kind !== k) { st.seq.kind = k; send({ t: 'allOff' }); } if (st.latch && k < 2) st.latch = false; pushSeq(); },
+  setOctave: (o) => { st.octave = o; },
+  armTrack: (i) => { st.armedTrack = i; send({ t: 'arm', track: i }); },
+  stopAll: () => { if (st.isPlaying) stop(); send({ t: 'allOff' }); },
+});
 buildButtons(); buildEncoders(); buildSlots(); buildLegend(); buildKeyboard(); setupAlbum();
 layout();
 window.addEventListener('resize', layout);
@@ -857,19 +881,22 @@ $('vol').addEventListener('pointerdown', (ev) => {
   el.addEventListener('pointermove', move); el.addEventListener('pointerup', end); el.addEventListener('pointercancel', end);
 });
 
-$('startBtn').addEventListener('click', async () => {
+async function begin(withLessons) {
   $('startMsg').textContent = 'Lade Klangerzeugung…';
   try {
     await startAudio();
     $('start').hidden = true;
     setupMIDI();
+    if (withLessons) learn.firstOpen();
   } catch (err) {
     $('startMsg').textContent = 'Der Ton konnte nicht gestartet werden: ' + (err && err.message ? err.message : err);
   }
-});
+}
+$('startBtn').addEventListener('click', () => begin(false));
+$('startLearn').addEventListener('click', () => begin(true));
 
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
 requestAnimationFrame(frame);
 
 // Für Tests und zum Experimentieren in der Konsole
-window.kassette = { st, send, get S() { return S; }, selectMode, selectPage, selectSlot, turn, pressEncoder, play, stop, toggleRecord, noteOn, noteOff };
+window.kassette = { learn, st, send, get S() { return S; }, selectMode, selectPage, selectSlot, turn, pressEncoder, play, stop, toggleRecord, noteOn, noteOff };
