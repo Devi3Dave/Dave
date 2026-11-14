@@ -66,6 +66,21 @@ Werte im Display. **Ziehen = drehen, antippen = drücken.**
 | `5` `6` `7` `8` `9` | Synth · Drum · Tape · Mixer · Seq |
 | `M` / `B` | Click / Hold |
 
+## Lernmodus
+
+Die Taste **LERNEN** (oder „Musik machen lernen“ auf dem Startbildschirm) öffnet sieben geführte Lektionen:
+
+1. **Erste Töne** – Klaviatur, Oktaven, der erste Akkord
+2. **Klang formen** – Engine, Hüllkurve, Effekt, LFO
+3. **Dein erster Beat** – Kick, Snare, Hi-Hat im Step-Sequencer
+4. **Aufnehmen** – Beat und Bass auf zwei Bandspuren
+5. **Akkorde & Melodie** – Tonleiter, C · a-Moll · F · G, Arpeggiator
+6. **Mischen & Export** – Lautstärke, Panorama, Master-Effekt, WAV
+7. **Band-Tricks** – Loop, halbe Geschwindigkeit, rückwärts, Lift/Drop
+
+Ein Coach über dem Gerät erklärt jeden Schritt, markiert das passende Bedienelement und geht weiter,
+sobald der Schritt erledigt ist. Der Fortschritt wird im Browser gespeichert. Die Lektionen stehen in `web/learn.js`.
+
 ## Kurzanleitung: der erste Song
 
 1. **DRUM** wählen, **SEQ** → Modus **PATTERN**, mit Tasten Steps eintragen (oder ZUFALL).

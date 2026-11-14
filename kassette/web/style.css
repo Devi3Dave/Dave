@@ -14,7 +14,8 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 
 #stage { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
   padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
-#device { width: 1200px; height: 700px; flex: none; transform-origin: center; padding: 24px; display: flex; flex-direction: column; gap: 18px;
+#rig { flex: none; width: 1200px; transform-origin: center; display: flex; flex-direction: column; gap: 12px; }
+#device { width: 1200px; height: 700px; flex: none; padding: 24px; display: flex; flex-direction: column; gap: 18px;
   border-radius: 34px; background: linear-gradient(var(--body), #cdcdc8); border: 1px solid rgba(255,255,255,.6);
   box-shadow: 0 14px 40px rgba(0,0,0,.55); }
 
@@ -66,7 +67,7 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 
 #buttons { display: flex; gap: 6px; height: 62px; flex: none; align-items: center; }
 #buttons .gap { flex: 1; min-width: 12px; }
-.hw { width: 54px; height: 58px; border: 0; border-radius: 11px; background: var(--btn); box-shadow: 0 2px 3px rgba(0,0,0,.22); cursor: pointer; position: relative;
+.hw { width: 51px; height: 58px; border: 0; border-radius: 11px; background: var(--btn); box-shadow: 0 2px 3px rgba(0,0,0,.22); cursor: pointer; position: relative;
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 6px 0 0; color: rgba(41,41,46,.82); font-weight: 700; flex: none; }
 .hw::before { content: ""; position: absolute; top: 5px; left: 50%; width: 18px; height: 3px; margin-left: -9px; border-radius: 2px; background: rgba(0,0,0,.08); }
 .hw svg { width: 19px; height: 19px; fill: currentColor; }
@@ -96,6 +97,7 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 .startcard b { font-size: 34px; font-weight: 900; letter-spacing: 6px; }
 .startcard small { font-size: 11px; font-weight: 700; opacity: .6; letter-spacing: 2px; }
 .startcard button { margin-top: 26px; border: 0; border-radius: 99px; padding: 16px 44px; font-size: 20px; font-weight: 800; background: var(--e0); color: #fff; cursor: pointer; }
+.startcard button.second { margin-top: 12px; padding: 12px 28px; font-size: 16px; background: rgba(255,255,255,.14); }
 .startcard p { font-size: 13px; opacity: .7; max-width: 320px; }
 
 dialog { border: 0; border-radius: 18px; padding: 22px; width: min(520px, 92vw); max-height: 88vh; background: #2a2a2e; color: #f2f2f2; font-family: system-ui, -apple-system, sans-serif;
@@ -114,3 +116,44 @@ dialog .msg { font-size: 14px; color: var(--e2); min-height: 18px; }
 #helpBody li { margin-bottom: 4px; }
 #helpBody ul { padding-left: 18px; margin: 0; }
 kbd { background: #1c1c1f; border-radius: 4px; padding: 1px 5px; font: 12px var(--mono); }
+
+/* ---------- Lernmodus ---------- */
+#coach { height: 110px; flex: none; display: flex; gap: 20px; align-items: center; padding: 14px 20px; border-radius: 22px; background: #2a2a2e; color: #f4f4f1;
+  border: 2px solid var(--e0); box-shadow: 0 8px 24px rgba(0,0,0,.4); transition: border-color .2s, background .2s; }
+#coach[hidden] { display: none; }
+#coach.ok { border-color: var(--play); background: #24352c; }
+.cmain { flex: 1; min-width: 0; }
+#coachTitle { font-size: 11px; font-weight: 800; letter-spacing: 1.5px; color: var(--e0); }
+#coach.ok #coachTitle { color: var(--play); }
+#coach.ok #coachTitle::after { content: "  ✓ RICHTIG"; }
+#coachText { margin: 6px 0 0; font: 500 17px/1.35 system-ui, -apple-system, sans-serif; }
+#coachText b { color: var(--e1); font-weight: 700; }
+.cside { display: flex; flex-direction: column; align-items: flex-end; gap: 10px; flex: none; }
+#coachDots { display: flex; gap: 5px; }
+#coachDots i { width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,.18); }
+#coachDots i.d { background: var(--play); }
+#coachDots i.c { background: var(--e0); }
+.cbtns { display: flex; gap: 6px; }
+.cbtns button { border: 0; border-radius: 10px; height: 38px; min-width: 38px; padding: 0 12px; background: rgba(255,255,255,.12); color: #fff; font-size: 14px; font-weight: 700; cursor: pointer; }
+.cbtns button:disabled { opacity: .3; }
+#coachSkip { background: var(--e0); }
+#coach.ok #coachSkip { background: var(--play); }
+
+.hl { animation: hl 1s ease-in-out infinite; position: relative; z-index: 5; }
+.key.w.hl { z-index: 1; }
+.key.b.hl { z-index: 6; }
+@keyframes hl {
+  0%, 100% { box-shadow: 0 0 0 3px var(--e0), 0 0 0 3px rgba(250,107,84,.5); }
+  50% { box-shadow: 0 0 0 3px var(--e0), 0 0 0 12px rgba(250,107,84,0); }
+}
+.key.hl { position: absolute; }
+.enc.hl { border-radius: 16px; }
+.screenwrap.hl { position: static; }
+
+#lessonList { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; max-height: 56vh; overflow: auto; }
+dialog .lesson { display: flex; align-items: center; gap: 14px; text-align: left; margin: 0; padding: 12px 14px; background: #38383d; width: 100%; }
+.lesson b { width: 34px; height: 34px; border-radius: 50%; background: var(--e0); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 16px; flex: none; }
+.lesson.done b { background: var(--play); }
+.lesson span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.lesson strong { font-size: 16px; }
+.lesson small { font-size: 12px; opacity: .65; line-height: 1.3; }

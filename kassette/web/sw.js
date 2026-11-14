@@ -1,6 +1,6 @@
 // Offline-Unterstützung: Netz zuerst (immer aktuelle Version), sonst aus dem Cache.
-const CACHE = 'kassette-v1';
-const FILES = ['./', 'index.html', 'style.css', 'app.js', 'screen.js', 'meta.js', 'dsp.js', 'worklet.js', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'icon-180.png'];
+const CACHE = 'kassette-v2';
+const FILES = ['./', 'index.html', 'style.css', 'app.js', 'screen.js', 'meta.js', 'dsp.js', 'learn.js', 'worklet.js', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'icon-180.png'];
 
 self.addEventListener('install', (e) => { e.waitUntil(caches.open(CACHE).then((c) => c.addAll(FILES)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', (e) => {

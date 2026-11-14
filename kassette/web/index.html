@@ -17,6 +17,22 @@
 </head>
 <body>
 <div id="stage">
+ <div id="rig">
+  <div id="coach" hidden>
+    <div class="cmain">
+      <small id="coachTitle"></small>
+      <p id="coachText"></p>
+    </div>
+    <div class="cside">
+      <div id="coachDots"></div>
+      <div class="cbtns">
+        <button id="coachBack" title="Schritt zurück">‹</button>
+        <button id="coachSkip">Überspringen ›</button>
+        <button id="coachMenu" title="Lektionen">☰</button>
+        <button id="coachQuit" title="Lernmodus beenden">✕</button>
+      </div>
+    </div>
+  </div>
   <div id="device">
     <div class="top">
       <div class="left">
@@ -48,6 +64,7 @@
       <div id="keyboard"></div>
     </div>
   </div>
+ </div>
 </div>
 
 <div id="start">
@@ -55,6 +72,7 @@
     <b>KASSETTE</b>
     <small>4-TRACK SYNTH STUDIO</small>
     <button id="startBtn">▶ Starten</button>
+    <button id="startLearn" class="second">🎓 Musik machen lernen</button>
     <p id="startMsg">Tippe auf Starten, um den Ton einzuschalten.</p>
   </div>
 </div>
@@ -81,6 +99,13 @@
   </section>
   <p id="albumMsg" class="msg"></p>
   <button class="close" data-close>Fertig</button>
+</dialog>
+
+<dialog id="learn">
+  <h2>Musik machen lernen</h2>
+  <p class="hint">Sieben kurze Lektionen führen dich Schritt für Schritt zum ersten eigenen Song. Der Coach markiert, was du drücken sollst, und geht weiter, sobald es geklappt hat.</p>
+  <div id="lessonList"></div>
+  <button class="close" data-close>Schließen</button>
 </dialog>
 
 <dialog id="help">
